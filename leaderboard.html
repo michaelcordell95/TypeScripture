@@ -69,13 +69,13 @@
     </div>
     <div class="content">
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('verse')">&#127963; Verse Scores</button>
-            <button class="tab" onclick="switchTab('bible')">&#128214; Bible Completion</button>
+            <button class="tab active" onclick="switchTab('bible')">&#128214; Bible Completion</button>
+            <button class="tab" onclick="switchTab('verse')">&#127963; Verse Scores</button>
             <button class="tab" onclick="switchTab('personal')">&#128100; My Stats</button>
         </div>
 
         <!-- VERSE SCORES TAB -->
-        <div id="tab-verse">
+        <div id="tab-verse" style="display:none;">
             <div class="browse-row">
                 <select id="lb-book" onchange="onBookChange()"></select>
                 <select id="lb-chapter" onchange="onChapterChange()"></select>
@@ -91,7 +91,7 @@
         </div>
 
         <!-- BIBLE COMPLETION TAB -->
-        <div id="tab-bible" style="display:none;">
+        <div id="tab-bible">
             <div class="lb-panel">
                 <div class="lb-header">
                     <h3>Global Bible Completion</h3>
@@ -138,13 +138,13 @@
                 currentUserId = session.user.id;
                 const { data } = await supabaseClient.from('profiles').select('username').eq('id', currentUserId).maybeSingle();
                 currentUsername = data ? data.username : session.user.email;
-                document.getElementById('user-display').innerText = '&#10003; ' + currentUsername;
+                document.getElementById('user-display').innerText = '✓ ' + currentUsername;
             }
         }
 
         function switchTab(tab) {
             var tabs = document.querySelectorAll('.tab');
-            var tabNames = ['verse', 'bible', 'personal'];
+            var tabNames = ['bible', 'verse', 'personal'];
             tabs.forEach(function(t, i) { t.classList.toggle('active', tabNames[i] === tab); });
             document.getElementById('tab-verse').style.display = tab === 'verse' ? 'block' : 'none';
             document.getElementById('tab-bible').style.display = tab === 'bible' ? 'block' : 'none';
@@ -341,7 +341,7 @@
             }
         }
 
-        init();
+        init().then(function() { loadBibleCompletionLeaderboard(); });
     </script>
 </body>
 </html>
