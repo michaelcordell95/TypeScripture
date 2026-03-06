@@ -70,40 +70,29 @@
     <div class="content">
         <div class="tabs">
             <button class="tab active" onclick="switchTab('bible')">&#128214; Bible Completion</button>
-            <button class="tab" onclick="switchTab('book')">&#128218; Book Scores</button>
-            <button class="tab" onclick="switchTab('verse')">&#127963; Verse Scores</button>
+            <button class="tab" onclick="switchTab('scores')">&#127963; Scores</button>
             <button class="tab" onclick="switchTab('personal')">&#128100; My Stats</button>
         </div>
 
-        <!-- BOOK SCORES TAB -->
-        <div id="tab-book" style="display:none;">
+        <!-- SCORES TAB -->
+        <div id="tab-scores" style="display:none;">
             <div class="browse-row">
-                <select id="book-lb-select" onchange="loadBookLeaderboard()">
+                <select id="scores-book" onchange="onScoresBookChange()">
                     <option value="">&#8212; Select Book &#8212;</option>
+                </select>
+                <select id="scores-chapter" onchange="onScoresChapterChange()">
+                    <option value="">&#8212; Chapter &#8212;</option>
+                </select>
+                <select id="scores-verse" onchange="onScoresVerseChange()">
+                    <option value="">&#8212; Verse &#8212;</option>
                 </select>
             </div>
             <div class="lb-panel">
                 <div class="lb-header">
-                    <h3 id="book-lb-title">Select a book to see scores</h3>
-                    <span id="book-lb-count"></span>
+                    <h3 id="scores-title">Select a book to see scores</h3>
+                    <span id="scores-count"></span>
                 </div>
-                <div id="book-lb-body"><div class="loading">Select a book above</div></div>
-            </div>
-        </div>
-
-        <!-- VERSE SCORES TAB -->
-        <div id="tab-verse" style="display:none;">
-            <div class="browse-row">
-                <select id="lb-book" onchange="onBookChange()"></select>
-                <select id="lb-chapter" onchange="onChapterChange()"></select>
-                <select id="lb-verse" onchange="loadVerseLeaderboard()"></select>
-            </div>
-            <div class="lb-panel">
-                <div class="lb-header">
-                    <h3 id="lb-title">Select a verse to see scores</h3>
-                    <span id="lb-count"></span>
-                </div>
-                <div id="lb-body"><div class="loading">Select a book, chapter, and verse above</div></div>
+                <div id="scores-body"><div class="loading">Select a book above</div></div>
             </div>
         </div>
 
@@ -163,21 +152,21 @@
 
         function switchTab(tab) {
             var tabs = document.querySelectorAll('.tab');
-            var tabNames = ['bible', 'book', 'verse', 'personal'];
+            var tabNames = ['bible', 'scores', 'personal'];
             tabs.forEach(function(t, i) { t.classList.toggle('active', tabNames[i] === tab); });
             document.getElementById('tab-bible').style.display = tab === 'bible' ? 'block' : 'none';
-            document.getElementById('tab-book').style.display = tab === 'book' ? 'block' : 'none';
-            document.getElementById('tab-verse').style.display = tab === 'verse' ? 'block' : 'none';
+            document.getElementById('tab-scores').style.display = tab === 'scores' ? 'block' : 'none';
             document.getElementById('tab-personal').style.display = tab === 'personal' ? 'block' : 'none';
             if (tab === 'bible') loadBibleCompletionLeaderboard();
-            if (tab === 'book') populateBookLbSelect();
+            if (tab === 'scores') populateScoresBookSelect();
             if (tab === 'personal') loadPersonalStats();
         }
 
         // ===== VERSE SCORES TAB =====
-        function populateBookSelect() {
-            var sel = document.getElementById('lb-book');
-            sel.innerHTML = '<option value="">&#8212; Select Book &#8212;</option>';
+        // ===== UNIFIED SCORES TAB =====
+        function populateScoresBookSelect() {
+            var sel = document.getElementById('scores-book');
+            if (sel.options.length > 1) return;
             books.forEach(function(b) {
                 var opt = document.createElement('option');
                 opt.value = b; opt.innerText = b;
@@ -185,89 +174,170 @@
             });
         }
 
-        function onBookChange() {
-            var book = document.getElementById('lb-book').value;
-            var chapSel = document.getElementById('lb-chapter');
-            var verseSel = document.getElementById('lb-verse');
+        function onScoresBookChange() {
+            var book = document.getElementById('scores-book').value;
+            var chapSel = document.getElementById('scores-chapter');
+            var verseSel = document.getElementById('scores-verse');
             chapSel.innerHTML = '<option value="">&#8212; Chapter &#8212;</option>';
             verseSel.innerHTML = '<option value="">&#8212; Verse &#8212;</option>';
-            document.getElementById('lb-body').innerHTML = '<div class="loading">Select a chapter and verse</div>';
-            document.getElementById('lb-title').innerText = 'Select a verse to see scores';
-            document.getElementById('lb-count').innerText = '';
-            if (!book) return;
+            document.getElementById('scores-count').innerText = '';
+            if (!book) {
+                document.getElementById('scores-title').innerText = 'Select a book to see scores';
+                document.getElementById('scores-body').innerHTML = '<div class="loading">Select a book above</div>';
+                return;
+            }
             var count = chapCounts[books.indexOf(book)];
             for (var i = 1; i <= count; i++) {
                 var opt = document.createElement('option');
                 opt.value = i; opt.innerText = 'Chapter ' + i;
                 chapSel.appendChild(opt);
             }
+            loadScoresLeaderboard();
         }
 
-        function onChapterChange() {
-            var book = document.getElementById('lb-book').value;
-            var chap = parseInt(document.getElementById('lb-chapter').value);
-            var verseSel = document.getElementById('lb-verse');
+        function onScoresChapterChange() {
+            var book = document.getElementById('scores-book').value;
+            var chap = parseInt(document.getElementById('scores-chapter').value);
+            var verseSel = document.getElementById('scores-verse');
             verseSel.innerHTML = '<option value="">&#8212; Verse &#8212;</option>';
-            document.getElementById('lb-body').innerHTML = '<div class="loading">Select a verse</div>';
-            if (!book || !chap) return;
+            if (!book || !chap) { loadScoresLeaderboard(); return; }
             var count = (verseCounts[book] && verseCounts[book][chap - 1]) || 30;
             for (var i = 1; i <= count; i++) {
                 var opt = document.createElement('option');
                 opt.value = i; opt.innerText = 'Verse ' + i;
                 verseSel.appendChild(opt);
             }
+            loadScoresLeaderboard();
         }
 
-        async function loadVerseLeaderboard() {
-            var book = document.getElementById('lb-book').value;
-            var chap = parseInt(document.getElementById('lb-chapter').value);
-            var verse = parseInt(document.getElementById('lb-verse').value);
-            if (!book || !chap || !verse) return;
+        function onScoresVerseChange() {
+            loadScoresLeaderboard();
+        }
 
-            document.getElementById('lb-title').innerText = book + ' ' + chap + ':' + verse;
-            document.getElementById('lb-body').innerHTML = '<div class="loading">Loading scores...</div>';
+        async function loadScoresLeaderboard() {
+            var book = document.getElementById('scores-book').value;
+            var chap = parseInt(document.getElementById('scores-chapter').value) || 0;
+            var verse = parseInt(document.getElementById('scores-verse').value) || 0;
+            if (!book) return;
+
+            document.getElementById('scores-body').innerHTML = '<div class="loading">Loading scores...</div>';
+            document.getElementById('scores-count').innerText = '';
 
             try {
-                var result = await supabaseClient
-                    .from('verse_progress')
-                    .select('user_id, best_wpm')
-                    .eq('book_name', book)
-                    .eq('chapter_num', chap)
-                    .eq('verse_num', verse)
-                    .gt('best_wpm', 0)
-                    .order('best_wpm', { ascending: false })
-                    .limit(25);
+                if (verse && chap) {
+                    // ===== VERSE level: best WPM =====
+                    document.getElementById('scores-title').innerText = book + ' ' + chap + ':' + verse;
+                    var result = await supabaseClient
+                        .from('verse_progress')
+                        .select('user_id, best_wpm')
+                        .eq('book_name', book).eq('chapter_num', chap).eq('verse_num', verse)
+                        .gt('best_wpm', 0).order('best_wpm', { ascending: false }).limit(50);
+                    if (result.error) throw result.error;
+                    var data = result.data || [];
+                    if (data.length === 0) {
+                        document.getElementById('scores-body').innerHTML = '<div class="empty">No scores yet &#8212; be the first!</div>';
+                        return;
+                    }
+                    var userIds = data.map(function(r) { return r.user_id; });
+                    var profResult = await supabaseClient.from('profiles').select('id, username').in('id', userIds);
+                    var usernameMap = {};
+                    (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+                    document.getElementById('scores-count').innerText = data.length + ' score' + (data.length !== 1 ? 's' : '');
+                    var rows = data.map(function(row, i) {
+                        var rank = i + 1;
+                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                        var username = usernameMap[row.user_id] || 'Anonymous';
+                        var isYou = row.user_id === currentUserId;
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span></td></tr>';
+                    }).join('');
+                    document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Best WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
 
-                if (result.error) throw result.error;
-                var data = result.data;
+                } else if (chap) {
+                    // ===== CHAPTER level: avg WPM for 100% completers =====
+                    document.getElementById('scores-title').innerText = book + ' — Chapter ' + chap;
+                    var chapVerseTotal = (verseCounts[book] && verseCounts[book][chap - 1]) || 0;
+                    var result = await supabaseClient
+                        .from('verse_progress')
+                        .select('user_id, best_wpm')
+                        .eq('book_name', book).eq('chapter_num', chap);
+                    if (result.error) throw result.error;
+                    var userData = {};
+                    (result.data || []).forEach(function(r) {
+                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0 };
+                        userData[r.user_id].count++;
+                        if (r.best_wpm > 0) { userData[r.user_id].totalWpm += r.best_wpm; userData[r.user_id].scoredVerses++; }
+                    });
+                    var completers = Object.keys(userData).filter(function(uid) { return userData[uid].count >= chapVerseTotal; });
+                    if (completers.length === 0) {
+                        document.getElementById('scores-body').innerHTML = '<div class="empty">Nobody has completed 100% of this chapter yet &#8212; be the first!</div>';
+                        return;
+                    }
+                    completers.sort(function(a, b) {
+                        var avgA = userData[a].scoredVerses > 0 ? userData[a].totalWpm / userData[a].scoredVerses : 0;
+                        var avgB = userData[b].scoredVerses > 0 ? userData[b].totalWpm / userData[b].scoredVerses : 0;
+                        return avgB - avgA;
+                    });
+                    completers = completers.slice(0, 50);
+                    var profResult = await supabaseClient.from('profiles').select('id, username').in('id', completers);
+                    var usernameMap = {};
+                    (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+                    document.getElementById('scores-count').innerText = completers.length + ' completion' + (completers.length !== 1 ? 's' : '');
+                    var rows = completers.map(function(userId, i) {
+                        var rank = i + 1;
+                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                        var username = usernameMap[userId] || 'Anonymous';
+                        var isYou = userId === currentUserId;
+                        var avg = userData[userId].scoredVerses > 0 ? Math.round(userData[userId].totalWpm / userData[userId].scoredVerses) : 0;
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span></td></tr>';
+                    }).join('');
+                    document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Avg WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
 
-                if (!data || data.length === 0) {
-                    document.getElementById('lb-count').innerText = '';
-                    document.getElementById('lb-body').innerHTML = '<div class="empty">No scores yet for this verse &#8212; be the first!</div>';
-                    return;
+                } else {
+                    // ===== BOOK level: avg WPM for 100% completers =====
+                    document.getElementById('scores-title').innerText = book;
+                    var bookVerseTotal = (verseCounts[book] || []).reduce(function(sum, v) { return sum + v; }, 0);
+                    var result = await supabaseClient
+                        .from('verse_progress')
+                        .select('user_id, best_wpm')
+                        .eq('book_name', book);
+                    if (result.error) throw result.error;
+                    var userData = {};
+                    (result.data || []).forEach(function(r) {
+                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0 };
+                        userData[r.user_id].count++;
+                        if (r.best_wpm > 0) { userData[r.user_id].totalWpm += r.best_wpm; userData[r.user_id].scoredVerses++; }
+                    });
+                    var completers = Object.keys(userData).filter(function(uid) { return userData[uid].count >= bookVerseTotal; });
+                    if (completers.length === 0) {
+                        document.getElementById('scores-body').innerHTML = '<div class="empty">Nobody has completed 100% of ' + book + ' yet &#8212; be the first!</div>';
+                        return;
+                    }
+                    completers.sort(function(a, b) {
+                        var avgA = userData[a].scoredVerses > 0 ? userData[a].totalWpm / userData[a].scoredVerses : 0;
+                        var avgB = userData[b].scoredVerses > 0 ? userData[b].totalWpm / userData[b].scoredVerses : 0;
+                        return avgB - avgA;
+                    });
+                    completers = completers.slice(0, 50);
+                    var profResult = await supabaseClient.from('profiles').select('id, username').in('id', completers);
+                    var usernameMap = {};
+                    (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+                    document.getElementById('scores-count').innerText = completers.length + ' completion' + (completers.length !== 1 ? 's' : '');
+                    var rows = completers.map(function(userId, i) {
+                        var rank = i + 1;
+                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                        var username = usernameMap[userId] || 'Anonymous';
+                        var isYou = userId === currentUserId;
+                        var avg = userData[userId].scoredVerses > 0 ? Math.round(userData[userId].totalWpm / userData[userId].scoredVerses) : 0;
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span></td></tr>';
+                    }).join('');
+                    document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Avg WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
                 }
-
-                var userIds = data.map(function(r) { return r.user_id; });
-                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', userIds);
-                var usernameMap = {};
-                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
-
-                document.getElementById('lb-count').innerText = data.length + ' score' + (data.length !== 1 ? 's' : '');
-
-                var rows = data.map(function(row, i) {
-                    var rank = i + 1;
-                    var username = usernameMap[row.user_id] || 'Anonymous';
-                    var isYou = row.user_id === currentUserId;
-                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
-                    var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
-                    return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span></td></tr>';
-                }).join('');
-
-                document.getElementById('lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
-
             } catch(err) {
-                console.error('Leaderboard error:', err);
-                document.getElementById('lb-body').innerHTML = '<div class="empty">Error loading scores.</div>';
+                console.error('Scores leaderboard error:', err);
+                document.getElementById('scores-body').innerHTML = '<div class="empty">Error loading scores.</div>';
             }
         }
 
@@ -400,85 +470,8 @@
         }
 
 
-        function populateBookLbSelect() {
-            var sel = document.getElementById('book-lb-select');
-            if (sel.options.length > 1) return;
-            books.forEach(function(b) {
-                var opt = document.createElement('option');
-                opt.value = b; opt.innerText = b;
-                sel.appendChild(opt);
-            });
-        }
 
-        async function loadBookLeaderboard() {
-            var book = document.getElementById('book-lb-select').value;
-            if (!book) return;
-            var bookVerseTotal = (verseCounts[book] || []).reduce(function(sum, v) { return sum + v; }, 0);
-            document.getElementById('book-lb-title').innerText = book;
-            document.getElementById('book-lb-body').innerHTML = '<div class="loading">Loading scores...</div>';
-            try {
-                // Fetch all verse progress for this book with WPM scores
-                var result = await supabaseClient
-                    .from('verse_progress')
-                    .select('user_id, best_wpm')
-                    .eq('book_name', book)
-                    .eq('completed', true);
-                if (result.error) throw result.error;
-
-                // Group by user: count verses and sum WPM
-                var userData = {};
-                (result.data || []).forEach(function(r) {
-                    if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0 };
-                    userData[r.user_id].count++;
-                    if (r.best_wpm > 0) {
-                        userData[r.user_id].totalWpm += r.best_wpm;
-                        userData[r.user_id].scoredVerses++;
-                    }
-                });
-
-                // Only keep users who completed 100% of the book
-                var completers = Object.keys(userData).filter(function(uid) {
-                    return userData[uid].count >= bookVerseTotal;
-                });
-
-                if (completers.length === 0) {
-                    document.getElementById('book-lb-count').innerText = '';
-                    document.getElementById('book-lb-body').innerHTML = '<div class="empty">Nobody has completed 100% of ' + book + ' yet &#8212; be the first!</div>';
-                    return;
-                }
-
-                // Sort by average WPM descending
-                completers.sort(function(a, b) {
-                    var avgA = userData[a].scoredVerses > 0 ? userData[a].totalWpm / userData[a].scoredVerses : 0;
-                    var avgB = userData[b].scoredVerses > 0 ? userData[b].totalWpm / userData[b].scoredVerses : 0;
-                    return avgB - avgA;
-                });
-                completers = completers.slice(0, 50);
-
-                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', completers);
-                var usernameMap = {};
-                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
-
-                document.getElementById('book-lb-count').innerText = completers.length + ' completion' + (completers.length !== 1 ? 's' : '');
-
-                var rows = completers.map(function(userId, i) {
-                    var rank = i + 1;
-                    var username = usernameMap[userId] || 'Anonymous';
-                    var isYou = userId === currentUserId;
-                    var avg = userData[userId].scoredVerses > 0 ? Math.round(userData[userId].totalWpm / userData[userId].scoredVerses) : 0;
-                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
-                    var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
-                    return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span></td></tr>';
-                }).join('');
-
-                document.getElementById('book-lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Avg WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
-            } catch(err) {
-                console.error('Book leaderboard error:', err);
-                document.getElementById('book-lb-body').innerHTML = '<div class="empty">Error loading scores.</div>';
-            }
-        }
-
-        init().then(function() { loadBibleCompletionLeaderboard(); });
+        init()        init().then(function() { loadBibleCompletionLeaderboard(); });
     </script>
 </body>
 </html>
