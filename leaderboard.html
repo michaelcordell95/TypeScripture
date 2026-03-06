@@ -92,6 +92,12 @@
                     <h3 id="scores-title">Select a book to see scores</h3>
                     <span id="scores-count"></span>
                 </div>
+                <div id="scores-personal" style="display:none; padding:10px 20px; font-size:13px; color:var(--text-muted); border-bottom:1px solid #30363d;">
+                    <span id="scores-personal-text"></span>
+                    <div style="margin-top:6px; background:#21262d; border-radius:4px; height:6px; width:100%;">
+                        <div id="scores-personal-bar" style="height:100%; border-radius:4px; background:linear-gradient(90deg,#2ea043,var(--accent)); width:0%; transition:width 0.5s;"></div>
+                    </div>
+                </div>
                 <div id="scores-body"><div class="loading">Select a book above</div></div>
             </div>
         </div>
@@ -163,6 +169,18 @@
 
         // ===== VERSE SCORES TAB =====
         // ===== UNIFIED SCORES TAB =====
+        function showPersonalStat(label, done, total) {
+            var el = document.getElementById('scores-personal');
+            var textEl = document.getElementById('scores-personal-text');
+            var barEl = document.getElementById('scores-personal-bar');
+            if (!currentUserId || total === 0) { el.style.display = 'none'; return; }
+            var pct = (done / total) * 100;
+            var displayPct = pct < 0.1 ? pct.toFixed(3) : pct < 1 ? pct.toFixed(2) : Math.round(pct);
+            textEl.innerHTML = 'Your completion: <span style="color:var(--accent);font-weight:700;">' + displayPct + '%</span> <span style="font-size:11px;">(' + done + '/' + total + ' ' + label + ')</span>';
+            barEl.style.width = Math.max(pct, 0.3) + '%';
+            el.style.display = 'block';
+        }
+
         function populateScoresBookSelect() {
             var sel = document.getElementById('scores-book');
             if (sel.options.length > 1) return;
@@ -183,6 +201,7 @@
             if (!book) {
                 document.getElementById('scores-title').innerText = 'Select a book to see scores';
                 document.getElementById('scores-body').innerHTML = '<div class="loading">Select a book above</div>';
+                document.getElementById('scores-personal').style.display = 'none';
                 return;
             }
             var count = chapCounts[books.indexOf(book)];
@@ -226,6 +245,7 @@
                 if (verse && chap) {
                     // ===== VERSE level: best WPM =====
                     document.getElementById('scores-title').innerText = book + ' ' + chap + ':' + verse;
+                    document.getElementById('scores-personal').style.display = 'none';
                     var result = await supabaseClient
                         .from('verse_progress')
                         .select('user_id, best_wpm')
@@ -268,6 +288,8 @@
                         if (r.best_wpm > 0) { userData[r.user_id].totalWpm += r.best_wpm; userData[r.user_id].scoredVerses++; }
                     });
                     var completers = Object.keys(userData).filter(function(uid) { return userData[uid].count >= chapVerseTotal; });
+                    var myCount = currentUserId && userData[currentUserId] ? userData[currentUserId].count : 0;
+                    showPersonalStat('verses', myCount, chapVerseTotal);
                     if (completers.length === 0) {
                         document.getElementById('scores-body').innerHTML = '<div class="empty">Nobody has completed 100% of this chapter yet &#8212; be the first!</div>';
                         return;
@@ -309,6 +331,8 @@
                         if (r.best_wpm > 0) { userData[r.user_id].totalWpm += r.best_wpm; userData[r.user_id].scoredVerses++; }
                     });
                     var completers = Object.keys(userData).filter(function(uid) { return userData[uid].count >= bookVerseTotal; });
+                    var myCount = currentUserId && userData[currentUserId] ? userData[currentUserId].count : 0;
+                    showPersonalStat('verses', myCount, bookVerseTotal);
                     if (completers.length === 0) {
                         document.getElementById('scores-body').innerHTML = '<div class="empty">Nobody has completed 100% of ' + book + ' yet &#8212; be the first!</div>';
                         return;
