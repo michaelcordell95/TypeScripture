@@ -340,8 +340,9 @@
             try {
                 var result = await supabaseClient
                     .from('verse_progress')
-                    .select('book_name, chapter_num, best_wpm')
-                    .eq('user_id', currentUserId);
+                    .select('book_name, chapter_num, verse_num, best_wpm')
+                    .eq('user_id', currentUserId)
+                    .eq('completed', true);
 
                 if (result.error) throw result.error;
                 var completed = result.data || [];
@@ -352,25 +353,40 @@
                 var pct = (completed.length / TOTAL_VERSES_BIBLE) * 100;
                 var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
 
-                // Count fully completed books and chapters
-                var bookVerseCounts = {};
-                var chapterVerseCounts = {};
+                // Build a set of completed verse keys for exact matching
+                var completedKeys = {};
                 completed.forEach(function(r) {
-                    bookVerseCounts[r.book_name] = (bookVerseCounts[r.book_name] || 0) + 1;
-                    var chapKey = r.book_name + '|' + r.chapter_num;
-                    chapterVerseCounts[chapKey] = (chapterVerseCounts[chapKey] || 0) + 1;
+                    var key = r.book_name + '|' + r.chapter_num + '|' + r.verse_num;
+                    completedKeys[key] = true;
                 });
-                var booksCompleted = Object.keys(bookVerseCounts).filter(function(b) {
-                    var total = (verseCounts[b] || []).reduce(function(s, v) { return s + v; }, 0);
-                    return total > 0 && bookVerseCounts[b] >= total;
+
+                // Count fully completed books
+                var booksCompleted = books.filter(function(book) {
+                    var chapters = verseCounts[book];
+                    if (!chapters) return false;
+                    for (var c = 0; c < chapters.length; c++) {
+                        for (var v = 1; v <= chapters[c]; v++) {
+                            if (!completedKeys[book + '|' + (c + 1) + '|' + v]) return false;
+                        }
+                    }
+                    return true;
                 }).length;
+
+                // Count fully completed chapters
                 var totalChapters = 1189;
-                var chaptersCompleted = Object.keys(chapterVerseCounts).filter(function(key) {
-                    var parts = key.split('|');
-                    var book = parts[0]; var chap = parseInt(parts[1]) - 1;
-                    var total = verseCounts[book] && verseCounts[book][chap];
-                    return total > 0 && chapterVerseCounts[key] >= total;
-                }).length;
+                var chaptersCompleted = 0;
+                books.forEach(function(book) {
+                    var chapters = verseCounts[book];
+                    if (!chapters) return;
+                    for (var c = 0; c < chapters.length; c++) {
+                        var chapNum = c + 1;
+                        var allDone = true;
+                        for (var v = 1; v <= chapters[c]; v++) {
+                            if (!completedKeys[book + '|' + chapNum + '|' + v]) { allDone = false; break; }
+                        }
+                        if (allDone) chaptersCompleted++;
+                    }
+                });
 
                 document.getElementById('stat-completion').innerText = displayPct;
                 document.getElementById('stat-verses').innerText = completed.length.toLocaleString();
