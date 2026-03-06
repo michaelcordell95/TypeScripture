@@ -26,7 +26,7 @@
         .tab:hover { color: var(--text-main); }
         .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
         .content { max-width: 1000px; margin: 0 auto; }
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
         .stat-card { background: var(--panel-bg); border: 1px solid #30363d; border-radius: 10px; padding: 16px; text-align: center; }
         .stat-card .value { font-size: 26px; font-weight: 800; color: var(--accent); }
         .stat-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; letter-spacing: 0.5px; }
@@ -70,8 +70,25 @@
     <div class="content">
         <div class="tabs">
             <button class="tab active" onclick="switchTab('bible')">&#128214; Bible Completion</button>
+            <button class="tab" onclick="switchTab('book')">&#128218; Book Scores</button>
             <button class="tab" onclick="switchTab('verse')">&#127963; Verse Scores</button>
             <button class="tab" onclick="switchTab('personal')">&#128100; My Stats</button>
+        </div>
+
+        <!-- BOOK SCORES TAB -->
+        <div id="tab-book" style="display:none;">
+            <div class="browse-row">
+                <select id="book-lb-select" onchange="loadBookLeaderboard()">
+                    <option value="">&#8212; Select Book &#8212;</option>
+                </select>
+            </div>
+            <div class="lb-panel">
+                <div class="lb-header">
+                    <h3 id="book-lb-title">Select a book to see scores</h3>
+                    <span id="book-lb-count"></span>
+                </div>
+                <div id="book-lb-body"><div class="loading">Select a book above</div></div>
+            </div>
         </div>
 
         <!-- VERSE SCORES TAB -->
@@ -110,6 +127,8 @@
                 <div class="stats-grid">
                     <div class="stat-card"><div class="value" id="stat-completion">0%</div><div class="label">Bible Completion</div></div>
                     <div class="stat-card"><div class="value" id="stat-verses">0</div><div class="label">Verses Completed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-books">0</div><div class="label">Books Completed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-chapters">0</div><div class="label">Chapters Completed</div></div>
                     <div class="stat-card"><div class="value" id="stat-avg">0</div><div class="label">Average WPM</div></div>
                     <div class="stat-card"><div class="value" id="stat-best">0</div><div class="label">Best WPM Ever</div></div>
                 </div>
@@ -144,12 +163,14 @@
 
         function switchTab(tab) {
             var tabs = document.querySelectorAll('.tab');
-            var tabNames = ['bible', 'verse', 'personal'];
+            var tabNames = ['bible', 'book', 'verse', 'personal'];
             tabs.forEach(function(t, i) { t.classList.toggle('active', tabNames[i] === tab); });
-            document.getElementById('tab-verse').style.display = tab === 'verse' ? 'block' : 'none';
             document.getElementById('tab-bible').style.display = tab === 'bible' ? 'block' : 'none';
+            document.getElementById('tab-book').style.display = tab === 'book' ? 'block' : 'none';
+            document.getElementById('tab-verse').style.display = tab === 'verse' ? 'block' : 'none';
             document.getElementById('tab-personal').style.display = tab === 'personal' ? 'block' : 'none';
             if (tab === 'bible') loadBibleCompletionLeaderboard();
+            if (tab === 'book') populateBookLbSelect();
             if (tab === 'personal') loadPersonalStats();
         }
 
@@ -319,7 +340,7 @@
             try {
                 var result = await supabaseClient
                     .from('verse_progress')
-                    .select('best_wpm')
+                    .select('book_name, chapter_num, best_wpm')
                     .eq('user_id', currentUserId);
 
                 if (result.error) throw result.error;
@@ -331,13 +352,90 @@
                 var pct = (completed.length / TOTAL_VERSES_BIBLE) * 100;
                 var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
 
+                // Count fully completed books and chapters
+                var bookVerseCounts = {};
+                var chapterVerseCounts = {};
+                completed.forEach(function(r) {
+                    bookVerseCounts[r.book_name] = (bookVerseCounts[r.book_name] || 0) + 1;
+                    var chapKey = r.book_name + '|' + r.chapter_num;
+                    chapterVerseCounts[chapKey] = (chapterVerseCounts[chapKey] || 0) + 1;
+                });
+                var booksCompleted = Object.keys(bookVerseCounts).filter(function(b) {
+                    var total = (verseCounts[b] || []).reduce(function(s, v) { return s + v; }, 0);
+                    return total > 0 && bookVerseCounts[b] >= total;
+                }).length;
+                var totalChapters = 1189;
+                var chaptersCompleted = Object.keys(chapterVerseCounts).filter(function(key) {
+                    var parts = key.split('|');
+                    var book = parts[0]; var chap = parseInt(parts[1]) - 1;
+                    var total = verseCounts[book] && verseCounts[book][chap];
+                    return total > 0 && chapterVerseCounts[key] >= total;
+                }).length;
+
                 document.getElementById('stat-completion').innerText = displayPct;
                 document.getElementById('stat-verses').innerText = completed.length.toLocaleString();
+                document.getElementById('stat-books').innerText = booksCompleted + ' / 66';
+                document.getElementById('stat-chapters').innerText = chaptersCompleted + ' / ' + totalChapters;
                 document.getElementById('stat-avg').innerText = avgWpm;
                 document.getElementById('stat-best').innerText = bestWpm;
 
             } catch(err) {
                 console.error('Personal stats error:', err);
+            }
+        }
+
+
+        function populateBookLbSelect() {
+            var sel = document.getElementById('book-lb-select');
+            if (sel.options.length > 1) return;
+            books.forEach(function(b) {
+                var opt = document.createElement('option');
+                opt.value = b; opt.innerText = b;
+                sel.appendChild(opt);
+            });
+        }
+
+        async function loadBookLeaderboard() {
+            var book = document.getElementById('book-lb-select').value;
+            if (!book) return;
+            var bookVerseTotal = (verseCounts[book] || []).reduce(function(sum, v) { return sum + v; }, 0);
+            document.getElementById('book-lb-title').innerText = book;
+            document.getElementById('book-lb-body').innerHTML = '<div class="loading">Loading scores...</div>';
+            try {
+                var result = await supabaseClient
+                    .from('verse_progress')
+                    .select('user_id')
+                    .eq('book_name', book)
+                    .eq('completed', true);
+                if (result.error) throw result.error;
+                var counts = {};
+                (result.data || []).forEach(function(r) { counts[r.user_id] = (counts[r.user_id] || 0) + 1; });
+                if (Object.keys(counts).length === 0) {
+                    document.getElementById('book-lb-count').innerText = '';
+                    document.getElementById('book-lb-body').innerHTML = '<div class="empty">No scores yet for this book &#8212; be the first!</div>';
+                    return;
+                }
+                var sorted = Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a]; }).slice(0, 50);
+                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', sorted);
+                var usernameMap = {};
+                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+                document.getElementById('book-lb-count').innerText = sorted.length + ' player' + (sorted.length !== 1 ? 's' : '');
+                var rows = sorted.map(function(userId, i) {
+                    var rank = i + 1;
+                    var username = usernameMap[userId] || 'Anonymous';
+                    var isYou = userId === currentUserId;
+                    var verseCount = counts[userId];
+                    var pct = bookVerseTotal > 0 ? (verseCount / bookVerseTotal) * 100 : 0;
+                    var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
+                    var barWidth = Math.max(pct, 0.5);
+                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                    var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                    return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td style="text-align:right;"><span style="font-weight:800;color:var(--accent);">' + displayPct + '</span><span style="color:var(--text-muted);font-size:11px;"> (' + verseCount + '/' + bookVerseTotal + ' verses)</span><div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%"></div></div></td></tr>';
+                }).join('');
+                document.getElementById('book-lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Completion</th></tr></thead><tbody>' + rows + '</tbody></table>';
+            } catch(err) {
+                console.error('Book leaderboard error:', err);
+                document.getElementById('book-lb-body').innerHTML = '<div class="empty">Error loading scores.</div>';
             }
         }
 
