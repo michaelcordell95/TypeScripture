@@ -140,7 +140,6 @@
         let currentUsername = null;
 
         async function init() {
-            populateBookSelect();
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session) {
                 currentUserId = session.user.id;
