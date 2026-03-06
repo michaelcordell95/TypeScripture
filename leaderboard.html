@@ -341,8 +341,7 @@
                 var result = await supabaseClient
                     .from('verse_progress')
                     .select('book_name, chapter_num, verse_num, best_wpm')
-                    .eq('user_id', currentUserId)
-                    .eq('completed', true);
+                    .eq('user_id', currentUserId);
 
                 if (result.error) throw result.error;
                 var completed = result.data || [];
