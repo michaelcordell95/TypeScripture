@@ -244,6 +244,7 @@
         // Guard: if Supabase CDN failed to load, app still works (no login/sync)
         let supabaseClient = null;
         let currentUserId = null;
+        let verseStreak = 0;
         let isLoggedIn = false;
         try {
             const { createClient } = supabase;
@@ -689,11 +690,16 @@
 
         function showLastVerse(wpm, accuracy, isNewBest) {
             const box = document.getElementById('last-verse-box');
-            box.innerHTML = 'Last verse: <span>' + wpm + ' WPM</span> · <span>' + accuracy + '% Acc</span>' + (isNewBest ? ' · <span class="new-best">New Best!</span>' : '');
+            let html = 'Last verse: <span>' + wpm + ' WPM</span> · <span>' + accuracy + '% Acc</span>';
+            if (isNewBest) html += ' · <span class="new-best">New Best!</span>';
+            if (verseStreak > 1) html += ' · <span style="color:#f0b429;font-weight:700;">🔥 ' + verseStreak + ' streak</span>';
+            if (!currentUserId) html += ' · <span style="color:var(--text-muted);font-size:0.85em;">Sign in to save to leaderboard</span>';
+            box.innerHTML = html;
             box.style.display = 'block';
         }
 
         async function loadVerse() {
+            verseStreak = 0;
             if (currentIndex >= currentVerses.length) {
                 showChapterComplete();
                 return;
@@ -778,6 +784,7 @@
 
                 // Only count verse as completed if accuracy >= 50%
                 if (accuracy >= 50) {
+                    verseStreak++;
                     completedSet.add(`KJV_${bookName}_${chapNum}_${verseNum}`);
                     localStorage.setItem('typeScriptureProgressSet', JSON.stringify(Array.from(completedSet)));
                     if (currentUserId) {
