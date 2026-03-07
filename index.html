@@ -624,6 +624,8 @@
             const isRead = document.getElementById('read-mode').checked;
             // Stats bar
             document.getElementById('stats-bar').style.display = isRead ? 'none' : 'flex';
+            // Turn off easy mode when reading (not helpful for reading)
+            if (isRead) document.getElementById('easy-mode').checked = false;
             // Hide typing buttons in nav, they move to bottom bar
             document.getElementById('btn-group').style.display = isRead ? 'none' : 'flex';
             // Hidden input - disable to prevent keyboard on mobile
