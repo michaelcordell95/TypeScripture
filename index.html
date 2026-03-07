@@ -215,7 +215,7 @@
             <select id="book-select" onchange="updateChapters(true)" aria-label="Book"></select>
             <select id="chapter-select" onchange="updateVerses(true)" aria-label="Chapter"></select>
             <select id="verse-select" onchange="fetchVerses()" aria-label="Verse"></select>
-            <button id="reset-btn" onclick="verseStreak=0; loadVerse();" title="Restart verse" aria-label="Restart verse">🔙</button>
+            <button id="reset-btn" onclick="verseStreak=0; loadVerse();" title="Restart verse" aria-label="Restart verse">🔄</button>
             <button id="next-verse-btn" onclick="goToNextVerse()" title="Next verse" aria-label="Next verse">👉</button>
             <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
         </div>
@@ -234,6 +234,11 @@
     <div id="last-verse-box"></div>
     <div id="accuracy-warning"></div>
     <div id="display"></div>
+    <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:16px 20px; display:none; justify-content:center; align-items:center; gap:24px; z-index:100;">
+        <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">👈</button>
+        <button id="read-bookmark-btn" onclick="toggleBookmark()" aria-label="Bookmark this verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">⭐</button>
+        <button id="read-next-btn" onclick="goToNextVerse()" aria-label="Next verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">👉</button>
+    </div>
     <input type="text" id="hidden-input" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none">
 
     <script src="/bible.js"></script>
@@ -311,6 +316,7 @@
             const btn = document.getElementById('bookmark-btn');
             btn.classList.toggle('bookmarked', currentBookmark);
             btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
+            syncReadBookmark();
         }
 
         async function toggleBookmark() {
@@ -333,6 +339,7 @@
             const btn = document.getElementById('bookmark-btn');
             btn.classList.toggle('bookmarked', currentBookmark);
             btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
+            syncReadBookmark();
         }
 
         async function checkAuth() {
@@ -614,8 +621,50 @@
             document.getElementById('stats-bar').style.display = isRead ? 'none' : 'flex';
             // Hidden input - disable to prevent keyboard on mobile
             inputEl.disabled = isRead;
+            // Read nav bar at bottom
+            const readNav = document.getElementById('read-nav');
+            readNav.style.display = isRead ? 'flex' : 'none';
+            // Add bottom padding so display isn't hidden behind nav bar
+            document.getElementById('display').style.marginBottom = isRead ? '120px' : '';
+            document.body.style.paddingBottom = isRead ? '120px' : '';
+            // Sync bookmark button state to read-nav bookmark button
+            syncReadBookmark();
             // Re-render current verse text in appropriate style
             if (activeVerseText) renderDisplay(isRead ? activeVerseText : '');
+        }
+
+        function syncReadBookmark() {
+            const btn = document.getElementById('read-bookmark-btn');
+            if (!btn) return;
+            const isBookmarked = document.getElementById('bookmark-btn').classList.contains('bookmarked');
+            btn.style.color = isBookmarked ? '#f0b429' : 'var(--text-muted)';
+            btn.style.borderColor = isBookmarked ? '#f0b429' : '#30363d';
+        }
+
+        function goToPrevVerse() {
+            const bookName = bookSel.value.replace(" ✅", "");
+            const bookIdx = books.indexOf(bookName);
+            let chapNum = parseInt(chapSel.value);
+            let verseIdx = parseInt(verseSel.value);
+
+            if (verseIdx > 0) {
+                verseSel.value = verseIdx - 1;
+                fetchVerses();
+            } else if (chapNum > 1) {
+                chapSel.value = chapNum - 1;
+                updateVerses();
+                // Go to last verse of previous chapter
+                verseSel.value = verseSel.options.length - 1;
+                fetchVerses();
+            } else if (bookIdx > 0) {
+                bookSel.value = books[bookIdx - 1];
+                updateChapters();
+                // Go to last chapter
+                chapSel.value = chapSel.options.length - 1;
+                updateVerses();
+                verseSel.value = verseSel.options.length - 1;
+                fetchVerses();
+            }
         }
 
         async function fetchVerses() {
