@@ -89,7 +89,7 @@
     <div class="nav-links">
         <a href="/">🏠 Home</a>
         <a href="/leaderboard.html">🏆 Leaderboard</a>
-        <a href="/bookmarks.html" class="active">🔖 Bookmarks</a>
+        <a href="/bookmarks.html" class="active">⭐ Bookmarks</a>
         <a href="/search.html">🔍 Search</a>
     </div>
     <div class="container">
@@ -97,7 +97,7 @@
             <span id="auth-username"></span>
             <button onclick="handleLogout()">Logout</button>
         </div>
-        <div class="page-title">🔖 My Bookmarks</div>
+        <div class="page-title">⭐ My Bookmarks</div>
         <div class="page-subtitle">Verses you've saved for easy reference</div>
         <div id="bookmark-count" class="count"></div>
         <div id="bookmark-list"><div class="loading">Loading...</div></div>
@@ -137,7 +137,7 @@
                 document.getElementById('auth-username').innerText = '✓ ' + username;
                 loadBookmarks();
             } else {
-                document.getElementById('bookmark-list').innerHTML = '<div class="signed-out"><span class="emoji">🔖</span>Sign in on the main page to view your bookmarks.</div>';
+                document.getElementById('bookmark-list').innerHTML = '<div class="signed-out"><span class="emoji">⭐</span>Sign in on the main page to view your bookmarks.</div>';
                 document.getElementById('bookmark-count').innerText = '';
             }
         }
@@ -150,7 +150,7 @@
 
             if (error || !data || data.length === 0) {
                 document.getElementById('bookmark-count').innerText = '';
-                document.getElementById('bookmark-list').innerHTML = '<div class="empty"><span class="emoji">🔖</span>No bookmarks yet — tap the 🔖 button on any verse to save it here.</div>';
+                document.getElementById('bookmark-list').innerHTML = '<div class="empty"><span class="emoji">⭐</span>No bookmarks yet — tap the ⭐ button on any verse to save it here.</div>';
                 return;
             }
 
@@ -184,7 +184,7 @@
             const remaining = document.querySelectorAll('.bookmark-card').length;
             if (remaining === 0) {
                 document.getElementById('bookmark-count').innerText = '';
-                document.getElementById('bookmark-list').innerHTML = '<div class="empty"><span class="emoji">🔖</span>No bookmarks yet — tap the 🔖 button on any verse to save it here.</div>';
+                document.getElementById('bookmark-list').innerHTML = '<div class="empty"><span class="emoji">⭐</span>No bookmarks yet — tap the ⭐ button on any verse to save it here.</div>';
             } else {
                 document.getElementById('bookmark-count').innerText = remaining + ' bookmark' + (remaining !== 1 ? 's' : '');
             }
