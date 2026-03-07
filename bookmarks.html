@@ -142,23 +142,70 @@
             }
         }
 
-        async function loadBookmarks() {
-            document.getElementById('bookmark-list').innerHTML = '<div class="loading">Loading bookmarks...</div>';
-            const { data, error } = await sb.from('bookmarks')
-                .select('*').eq('user_id', currentUserId)
-                .order('created_at', { ascending: false });
+        // ===== OFFLINE BOOKMARK CACHE (mirrors main app logic) =====
+        function bmCacheKey() { return 'tsBookmarks_' + currentUserId; }
+        function bmPendingKey() { return 'tsBookmarksPending_' + currentUserId; }
+        function bmKey(book, chap, verse) { return book + '|' + chap + '|' + verse; }
 
-            if (error || !data || data.length === 0) {
+        function getCachedBookmarks() {
+            try { return new Set(JSON.parse(localStorage.getItem(bmCacheKey())) || []); }
+            catch(e) { return new Set(); }
+        }
+        function getCachedBookmarkList() {
+            try { return JSON.parse(localStorage.getItem(bmCacheKey() + '_list')) || []; }
+            catch(e) { return []; }
+        }
+        function saveCachedBookmarkList(list) {
+            localStorage.setItem(bmCacheKey() + '_list', JSON.stringify(list));
+            // Also update the set cache
+            const set = new Set(list.map(function(b) { return bmKey(b.book_name, b.chapter_num, b.verse_num); }));
+            localStorage.setItem(bmCacheKey(), JSON.stringify(Array.from(set)));
+        }
+        function getPendingQueue() {
+            try { return JSON.parse(localStorage.getItem(bmPendingKey())) || []; }
+            catch(e) { return []; }
+        }
+        function savePendingQueue(queue) {
+            localStorage.setItem(bmPendingKey(), JSON.stringify(queue));
+        }
+
+        async function flushPendingBookmarks() {
+            if (!currentUserId || !navigator.onLine) return;
+            const queue = getPendingQueue();
+            if (queue.length === 0) return;
+            const remaining = [];
+            for (const item of queue) {
+                try {
+                    if (item.action === 'add') {
+                        await sb.from('bookmarks').insert({
+                            user_id: currentUserId, book_name: item.book,
+                            chapter_num: item.chap, verse_num: item.verse
+                        });
+                    } else {
+                        await sb.from('bookmarks').delete()
+                            .eq('user_id', currentUserId).eq('book_name', item.book)
+                            .eq('chapter_num', item.chap).eq('verse_num', item.verse);
+                    }
+                } catch(e) { remaining.push(item); }
+            }
+            savePendingQueue(remaining);
+        }
+
+        function renderBookmarks(list, fromCache) {
+            if (!list || list.length === 0) {
                 document.getElementById('bookmark-count').innerText = '';
                 document.getElementById('bookmark-list').innerHTML = '<div class="empty"><span class="emoji">⭐</span>No bookmarks yet — tap the ⭐ button on any verse to save it here.</div>';
                 return;
             }
-
-            document.getElementById('bookmark-count').innerText = data.length + ' bookmark' + (data.length !== 1 ? 's' : '');
-
-            const cards = data.map(function(b) {
+            const offlineBadge = fromCache && !navigator.onLine
+                ? '<div style="font-size:12px;color:#f0b429;text-align:center;margin-bottom:10px;">📶 Offline — showing cached bookmarks</div>'
+                : '';
+            document.getElementById('bookmark-count').innerText = list.length + ' bookmark' + (list.length !== 1 ? 's' : '');
+            const cards = list.map(function(b) {
                 const ref = b.book_name + ' ' + b.chapter_num + ':' + b.verse_num;
-                const date = new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const date = b.created_at
+                    ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'Cached';
                 const verseText = getVerseText(b.book_name, b.chapter_num, b.verse_num);
                 const verseUrl = '/?book=' + encodeURIComponent(b.book_name) + '&chapter=' + b.chapter_num + '&verse=' + b.verse_num;
                 return '<div class="bookmark-card" id="bm-' + b.book_name.replace(/\s/g,'_') + '_' + b.chapter_num + '_' + b.verse_num + '">' +
@@ -167,17 +214,42 @@
                         (verseText ? '<div class="bookmark-text">' + verseText + '</div>' : '') +
                     '</div>' +
                     '<span class="bookmark-date">Saved ' + date + '</span>' +
-                    '<button class="remove-btn" onclick="removeBookmark(\'' + b.book_name.replace(/'/g,"\\'") + '\',' + b.chapter_num + ',' + b.verse_num + ')">Remove</button>' +
+                    '<button class="remove-btn" onclick="removeBookmark(\'' + b.book_name.replace(/'/g,"\'") + '\',' + b.chapter_num + ',' + b.verse_num + ')">Remove</button>' +
                 '</div>';
             }).join('');
+            document.getElementById('bookmark-list').innerHTML = offlineBadge + '<div class="bookmark-list">' + cards + '</div>';
+        }
 
-            document.getElementById('bookmark-list').innerHTML = '<div class="bookmark-list">' + cards + '</div>';
+        async function loadBookmarks() {
+            document.getElementById('bookmark-list').innerHTML = '<div class="loading">Loading bookmarks...</div>';
+
+            // Show cached bookmarks immediately while we fetch
+            const cached = getCachedBookmarkList();
+            if (cached.length > 0) renderBookmarks(cached, true);
+
+            if (!navigator.onLine) {
+                // Fully offline — cached render is all we can do
+                return;
+            }
+
+            // Flush any pending changes first, then fetch fresh list
+            await flushPendingBookmarks();
+
+            try {
+                const { data, error } = await sb.from('bookmarks')
+                    .select('*').eq('user_id', currentUserId)
+                    .order('created_at', { ascending: false });
+                if (error) throw error;
+                saveCachedBookmarkList(data || []);
+                renderBookmarks(data, false);
+            } catch(e) {
+                // Network failed — cached render already shown above
+                console.warn('Could not load bookmarks from DB:', e);
+            }
         }
 
         async function removeBookmark(bookName, chapNum, verseNum) {
-            await sb.from('bookmarks').delete()
-                .eq('user_id', currentUserId).eq('book_name', bookName)
-                .eq('chapter_num', chapNum).eq('verse_num', verseNum);
+            // Optimistic UI update
             const id = 'bm-' + bookName.replace(/\s/g,'_') + '_' + chapNum + '_' + verseNum;
             const el = document.getElementById(id);
             if (el) el.remove();
@@ -188,7 +260,36 @@
             } else {
                 document.getElementById('bookmark-count').innerText = remaining + ' bookmark' + (remaining !== 1 ? 's' : '');
             }
+
+            // Update local cache
+            const list = getCachedBookmarkList().filter(function(b) {
+                return !(b.book_name === bookName && b.chapter_num === chapNum && b.verse_num === verseNum);
+            });
+            saveCachedBookmarkList(list);
+
+            // Sync to Supabase or queue
+            if (navigator.onLine) {
+                try {
+                    await sb.from('bookmarks').delete()
+                        .eq('user_id', currentUserId).eq('book_name', bookName)
+                        .eq('chapter_num', chapNum).eq('verse_num', verseNum);
+                } catch(e) {
+                    const queue = getPendingQueue();
+                    queue.push({ action: 'remove', book: bookName, chap: chapNum, verse: verseNum });
+                    savePendingQueue(queue);
+                }
+            } else {
+                const queue = getPendingQueue().filter(function(q) {
+                    return !(q.book === bookName && q.chap === chapNum && q.verse === verseNum);
+                });
+                queue.push({ action: 'remove', book: bookName, chap: chapNum, verse: verseNum });
+                savePendingQueue(queue);
+            }
         }
+
+        window.addEventListener('online', function() {
+            flushPendingBookmarks().then(loadBookmarks);
+        });
 
         async function handleLogout() {
             await sb.auth.signOut();
