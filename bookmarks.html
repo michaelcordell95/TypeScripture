@@ -159,9 +159,10 @@
                 const ref = b.book_name + ' ' + b.chapter_num + ':' + b.verse_num;
                 const date = new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                 const verseText = getVerseText(b.book_name, b.chapter_num, b.verse_num);
+                const verseUrl = '/?book=' + encodeURIComponent(b.book_name) + '&chapter=' + b.chapter_num + '&verse=' + b.verse_num;
                 return '<div class="bookmark-card" id="bm-' + b.book_name.replace(/\s/g,'_') + '_' + b.chapter_num + '_' + b.verse_num + '">' +
                     '<div style="flex:1;">' +
-                        '<div class="bookmark-ref">' + ref + '</div>' +
+                        '<a href="' + verseUrl + '" style="text-decoration:none;"><div class="bookmark-ref" style="cursor:pointer;">↗ ' + ref + '</div></a>' +
                         (verseText ? '<div class="bookmark-text">' + verseText + '</div>' : '') +
                     '</div>' +
                     '<span class="bookmark-date">Saved ' + date + '</span>' +
