@@ -48,13 +48,17 @@
         .username.is-you { color: var(--accent); }
         .username.is-you::after { content: ' (you)'; font-size: 11px; font-weight: 400; color: var(--text-muted); }
         .score-cell { font-weight: 800; color: var(--accent); text-align: right; }
+        .wpm-cell { text-align: right; white-space: nowrap; }
+        .wpm-val { font-weight: 700; color: var(--text-main); }
+        .wpm-label { font-size: 11px; color: var(--text-muted); font-weight: 400; }
         .progress-bar-wrap { width: 120px; background: #21262d; border-radius: 4px; height: 6px; display: inline-block; vertical-align: middle; margin-left: 8px; }
         .progress-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #2ea043, var(--accent)); }
         .empty, .loading { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
-        @media (max-width: 600px) {
+        @media (max-width: 700px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
             .header { flex-wrap: wrap; gap: 10px; }
             .progress-bar-wrap { display: none; }
+            .lb-table .hide-mobile { display: none; }
         }
     </style>
 </head>
@@ -179,7 +183,6 @@
         }
 
         // ===== VERSE SCORES TAB =====
-        // ===== UNIFIED SCORES TAB =====
         function showPersonalStat(label, done, total) {
             var el = document.getElementById('scores-personal');
             var textEl = document.getElementById('scores-personal-text');
@@ -254,7 +257,6 @@
 
             try {
                 if (verse && chap) {
-                    // ===== VERSE level: best WPM =====
                     document.getElementById('scores-title').innerText = book + ' ' + chap + ':' + verse;
                     document.getElementById('scores-personal').style.display = 'none';
                     var result = await supabaseClient
@@ -284,7 +286,6 @@
                     document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Best WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
 
                 } else if (chap) {
-                    // ===== CHAPTER level: avg WPM for 100% completers =====
                     document.getElementById('scores-title').innerText = book + ' — Chapter ' + chap;
                     var chapVerseTotal = (verseCounts[book] && verseCounts[book][chap - 1]) || 0;
                     var result = await supabaseClient
@@ -327,7 +328,6 @@
                     document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Avg WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
 
                 } else {
-                    // ===== BOOK level: avg WPM for 100% completers =====
                     document.getElementById('scores-title').innerText = book;
                     var bookVerseTotal = (verseCounts[book] || []).reduce(function(sum, v) { return sum + v; }, 0);
                     var result = await supabaseClient
@@ -380,28 +380,40 @@
             document.getElementById('bible-lb-body').innerHTML = '<div class="loading">Loading...</div>';
 
             try {
-                // Get distinct verse counts per user
+                // Fetch completed verses WITH wpm data in one query
                 var result = await supabaseClient
                     .from('verse_progress')
-                    .select('user_id')
+                    .select('user_id, best_wpm')
                     .eq('completed', true);
 
                 if (result.error) throw result.error;
 
-                // Count verses per user
-                var counts = {};
+                // Aggregate per user: verse count, total wpm, best wpm
+                var userData = {};
                 (result.data || []).forEach(function(r) {
-                    counts[r.user_id] = (counts[r.user_id] || 0) + 1;
+                    if (!userData[r.user_id]) {
+                        userData[r.user_id] = { verseCount: 0, totalWpm: 0, scoredVerses: 0, bestWpm: 0 };
+                    }
+                    userData[r.user_id].verseCount++;
+                    if (r.best_wpm > 0) {
+                        userData[r.user_id].totalWpm += r.best_wpm;
+                        userData[r.user_id].scoredVerses++;
+                        if (r.best_wpm > userData[r.user_id].bestWpm) {
+                            userData[r.user_id].bestWpm = r.best_wpm;
+                        }
+                    }
                 });
 
-                if (Object.keys(counts).length === 0) {
+                if (Object.keys(userData).length === 0) {
                     document.getElementById('bible-lb-count').innerText = '';
                     document.getElementById('bible-lb-body').innerHTML = '<div class="empty">No completions yet &#8212; be the first!</div>';
                     return;
                 }
 
                 // Sort by verse count descending
-                var sorted = Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a]; }).slice(0, 50);
+                var sorted = Object.keys(userData).sort(function(a, b) {
+                    return userData[b].verseCount - userData[a].verseCount;
+                }).slice(0, 50);
 
                 // Fetch usernames
                 var profResult = await supabaseClient.from('profiles').select('id, username').in('id', sorted);
@@ -412,18 +424,47 @@
 
                 var rows = sorted.map(function(userId, i) {
                     var rank = i + 1;
+                    var u = userData[userId];
                     var username = usernameMap[userId] || 'Anonymous';
                     var isYou = userId === currentUserId;
-                    var verseCount = counts[userId];
-                    var pct = ((verseCount / TOTAL_VERSES_BIBLE) * 100);
+                    var verseCount = u.verseCount;
+                    var pct = (verseCount / TOTAL_VERSES_BIBLE) * 100;
                     var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
                     var barWidth = Math.max((verseCount / TOTAL_VERSES_BIBLE) * 100, 0.5);
                     var rankClass = rank <= 3 ? 'rank-' + rank : '';
                     var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
-                    return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td style="text-align:right;"><span style="font-weight:800;color:var(--accent);">' + displayPct + '</span><span style="color:var(--text-muted);font-size:11px;"> (' + verseCount.toLocaleString() + ' verses)</span><div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%"></div></div></td></tr>';
+                    var avgWpm = u.scoredVerses > 0 ? Math.round(u.totalWpm / u.scoredVerses) : 0;
+                    var bestWpm = u.bestWpm || 0;
+                    var avgCell = avgWpm > 0
+                        ? '<span class="wpm-val">' + avgWpm + '</span> <span class="wpm-label">WPM</span>'
+                        : '<span class="wpm-label">—</span>';
+                    var bestCell = bestWpm > 0
+                        ? '<span class="wpm-val">' + bestWpm + '</span> <span class="wpm-label">WPM</span>'
+                        : '<span class="wpm-label">—</span>';
+                    return '<tr>' +
+                        '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                        '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                        '<td style="text-align:right;">' +
+                            '<span style="font-weight:800;color:var(--accent);">' + displayPct + '</span>' +
+                            '<span style="color:var(--text-muted);font-size:11px;"> (' + verseCount.toLocaleString() + ')</span>' +
+                            '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%"></div></div>' +
+                        '</td>' +
+                        '<td class="wpm-cell hide-mobile">' + avgCell + '</td>' +
+                        '<td class="wpm-cell hide-mobile">' + bestCell + '</td>' +
+                    '</tr>';
                 }).join('');
 
-                document.getElementById('bible-lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Completion</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                document.getElementById('bible-lb-body').innerHTML =
+                    '<table class="lb-table">' +
+                        '<thead><tr>' +
+                            '<th>#</th>' +
+                            '<th>Player</th>' +
+                            '<th style="text-align:right;">Completion</th>' +
+                            '<th class="hide-mobile" style="text-align:right;">Avg WPM</th>' +
+                            '<th class="hide-mobile" style="text-align:right;">Best WPM</th>' +
+                        '</tr></thead>' +
+                        '<tbody>' + rows + '</tbody>' +
+                    '</table>';
 
             } catch(err) {
                 console.error('Bible completion error:', err);
@@ -456,14 +497,12 @@
                 var pct = (completed.length / TOTAL_VERSES_BIBLE) * 100;
                 var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
 
-                // Build a set of completed verse keys for exact matching
                 var completedKeys = {};
                 completed.forEach(function(r) {
                     var key = r.book_name + '|' + r.chapter_num + '|' + r.verse_num;
                     completedKeys[key] = true;
                 });
 
-                // Count fully completed books
                 var booksCompleted = books.filter(function(book) {
                     var chapters = verseCounts[book];
                     if (!chapters) return false;
@@ -475,8 +514,6 @@
                     return true;
                 }).length;
 
-                // Count fully completed chapters
-                var totalChapters = 1189;
                 var chaptersCompleted = 0;
                 books.forEach(function(book) {
                     var chapters = verseCounts[book];
@@ -494,7 +531,7 @@
                 document.getElementById('stat-completion').innerText = displayPct;
                 document.getElementById('stat-verses').innerText = completed.length.toLocaleString();
                 document.getElementById('stat-books').innerText = booksCompleted + ' / 66';
-                document.getElementById('stat-chapters').innerText = chaptersCompleted + ' / ' + totalChapters;
+                document.getElementById('stat-chapters').innerText = chaptersCompleted + ' / 1189';
                 document.getElementById('stat-avg').innerText = avgWpm;
                 document.getElementById('stat-best').innerText = bestWpm;
 
@@ -503,15 +540,12 @@
             }
         }
 
-
-
         async function searchPlayer() {
             var username = document.getElementById('search-input').value.trim();
             var resultEl = document.getElementById('search-result');
             if (!username) return;
             resultEl.innerHTML = '<div class="loading">Searching...</div>';
 
-            // Look up profile
             var profResult = await supabaseClient.from('profiles').select('id, username').ilike('username', username).limit(1);
             if (profResult.error || !profResult.data || profResult.data.length === 0) {
                 resultEl.innerHTML = '<div class="empty">No player found with that username.</div>';
@@ -520,7 +554,6 @@
             var profile = profResult.data[0];
             var uid = profile.id;
 
-            // Fetch their verse progress
             var result = await supabaseClient.from('verse_progress').select('book_name, chapter_num, verse_num, best_wpm').eq('user_id', uid);
             if (result.error) { resultEl.innerHTML = '<div class="empty">Error loading stats.</div>'; return; }
 
@@ -532,7 +565,6 @@
             var pct = (rows.length / TOTAL_VERSES_BIBLE) * 100;
             var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
 
-            // Count books and chapters completed
             var completedKeys = {};
             rows.forEach(function(r) { completedKeys[r.book_name + '|' + r.chapter_num + '|' + r.verse_num] = true; });
             var booksCompleted = books.filter(function(book) {
@@ -566,7 +598,6 @@
                 '</div>';
         }
 
-        // Allow pressing Enter in search box
         document.getElementById('search-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchPlayer(); });
 
         init().then(function() { loadBibleCompletionLeaderboard(); });
