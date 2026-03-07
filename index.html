@@ -660,7 +660,9 @@
             let chapNum = parseInt(chapSel.value);
             let verseIdx = parseInt(verseSel.value); // 0-indexed
 
-            const totalVerses = verseCounts[bookName][chapNum - 1];
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            const chapEntry = bookEntry && bookEntry.chapters.find(c => c.chapter === chapNum);
+            const totalVerses = chapEntry ? chapEntry.verses.length : 1;
             const totalChaps = chapCounts[bookIdx];
 
             if (verseIdx + 1 < totalVerses) {
