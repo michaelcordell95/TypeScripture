@@ -314,6 +314,72 @@
         // Check authentication on page load
         let currentBookmark = false;
 
+        // ===== OFFLINE BOOKMARK CACHE =====
+        // localStorage keys:
+        //   tsBookmarks_{userId}        → Set of "book|chap|verse" strings (full cache)
+        //   tsBookmarksPending_{userId} → Array of {action:'add'|'remove', book, chap, verse}
+
+        function bmCacheKey() { return 'tsBookmarks_' + currentUserId; }
+        function bmPendingKey() { return 'tsBookmarksPending_' + currentUserId; }
+
+        function getCachedBookmarks() {
+            try { return new Set(JSON.parse(localStorage.getItem(bmCacheKey())) || []); }
+            catch(e) { return new Set(); }
+        }
+        function saveCachedBookmarks(set) {
+            localStorage.setItem(bmCacheKey(), JSON.stringify(Array.from(set)));
+        }
+        function getPendingQueue() {
+            try { return JSON.parse(localStorage.getItem(bmPendingKey())) || []; }
+            catch(e) { return []; }
+        }
+        function savePendingQueue(queue) {
+            localStorage.setItem(bmPendingKey(), JSON.stringify(queue));
+        }
+        function bmKey(book, chap, verse) { return book + '|' + chap + '|' + verse; }
+
+        // Sync pending queue to Supabase when online
+        async function flushPendingBookmarks() {
+            if (!currentUserId || !supabaseClient || !navigator.onLine) return;
+            const queue = getPendingQueue();
+            if (queue.length === 0) return;
+            console.log('Flushing', queue.length, 'pending bookmark changes...');
+            const remaining = [];
+            for (const item of queue) {
+                try {
+                    if (item.action === 'add') {
+                        await supabaseClient.from('bookmarks').insert({
+                            user_id: currentUserId, book_name: item.book,
+                            chapter_num: item.chap, verse_num: item.verse
+                        });
+                    } else {
+                        await supabaseClient.from('bookmarks').delete()
+                            .eq('user_id', currentUserId).eq('book_name', item.book)
+                            .eq('chapter_num', item.chap).eq('verse_num', item.verse);
+                    }
+                    console.log('✓ Synced bookmark:', item.action, item.book, item.chap + ':' + item.verse);
+                } catch(e) {
+                    console.warn('Failed to sync bookmark, keeping in queue:', e);
+                    remaining.push(item);
+                }
+            }
+            savePendingQueue(remaining);
+        }
+
+        // Refresh local cache from Supabase (called on login and when online)
+        async function refreshBookmarkCache() {
+            if (!currentUserId || !supabaseClient || !navigator.onLine) return;
+            try {
+                const { data } = await supabaseClient.from('bookmarks')
+                    .select('book_name, chapter_num, verse_num')
+                    .eq('user_id', currentUserId);
+                if (data) {
+                    const set = new Set(data.map(b => bmKey(b.book_name, b.chapter_num, b.verse_num)));
+                    saveCachedBookmarks(set);
+                }
+            } catch(e) { console.warn('Could not refresh bookmark cache:', e); }
+        }
+
         async function loadBookmarkState() {
             if (!currentUserId || !supabaseClient) {
                 document.getElementById('bookmark-btn').classList.remove('bookmarked');
@@ -324,10 +390,29 @@
             const chapNum = parseInt(document.getElementById('chapter-select').value);
             const verseNum = parseInt(document.getElementById('verse-select').value) + 1;
             if (!bookName || !chapNum || !verseNum) return;
-            const { data } = await supabaseClient.from('bookmarks').select('id')
-                .eq('user_id', currentUserId).eq('book_name', bookName)
-                .eq('chapter_num', chapNum).eq('verse_num', verseNum).maybeSingle();
-            currentBookmark = !!data;
+
+            // Always check local cache first (instant, works offline)
+            const cached = getCachedBookmarks();
+            currentBookmark = cached.has(bmKey(bookName, chapNum, verseNum));
+
+            // If online, verify against DB in background
+            if (navigator.onLine) {
+                try {
+                    const { data } = await supabaseClient.from('bookmarks').select('id')
+                        .eq('user_id', currentUserId).eq('book_name', bookName)
+                        .eq('chapter_num', chapNum).eq('verse_num', verseNum).maybeSingle();
+                    const dbState = !!data;
+                    if (dbState !== currentBookmark) {
+                        // DB is source of truth — update cache
+                        currentBookmark = dbState;
+                        const updated = getCachedBookmarks();
+                        if (dbState) updated.add(bmKey(bookName, chapNum, verseNum));
+                        else updated.delete(bmKey(bookName, chapNum, verseNum));
+                        saveCachedBookmarks(updated);
+                    }
+                } catch(e) { /* offline or error — trust cache */ }
+            }
+
             const btn = document.getElementById('bookmark-btn');
             btn.classList.toggle('bookmarked', currentBookmark);
             btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
@@ -340,21 +425,47 @@
             const chapNum = parseInt(document.getElementById('chapter-select').value);
             const verseNum = parseInt(document.getElementById('verse-select').value) + 1;
             if (!bookName || !chapNum || !verseNum) return;
-            if (currentBookmark) {
-                await supabaseClient.from('bookmarks').delete()
-                    .eq('user_id', currentUserId).eq('book_name', bookName)
-                    .eq('chapter_num', chapNum).eq('verse_num', verseNum);
-            } else {
-                await supabaseClient.from('bookmarks').insert({
-                    user_id: currentUserId, book_name: bookName,
-                    chapter_num: chapNum, verse_num: verseNum
-                });
-            }
+
+            // Optimistic update — update UI and cache immediately
             currentBookmark = !currentBookmark;
+            const cached = getCachedBookmarks();
+            if (currentBookmark) cached.add(bmKey(bookName, chapNum, verseNum));
+            else cached.delete(bmKey(bookName, chapNum, verseNum));
+            saveCachedBookmarks(cached);
+
             const btn = document.getElementById('bookmark-btn');
             btn.classList.toggle('bookmarked', currentBookmark);
             btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
             syncReadBookmark();
+
+            // Try to sync to Supabase
+            if (navigator.onLine) {
+                try {
+                    if (!currentBookmark) {
+                        await supabaseClient.from('bookmarks').delete()
+                            .eq('user_id', currentUserId).eq('book_name', bookName)
+                            .eq('chapter_num', chapNum).eq('verse_num', verseNum);
+                    } else {
+                        await supabaseClient.from('bookmarks').insert({
+                            user_id: currentUserId, book_name: bookName,
+                            chapter_num: chapNum, verse_num: verseNum
+                        });
+                    }
+                } catch(e) {
+                    // Network failed — add to pending queue
+                    console.warn('Bookmark sync failed, queuing for later:', e);
+                    const queue = getPendingQueue();
+                    queue.push({ action: currentBookmark ? 'add' : 'remove', book: bookName, chap: chapNum, verse: verseNum });
+                    savePendingQueue(queue);
+                }
+            } else {
+                // Offline — add to pending queue
+                const queue = getPendingQueue();
+                // Remove any existing opposite action for same verse
+                const filtered = queue.filter(q => !(q.book === bookName && q.chap === chapNum && q.verse === verseNum));
+                filtered.push({ action: currentBookmark ? 'add' : 'remove', book: bookName, chap: chapNum, verse: verseNum });
+                savePendingQueue(filtered);
+            }
         }
 
         async function checkAuth() {
@@ -446,6 +557,8 @@
         // Load user progress from Supabase
         async function loadUserProgress() {
             if (!currentUserId) return;
+            await flushPendingBookmarks();
+            await refreshBookmarkCache();
 
             try {
                 console.log('Loading progress for user:', currentUserId);
@@ -972,6 +1085,11 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
         }
+
+        // Flush pending bookmarks when back online
+        window.addEventListener('online', () => {
+            flushPendingBookmarks();
+        });
 
         // PWA install prompt
         let deferredInstallPrompt = null;
