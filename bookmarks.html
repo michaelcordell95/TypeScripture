@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>TypeScripture — Bookmarks</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --panel-bg: #161b22;
+            --accent: #58a6ff;
+            --text-main: #c9d1d9;
+            --text-muted: #484f58;
+            --text-bright: #ffffff;
+            --error: #f85149;
+            --gold: #f0b429;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+        .logo-text { font-size: 32px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
+        .logo-text span { color: var(--text-bright); }
+        .nav-links { display: flex; gap: 10px; margin-bottom: 24px; }
+        .nav-links a {
+            color: var(--text-muted); font-size: 12px; text-decoration: none;
+            border: 1px solid #30363d; padding: 5px 10px; border-radius: 6px;
+        }
+        .nav-links a:hover { border-color: var(--accent); color: var(--text-main); }
+        .nav-links a.active { border-color: var(--gold); color: var(--gold); }
+        .container { width: 90%; max-width: 700px; }
+        .page-title { font-size: 20px; font-weight: 800; color: var(--text-bright); margin-bottom: 4px; }
+        .page-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+        .bookmark-list { display: flex; flex-direction: column; gap: 10px; }
+        .bookmark-card {
+            background: var(--panel-bg);
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .bookmark-card:hover { border-color: #444d56; }
+        .bookmark-ref { font-weight: 700; color: var(--accent); font-size: 15px; }
+        .bookmark-text { font-size: 13px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+        .bookmark-date { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+        .remove-btn {
+            background: transparent; border: 1px solid #30363d;
+            color: var(--text-muted); padding: 5px 10px; border-radius: 6px;
+            cursor: pointer; font-size: 12px; white-space: nowrap;
+        }
+        .remove-btn:hover { border-color: var(--error); color: var(--error); }
+        .loading { text-align: center; color: var(--text-muted); padding: 40px; }
+        .empty { text-align: center; color: var(--text-muted); padding: 60px 20px; font-size: 14px; }
+        .empty .emoji { font-size: 40px; display: block; margin-bottom: 12px; }
+        .signed-out { text-align: center; padding: 60px 20px; }
+        .signed-out .emoji { font-size: 40px; display: block; margin-bottom: 12px; }
+        .count { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+        #auth-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); }
+        #auth-bar button {
+            background: transparent; border: 1px solid #30363d; color: var(--text-muted);
+            padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+        }
+        #auth-bar button:hover { border-color: var(--error); color: var(--error); }
+        @media (max-width: 600px) {
+            .bookmark-card { flex-wrap: wrap; }
+            .bookmark-date { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <span style="font-size:40px; line-height:1; color:var(--accent);">✝</span>
+        <div class="logo-text">Type<span>Scripture</span></div>
+    </div>
+    <div class="nav-links">
+        <a href="/">🏠 Home</a>
+        <a href="/leaderboard.html">🏆 Leaderboard</a>
+        <a href="/bookmarks.html" class="active">🔖 Bookmarks</a>
+    </div>
+    <div class="container">
+        <div id="auth-bar" style="display:none;">
+            <span id="auth-username"></span>
+            <button onclick="handleLogout()">Logout</button>
+        </div>
+        <div class="page-title">🔖 My Bookmarks</div>
+        <div class="page-subtitle">Verses you've saved for easy reference</div>
+        <div id="bookmark-count" class="count"></div>
+        <div id="bookmark-list"><div class="loading">Loading...</div></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://ddubjpmuomforwickzyb.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdWJqcG11b21mb3J3aWNrenliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTI0ODMsImV4cCI6MjA4ODE2ODQ4M30.wOiDepkS64pRFEpul_sKJ9MIVIVTWzg8BZ1fMTOK3_U";
+        const { createClient } = supabase;
+        const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce' } });
+
+        let currentUserId = null;
+
+        // Handle PKCE redirect
+        async function init() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('code')) {
+                await sb.auth.exchangeCodeForSession(window.location.href);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            const { data: { session } } = await sb.auth.getSession();
+            if (session) {
+                currentUserId = session.user.id;
+                const { data: profile } = await sb.from('profiles').select('username').eq('id', currentUserId).maybeSingle();
+                const username = profile ? profile.username : session.user.email;
+                document.getElementById('auth-bar').style.display = 'flex';
+                document.getElementById('auth-username').innerText = '✓ ' + username;
+                loadBookmarks();
+            } else {
+                document.getElementById('bookmark-list').innerHTML = '<div class="signed-out"><span class="emoji">🔖</span>Sign in on the main page to view your bookmarks.</div>';
+                document.getElementById('bookmark-count').innerText = '';
+            }
+        }
+
+        async function loadBookmarks() {
+            document.getElementById('bookmark-list').innerHTML = '<div class="loading">Loading bookmarks...</div>';
+            const { data, error } = await sb.from('bookmarks')
+                .select('*').eq('user_id', currentUserId)
+                .order('created_at', { ascending: false });
+
+            if (error || !data || data.length === 0) {
+                document.getElementById('bookmark-count').innerText = '';
+                document.getElementById('bookmark-list').innerHTML = '<div class="empty"><span class="emoji">🔖</span>No bookmarks yet — tap the 🔖 button on any verse to save it here.</div>';
+                return;
+            }
+
+            document.getElementById('bookmark-count').innerText = data.length + ' bookmark' + (data.length !== 1 ? 's' : '');
+
+            const cards = data.map(function(b) {
+                const ref = b.book_name + ' ' + b.chapter_num + ':' + b.verse_num;
+                const date = new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                return '<div class="bookmark-card" id="bm-' + b.book_name.replace(/\s/g,'_') + '_' + b.chapter_num + '_' + b.verse_num + '">' +
+                    '<div style="flex:1;">' +
+                        '<div class="bookmark-ref">' + ref + '</div>' +
+                    '</div>' +
+                    '<span class="bookmark-date">Saved ' + date + '</span>' +
+                    '<button class="remove-btn" onclick="removeBookmark(\'' + b.book_name.replace(/'/g,"\\'") + '\',' + b.chapter_num + ',' + b.verse_num + ')">Remove</button>' +
+                '</div>';
+            }).join('');
+
+            document.getElementById('bookmark-list').innerHTML = '<div class="bookmark-list">' + cards + '</div>';
+        }
+
+        async function removeBookmark(bookName, chapNum, verseNum) {
+            await sb.from('bookmarks').delete()
+                .eq('user_id', currentUserId).eq('book_name', bookName)
+                .eq('chapter_num', chapNum).eq('verse_num', verseNum);
+            const id = 'bm-' + bookName.replace(/\s/g,'_') + '_' + chapNum + '_' + verseNum;
+            const el = document.getElementById(id);
+            if (el) el.remove();
+            const remaining = document.querySelectorAll('.bookmark-card').length;
+            if (remaining === 0) {
+                document.getElementById('bookmark-count').innerText = '';
+                document.getElementById('bookmark-list').innerHTML = '<div class="empty"><span class="emoji">🔖</span>No bookmarks yet — tap the 🔖 button on any verse to save it here.</div>';
+            } else {
+                document.getElementById('bookmark-count').innerText = remaining + ' bookmark' + (remaining !== 1 ? 's' : '');
+            }
+        }
+
+        async function handleLogout() {
+            await sb.auth.signOut();
+            window.location.reload();
+        }
+
+        init();
+    </script>
+</body>
+</html>
