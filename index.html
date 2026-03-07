@@ -806,6 +806,13 @@
             if (!['SELECT', 'BUTTON', 'INPUT'].includes(e.target.tagName)) inputEl.focus({ preventScroll: true });
         });
 
+        // Arrow keys: left = reset, right = next verse (only when not typing in a select)
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'SELECT') return;
+            if (e.key === 'ArrowLeft') { e.preventDefault(); loadVerse(); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); goToNextVerse(); }
+        });
+
         // Check for URL params (e.g. from bookmarks page)
         const urlParams = new URLSearchParams(window.location.search);
         const urlBook = urlParams.get('book');
