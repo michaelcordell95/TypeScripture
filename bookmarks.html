@@ -108,6 +108,17 @@
         const { createClient } = supabase;
         const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce' } });
 
+        const KJV_EMBEDDED = {"books":[{"name":"Genesis","chapters":[{"chapter":1,"verses":[{"verse":1,"text":"In the beginning God created the heaven and the earth."},{"verse":2,"text":"And the earth was without form, and void; and darkness was upon the face of the deep. And the Spirit of God moved upon the face of the waters."}]}]},{"name":"Psalms","chapters":[{"chapter":117,"verses":[{"verse":1,"text":"O praise the LORD, all ye nations: praise him, all ye people."},{"verse":2,"text":"For his merciful kindness is great toward us: and the truth of the LORD endureth for ever. Praise ye the LORD."}]}]}]};
+
+        function getVerseText(bookName, chapNum, verseNum) {
+            const book = KJV_EMBEDDED.books.find(function(b) { return b.name === bookName; });
+            if (!book) return null;
+            const chap = book.chapters.find(function(c) { return c.chapter === chapNum; });
+            if (!chap) return null;
+            const verse = chap.verses.find(function(v) { return v.verse === verseNum; });
+            return verse ? verse.text : null;
+        }
+
         let currentUserId = null;
 
         // Handle PKCE redirect
@@ -148,9 +159,11 @@
             const cards = data.map(function(b) {
                 const ref = b.book_name + ' ' + b.chapter_num + ':' + b.verse_num;
                 const date = new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const verseText = getVerseText(b.book_name, b.chapter_num, b.verse_num);
                 return '<div class="bookmark-card" id="bm-' + b.book_name.replace(/\s/g,'_') + '_' + b.chapter_num + '_' + b.verse_num + '">' +
                     '<div style="flex:1;">' +
                         '<div class="bookmark-ref">' + ref + '</div>' +
+                        (verseText ? '<div class="bookmark-text">' + verseText + '</div>' : '') +
                     '</div>' +
                     '<span class="bookmark-date">Saved ' + date + '</span>' +
                     '<button class="remove-btn" onclick="removeBookmark(\'' + b.book_name.replace(/'/g,"\\'") + '\',' + b.chapter_num + ',' + b.verse_num + ')">Remove</button>' +
