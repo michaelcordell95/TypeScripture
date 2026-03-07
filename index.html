@@ -771,7 +771,42 @@
             if (!['SELECT', 'BUTTON', 'INPUT'].includes(e.target.tagName)) inputEl.focus({ preventScroll: true });
         });
 
+        // Check for URL params (e.g. from bookmarks page)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlBook = urlParams.get('book');
+        const urlChapter = urlParams.get('chapter');
+        const urlVerse = urlParams.get('verse');
+
         updateBooks();
+
+        if (urlBook && urlChapter && urlVerse) {
+            // Set book
+            const bookSel2 = document.getElementById('book-select');
+            for (let i = 0; i < bookSel2.options.length; i++) {
+                if (bookSel2.options[i].value.replace(' ✅','') === urlBook) {
+                    bookSel2.selectedIndex = i; break;
+                }
+            }
+            updateChapters();
+            // Set chapter
+            const chapSel2 = document.getElementById('chapter-select');
+            for (let i = 0; i < chapSel2.options.length; i++) {
+                if (chapSel2.options[i].value === urlChapter) {
+                    chapSel2.selectedIndex = i; break;
+                }
+            }
+            updateVerses();
+            // Set verse (verse-select is 0-indexed)
+            const verseSel2 = document.getElementById('verse-select');
+            for (let i = 0; i < verseSel2.options.length; i++) {
+                if (parseInt(verseSel2.options[i].value) === parseInt(urlVerse) - 1) {
+                    verseSel2.selectedIndex = i; break;
+                }
+            }
+            // Clean URL without reloading
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
         fetchVerses();
 
         // Auth init — runs after all variables and functions are declared
