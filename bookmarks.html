@@ -102,13 +102,12 @@
         <div id="bookmark-list"><div class="loading">Loading...</div></div>
     </div>
 
+    <script src="/bible.js"></script>
     <script>
         const SUPABASE_URL = "https://ddubjpmuomforwickzyb.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdWJqcG11b21mb3J3aWNrenliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTI0ODMsImV4cCI6MjA4ODE2ODQ4M30.wOiDepkS64pRFEpul_sKJ9MIVIVTWzg8BZ1fMTOK3_U";
         const { createClient } = supabase;
         const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce' } });
-
-        const KJV_EMBEDDED = {"books":[{"name":"Genesis","chapters":[{"chapter":1,"verses":[{"verse":1,"text":"In the beginning God created the heaven and the earth."},{"verse":2,"text":"And the earth was without form, and void; and darkness was upon the face of the deep. And the Spirit of God moved upon the face of the waters."}]}]},{"name":"Psalms","chapters":[{"chapter":117,"verses":[{"verse":1,"text":"O praise the LORD, all ye nations: praise him, all ye people."},{"verse":2,"text":"For his merciful kindness is great toward us: and the truth of the LORD endureth for ever. Praise ye the LORD."}]}]}]};
 
         function getVerseText(bookName, chapNum, verseNum) {
             const book = KJV_EMBEDDED.books.find(function(b) { return b.name === bookName; });
