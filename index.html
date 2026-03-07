@@ -222,6 +222,7 @@
         <div class="settings-group">
             <label><input type="checkbox" id="easy-mode" checked onchange="fetchVerses()"> Easy Mode</label>
             <label><input type="checkbox" id="repeat-mode"> Repeat</label>
+            <label><input type="checkbox" id="read-mode" onchange="toggleReadMode()"> Read Mode</label>
         </div>
     </div>
     <div id="stats-bar">
@@ -607,6 +608,16 @@
             if (autoLoad) fetchVerses();
         }
 
+        function toggleReadMode() {
+            const isRead = document.getElementById('read-mode').checked;
+            // Stats bar
+            document.getElementById('stats-bar').style.display = isRead ? 'none' : 'flex';
+            // Hidden input - disable to prevent keyboard on mobile
+            inputEl.disabled = isRead;
+            // Re-render current verse text in appropriate style
+            if (activeVerseText) renderDisplay(isRead ? activeVerseText : '');
+        }
+
         async function fetchVerses() {
             const bookName = bookSel.value.replace(" ✅", "");
             const chapNum = parseInt(chapSel.value);
@@ -731,6 +742,13 @@
         }
 
         function renderDisplay(typed) {
+            const isRead = document.getElementById('read-mode').checked;
+            if (isRead) {
+                displayEl.innerHTML = activeVerseText.split('').map(char =>
+                    `<span class="correct">${char}</span>`
+                ).join('');
+                return;
+            }
             displayEl.innerHTML = activeVerseText.split('').map((char, i) => {
                 let className = (i < typed.length) ? (typed[i] === activeVerseText[i] ? "correct" : "incorrect") : (i === typed.length ? "current-char" : "");
                 return `<span class="${className}">${char}</span>`;
