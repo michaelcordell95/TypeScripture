@@ -69,8 +69,8 @@
         .complete-screen h2 { color: var(--accent); font-size: 1.4em; font-weight: 800; letter-spacing: -0.5px; margin: 0; }
         .complete-screen .avg { color: var(--text-main); font-size: 1em; }
         .complete-screen .avg strong { color: var(--accent); font-size: 1.2em; }
-        #reset-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-        #reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+        #reset-btn, #next-verse-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 16px; line-height: 1; }
+        #reset-btn:hover, #next-verse-btn:hover { border-color: var(--accent); color: var(--accent); }
         #bookmark-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
         #bookmark-btn:hover { border-color: #f0b429; color: #f0b429; }
         #bookmark-btn.bookmarked { border-color: #f0b429; color: #f0b429; }
@@ -185,7 +185,7 @@
         </div>
         <div style="display:flex; align-items:center; gap:10px; justify-content:center; flex-wrap:wrap;">
             <a href="/leaderboard.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text-main)'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">🏆 Leaderboard</a>
-            <a href="/bookmarks.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='#f0b429';this.style.color='#f0b429'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">🔖 Bookmarks</a>
+            <a href="/bookmarks.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='#f0b429';this.style.color='#f0b429'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">⭐ Bookmarks</a>
             <a href="/search.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='#58a6ff';this.style.color='#58a6ff'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">🔍 Search</a>
             <div id="auth-container" style="margin:0; display:flex; gap:8px; align-items:center;">
                 <button id="google-login-btn" onclick="handleGoogleLogin()">
@@ -215,8 +215,9 @@
             <select id="book-select" onchange="updateChapters(true)"></select>
             <select id="chapter-select" onchange="updateVerses(true)"></select>
             <select id="verse-select" onchange="fetchVerses()"></select>
-            <button id="reset-btn" onclick="loadVerse()" title="Restart verse">↺ Reset</button>
-            <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse">🔖</button>
+            <button id="reset-btn" onclick="loadVerse()" title="Restart verse">🔙</button>
+            <button id="next-verse-btn" onclick="goToNextVerse()" title="Next verse">👉</button>
+            <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse">⭐</button>
         </div>
         <div class="settings-group">
             <label><input type="checkbox" id="easy-mode" checked> Easy Mode</label>
@@ -651,6 +652,37 @@
                 updateVerses();
                 fetchVerses();
             }
+        }
+
+        function goToNextVerse() {
+            const bookName = bookSel.value.replace(" ✅", "");
+            const bookIdx = books.indexOf(bookName);
+            let chapNum = parseInt(chapSel.value);
+            let verseIdx = parseInt(verseSel.value); // 0-indexed
+
+            const totalVerses = verseCounts[bookName][chapNum - 1];
+            const totalChaps = chapCounts[bookIdx];
+
+            if (verseIdx + 1 < totalVerses) {
+                // Next verse in same chapter
+                verseSel.value = verseIdx + 1;
+                fetchVerses();
+            } else if (chapNum < totalChaps) {
+                // First verse of next chapter
+                chapSel.value = chapNum + 1;
+                updateVerses();
+                verseSel.value = 0;
+                fetchVerses();
+            } else if (bookIdx + 1 < books.length) {
+                // First verse of next book
+                bookSel.value = books[bookIdx + 1];
+                updateChapters();
+                chapSel.value = 1;
+                updateVerses();
+                verseSel.value = 0;
+                fetchVerses();
+            }
+            // If at very end (Revelation 22:21), do nothing
         }
 
         function showLastVerse(wpm, accuracy, isNewBest) {
