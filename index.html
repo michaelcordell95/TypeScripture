@@ -143,6 +143,9 @@
             .nav-group { flex-wrap: wrap; justify-content: center; }
             .settings-group { border-left: none; padding-left: 0; border-top: 1px solid #30363d; padding-top: 8px; justify-content: center; }
             select { font-size: 13px; max-width: 90px; }
+            #select-group { width: 100%; justify-content: center; }
+            #select-group select { flex: 1; max-width: none; min-width: 0; }
+            #btn-group { justify-content: center; }
 
             /* Stats — stick to top so keyboard can't push them off screen */
             #stats-bar {
@@ -211,10 +214,12 @@
     <div id="bible-progress-container"><div id="bible-progress-fill"></div></div>
     <div id="progress-text">Bible Completion: 0%</div>
     <div id="nav-header">
-        <div class="nav-group">
+        <div class="nav-group" id="select-group">
             <select id="book-select" onchange="updateChapters(true)" aria-label="Book"></select>
             <select id="chapter-select" onchange="updateVerses(true)" aria-label="Chapter"></select>
             <select id="verse-select" onchange="fetchVerses()" aria-label="Verse"></select>
+        </div>
+        <div class="nav-group" id="btn-group">
             <button id="reset-btn" onclick="verseStreak=0; loadVerse();" title="Restart verse" aria-label="Restart verse">🔄</button>
             <button id="next-verse-btn" onclick="goToNextVerse()" title="Next verse" aria-label="Next verse">👉</button>
             <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
@@ -619,6 +624,8 @@
             const isRead = document.getElementById('read-mode').checked;
             // Stats bar
             document.getElementById('stats-bar').style.display = isRead ? 'none' : 'flex';
+            // Hide typing buttons in nav, they move to bottom bar
+            document.getElementById('btn-group').style.display = isRead ? 'none' : 'flex';
             // Hidden input - disable to prevent keyboard on mobile
             inputEl.disabled = isRead;
             // Read nav bar at bottom
