@@ -430,6 +430,8 @@
         }
 
         async function checkAndPromptUsername(userId) {
+            // Don't show username modal when offline — can't save anyway
+            if (!navigator.onLine) return;
             const username = await fetchUsername(userId);
             if (username) {
                 currentUsername = username;
