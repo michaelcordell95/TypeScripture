@@ -470,9 +470,8 @@
                         chapter_num: chapNum,
                         verse_num: verseNum,
                         best_wpm: wpm,
-                        completed: true
-                        // Note: completed_at intentionally omitted so DB uses its DEFAULT on insert
-                        // and doesn't overwrite on update
+                        completed: true,
+                        completed_at: new Date().toISOString()
                     }, { 
                         onConflict: 'user_id,book_name,chapter_num,verse_num'
                     });
@@ -753,7 +752,8 @@
                             chapter_num: chapNum,
                             verse_num: verseNum,
                             best_wpm: 0,
-                            completed: true
+                            completed: true,
+                            completed_at: new Date().toISOString()
                         }, { onConflict: 'user_id,book_name,chapter_num,verse_num',
                              ignoreDuplicates: true });
                     }
