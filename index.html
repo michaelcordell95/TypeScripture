@@ -215,7 +215,7 @@
             <select id="book-select" onchange="updateChapters(true)"></select>
             <select id="chapter-select" onchange="updateVerses(true)"></select>
             <select id="verse-select" onchange="fetchVerses()"></select>
-            <button id="reset-btn" onclick="loadVerse()" title="Restart verse">🔙</button>
+            <button id="reset-btn" onclick="verseStreak=0; loadVerse();" title="Restart verse">🔙</button>
             <button id="next-verse-btn" onclick="goToNextVerse()" title="Next verse">👉</button>
             <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse">⭐</button>
         </div>
@@ -699,7 +699,6 @@
         }
 
         async function loadVerse() {
-            verseStreak = 0;
             if (currentIndex >= currentVerses.length) {
                 showChapterComplete();
                 return;
