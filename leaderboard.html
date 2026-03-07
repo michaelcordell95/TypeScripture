@@ -72,6 +72,7 @@
             <button class="tab active" onclick="switchTab('bible')">&#128214; Bible Completion</button>
             <button class="tab" onclick="switchTab('scores')">&#127963; Scores</button>
             <button class="tab" onclick="switchTab('personal')">&#128100; My Stats</button>
+            <button class="tab" onclick="switchTab('search')">&#128269; Player Search</button>
         </div>
 
         <!-- SCORES TAB -->
@@ -100,6 +101,15 @@
                 </div>
                 <div id="scores-body"><div class="loading">Select a book above</div></div>
             </div>
+        </div>
+
+        <!-- PLAYER SEARCH TAB -->
+        <div id="tab-search" style="display:none;">
+            <div class="browse-row" style="gap:10px;">
+                <input id="search-input" type="text" placeholder="Enter username..." style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:8px 14px;border-radius:6px;font-size:14px;min-width:220px;" />
+                <button onclick="searchPlayer()" style="background:var(--accent);color:#0d1117;border:none;padding:8px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;">Search</button>
+            </div>
+            <div id="search-result"></div>
         </div>
 
         <!-- BIBLE COMPLETION TAB -->
@@ -157,11 +167,12 @@
 
         function switchTab(tab) {
             var tabs = document.querySelectorAll('.tab');
-            var tabNames = ['bible', 'scores', 'personal'];
+            var tabNames = ['bible', 'scores', 'personal', 'search'];
             tabs.forEach(function(t, i) { t.classList.toggle('active', tabNames[i] === tab); });
             document.getElementById('tab-bible').style.display = tab === 'bible' ? 'block' : 'none';
             document.getElementById('tab-scores').style.display = tab === 'scores' ? 'block' : 'none';
             document.getElementById('tab-personal').style.display = tab === 'personal' ? 'block' : 'none';
+            document.getElementById('tab-search').style.display = tab === 'search' ? 'block' : 'none';
             if (tab === 'bible') loadBibleCompletionLeaderboard();
             if (tab === 'scores') populateScoresBookSelect();
             if (tab === 'personal') loadPersonalStats();
@@ -493,6 +504,70 @@
         }
 
 
+
+        async function searchPlayer() {
+            var username = document.getElementById('search-input').value.trim();
+            var resultEl = document.getElementById('search-result');
+            if (!username) return;
+            resultEl.innerHTML = '<div class="loading">Searching...</div>';
+
+            // Look up profile
+            var profResult = await supabaseClient.from('profiles').select('id, username').ilike('username', username).limit(1);
+            if (profResult.error || !profResult.data || profResult.data.length === 0) {
+                resultEl.innerHTML = '<div class="empty">No player found with that username.</div>';
+                return;
+            }
+            var profile = profResult.data[0];
+            var uid = profile.id;
+
+            // Fetch their verse progress
+            var result = await supabaseClient.from('verse_progress').select('book_name, chapter_num, verse_num, best_wpm').eq('user_id', uid);
+            if (result.error) { resultEl.innerHTML = '<div class="empty">Error loading stats.</div>'; return; }
+
+            var rows = result.data || [];
+            var withWpm = rows.filter(function(r) { return r.best_wpm > 0; });
+            var totalWpm = withWpm.reduce(function(s, r) { return s + r.best_wpm; }, 0);
+            var avgWpm = withWpm.length > 0 ? Math.round(totalWpm / withWpm.length) : 0;
+            var bestWpm = withWpm.length > 0 ? Math.max.apply(null, withWpm.map(function(r) { return r.best_wpm; })) : 0;
+            var pct = (rows.length / TOTAL_VERSES_BIBLE) * 100;
+            var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
+
+            // Count books and chapters completed
+            var completedKeys = {};
+            rows.forEach(function(r) { completedKeys[r.book_name + '|' + r.chapter_num + '|' + r.verse_num] = true; });
+            var booksCompleted = books.filter(function(book) {
+                var chapters = verseCounts[book]; if (!chapters) return false;
+                for (var c = 0; c < chapters.length; c++) for (var v = 1; v <= chapters[c]; v++) if (!completedKeys[book + '|' + (c+1) + '|' + v]) return false;
+                return true;
+            }).length;
+            var chaptersCompleted = 0;
+            books.forEach(function(book) {
+                var chapters = verseCounts[book]; if (!chapters) return;
+                for (var c = 0; c < chapters.length; c++) {
+                    var allDone = true;
+                    for (var v = 1; v <= chapters[c]; v++) { if (!completedKeys[book + '|' + (c+1) + '|' + v]) { allDone = false; break; } }
+                    if (allDone) chaptersCompleted++;
+                }
+            });
+
+            var isYou = uid === currentUserId;
+            resultEl.innerHTML =
+                '<div style="padding:16px 20px;border-bottom:1px solid #30363d;">' +
+                    '<span style="font-size:16px;font-weight:800;color:var(--accent);">' + profile.username + '</span>' +
+                    (isYou ? ' <span style="font-size:11px;color:var(--text-muted);">(you)</span>' : '') +
+                '</div>' +
+                '<div class="stats-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#30363d;">' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + displayPct + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Bible Completion</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + rows.length.toLocaleString() + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Verses Typed</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + booksCompleted + ' / 66</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Books Complete</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + chaptersCompleted + ' / 1189</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Chapters Complete</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + avgWpm + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Avg WPM</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + bestWpm + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Best WPM</div></div>' +
+                '</div>';
+        }
+
+        // Allow pressing Enter in search box
+        document.getElementById('search-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchPlayer(); });
 
         init().then(function() { loadBibleCompletionLeaderboard(); });
     </script>
