@@ -250,8 +250,9 @@
     <div id="accuracy-warning"></div>
     <div id="display"></div>
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:16px 20px; display:none; justify-content:center; align-items:center; gap:24px; z-index:100;">
-        <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">👈</button>
         <button id="read-bookmark-btn" onclick="toggleBookmark()" aria-label="Bookmark this verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">⭐</button>
+        <button id="read-share-btn" onclick="shareVerse()" aria-label="Copy verse to share" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">📋</button>
+        <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">👈</button>
         <button id="read-next-btn" onclick="goToNextVerse()" aria-label="Next verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">👉</button>
     </div>
     <input type="text" id="hidden-input" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none">
@@ -836,6 +837,38 @@
             const isBookmarked = document.getElementById('bookmark-btn').classList.contains('bookmarked');
             btn.style.color = isBookmarked ? '#f0b429' : 'var(--text-muted)';
             btn.style.borderColor = isBookmarked ? '#f0b429' : '#30363d';
+        }
+
+        function shareVerse() {
+            if (!activeVerseText) return;
+            const bookName = document.getElementById('book-select').value.replace(' ✅', '');
+            const chapNum = document.getElementById('chapter-select').value;
+            const verseNum = parseInt(document.getElementById('verse-select').value) + 1;
+            const ref = bookName + ' ' + chapNum + ':' + verseNum;
+            const text = ref + ' ' + activeVerseText;
+
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('read-share-btn');
+                btn.innerText = '✅';
+                btn.style.borderColor = '#2ea043';
+                btn.style.color = '#2ea043';
+                setTimeout(() => {
+                    btn.innerText = '📋';
+                    btn.style.borderColor = '#30363d';
+                    btn.style.color = 'var(--text-muted)';
+                }, 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                const btn = document.getElementById('read-share-btn');
+                btn.innerText = '✅';
+                setTimeout(() => { btn.innerText = '📋'; }, 2000);
+            });
         }
 
         function goToPrevVerse() {
