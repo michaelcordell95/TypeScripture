@@ -264,7 +264,7 @@
     <div id="read-ref-box" style="display:none; text-align:center; margin-bottom:1.5vh;"></div>
     <div id="accuracy-warning"></div>
     <div id="display"></div>
-    <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:16px 20px; display:none; justify-content:center; align-items:center; gap:24px; z-index:100;">
+    <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:16px 20px; justify-content:center; align-items:center; gap:24px; z-index:100;">
         <button id="read-bookmark-btn" onclick="toggleBookmark()" aria-label="Bookmark this verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">⭐</button>
         <button id="read-share-btn" onclick="shareVerse()" aria-label="Copy verse to share" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">📋</button>
         <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">👈</button>
@@ -836,8 +836,9 @@
             if (isRead) document.getElementById('easy-mode').checked = false;
             // Hide typing buttons in nav, they move to bottom bar
             document.getElementById('btn-group').style.display = isRead ? 'none' : 'flex';
-            // Hidden input - disable to prevent keyboard on mobile
+            // Hidden input - disable and hide to prevent it blocking read nav buttons
             inputEl.disabled = isRead;
+            inputEl.style.height = isRead ? '1px' : '44px';
             // Read nav bar at bottom
             const readNav = document.getElementById('read-nav');
             readNav.style.display = isRead ? 'flex' : 'none';
@@ -1161,13 +1162,6 @@
 
         updateBooks();
 
-        // Auto-enable Read Mode on mobile
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 600;
-        if (isMobile) {
-            document.getElementById('read-mode').checked = true;
-            toggleReadMode();
-        }
-
         if (urlBook && urlChapter && urlVerse) {
             // Set book
             const bookSel2 = document.getElementById('book-select');
@@ -1198,6 +1192,13 @@
 
         fetchVerses();
 
+        // Auto-enable Read Mode on mobile (after fetchVerses so it's last)
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 600;
+        if (isMobile) {
+            document.getElementById('read-mode').checked = true;
+            toggleReadMode();
+        }
+
         // Auth init — runs after all variables and functions are declared
         checkAuth();
 
@@ -1221,6 +1222,9 @@
             }
         });
     </script>
+    <div style="text-align:center; padding: 24px 0 8px; font-size: 12px; position:relative; z-index:60;">
+        <a href="/about.html" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">👤 About &amp; Contact</a>
+    </div>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
