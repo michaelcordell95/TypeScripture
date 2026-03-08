@@ -218,7 +218,7 @@
     <div class="nav-links">
         <a class="nav-link" href="/">&#127381; Type</a>
         <a class="nav-link" href="/leaderboard.html">&#127942; Leaderboard</a>
-        <a class="nav-link" href="/bookmarks.html">&#128278; Bookmarks</a>
+        <a class="nav-link" href="/bookmarks.html">⭐ Bookmarks</a>
         <a class="nav-link active" href="/search.html">&#128269; Search</a>
     </div>
 </div>
@@ -256,7 +256,7 @@
     const SUPABASE_URL = "https://ddubjpmuomforwickzyb.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdWJqcG11b21mb3J3aWNrenliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTI0ODMsImV4cCI6MjA4ODE2ODQ4M30.wOiDepkS64pRFEpul_sKJ9MIVIVTWzg8BZ1fMTOK3_U";
     const { createClient } = supabase;
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce' } });
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' } });
 
     const PAGE_SIZE = 20;
     let allResults = [];
