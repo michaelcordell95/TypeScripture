@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+    <title>TypeScripture — About</title>
+    <style>
+        :root {
+            --bg-dark: #0d1117; --panel-bg: #161b22; --accent: #58a6ff;
+            --text-main: #c9d1d9; --text-muted: #8b949e; --text-bright: #ffffff;
+            --border: #30363d;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: var(--bg-dark); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 20px; }
+
+        .header { display: flex; align-items: center; justify-content: space-between; max-width: 700px; margin: 0 auto 24px; flex-wrap: wrap; gap: 10px; }
+        .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+        .logo-text { font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
+        .logo-text span { color: var(--text-bright); }
+        .back-link { color: var(--text-muted); font-size: 13px; text-decoration: none; border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; transition: all 0.2s; }
+        .back-link:hover { color: var(--text-main); border-color: var(--accent); }
+
+        .content { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+        .panel { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+        .panel-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
+
+        .story-text { font-size: 15px; line-height: 1.8; color: var(--text-main); }
+        .story-text p { margin-bottom: 16px; }
+        .story-text p:last-child { margin-bottom: 0; }
+        .story-text strong { color: var(--text-bright); }
+
+        .verse-quote {
+            border-left: 3px solid var(--accent);
+            padding: 12px 16px;
+            background: rgba(88,166,255,0.06);
+            border-radius: 0 8px 8px 0;
+            font-size: 14px; color: var(--text-muted); font-style: italic; margin: 16px 0;
+        }
+        .verse-quote cite { display: block; margin-top: 6px; font-style: normal; font-size: 12px; color: var(--accent); }
+
+        .moment-card { display: flex; gap: 14px; align-items: flex-start; padding: 16px; background: #21262d; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; }
+        .moment-card:last-child { margin-bottom: 0; }
+        .moment-card .icon { font-size: 24px; flex-shrink: 0; line-height: 1; margin-top: 2px; }
+        .moment-card .text { font-size: 14px; line-height: 1.7; color: var(--text-main); }
+        .moment-card .text strong { color: var(--text-bright); }
+
+        .support-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 480px) { .support-grid { grid-template-columns: 1fr; } }
+
+        .support-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: #21262d; border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--text-main); transition: border-color 0.2s, background 0.2s; }
+        .support-card:hover { border-color: var(--accent); background: rgba(88,166,255,0.06); }
+        .support-card .emoji { font-size: 28px; line-height: 1; flex-shrink: 0; }
+        .support-card .info .name { font-size: 14px; font-weight: 700; color: var(--text-bright); }
+        .support-card .info .handle { font-size: 12px; color: var(--accent); margin-top: 2px; }
+        .support-card .info .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        .social-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: #21262d; border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--text-main); transition: border-color 0.2s, background 0.2s; }
+        .social-card:hover { border-color: var(--accent); background: rgba(88,166,255,0.06); }
+        .social-card .emoji { font-size: 28px; flex-shrink: 0; }
+        .social-card .info .name { font-size: 14px; font-weight: 700; color: var(--text-bright); }
+        .social-card .info .handle { font-size: 12px; color: var(--accent); margin-top: 2px; }
+        .social-card .info .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        .cta-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #0d1117; font-weight: 700; font-size: 14px; padding: 10px 24px; border-radius: 8px; text-decoration: none; transition: background 0.2s; }
+        .cta-btn:hover { background: #79b8ff; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <a class="brand" href="/">
+        <span style="font-size:40px; line-height:1; color:var(--accent);">✝</span>
+        <div class="logo-text">Type<span>Scripture</span></div>
+    </a>
+    <a class="back-link" href="/">&#8592; Back to Typing</a>
+</div>
+
+<div class="content">
+
+    <!-- STORY -->
+    <div class="panel">
+        <div class="panel-title">👤 About the Developer</div>
+        <div class="story-text">
+            <p>Hey, I'm Michael — a student studying IT and web development, and a self-described newbie typist. I built TypeScripture because I got tired of typing random words and wanted my practice to actually mean something.</p>
+            <div class="verse-quote">
+                "Therefore being justified by faith, we have peace with God through our Lord Jesus Christ:"
+                <cite>Romans 5:1</cite>
+            </div>
+            <p>I was grinding away on typing games and it hit me — <strong>why am I memorizing nonsense when I could be learning scripture at the same time?</strong> So I decided to build it myself using AI.</p>
+        </div>
+    </div>
+
+    <!-- MOMENTS -->
+    <div class="panel">
+        <div class="panel-title">📖 How it happened</div>
+        <div class="moment-card">
+            <div class="icon">✈️</div>
+            <div class="text"><strong>The idea started on a trip to Korea.</strong> I went to meet my fiancée's family. While everyone was sleeping I opened Google Gemini and built a rough version overnight just to show her before she woke up.</div>
+        </div>
+        <div class="moment-card">
+            <div class="icon">📱</div>
+            <div class="text"><strong>I beta tested it on the 16 hour flight home.</strong> I propped my phone up against my laptop, opened my Bible app to Acts 7, and typed the whole thing into Notepad. That was the first real test.</div>
+        </div>
+        <div class="moment-card">
+            <div class="icon">✝️</div>
+            <div class="text"><strong>I made this for God's glory, not for profit.</strong> If you sign up I'm not going to sell your email, spam you, or do anything weird with your data. It's just a typing app built by a guy who loves the Word.</div>
+        </div>
+        <div class="moment-card">
+            <div class="icon">🇰🇷</div>
+            <div class="text"><strong>The first version is still live</strong> at <a href="https://michaelcordell95.github.io/bibletype/" target="_blank" rel="noopener" style="color:var(--accent);">michaelcordell95.github.io/bibletype</a> — it even has a Korean mode I built so her family could use it.</div>
+        </div>
+    </div>
+
+    <!-- SUPPORT -->
+    <div class="panel">
+        <div class="panel-title">💛 Support</div>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:16px;">It will always be free — but the domain name did cost me like $10 😂</p>
+        <div class="support-grid">
+            <a class="support-card" href="https://cash.app/$mc95ca" target="_blank" rel="noopener">
+                <div class="emoji">💵</div>
+                <div class="info">
+                    <div class="name">Cash App</div>
+                    <div class="handle">$mc95ca</div>
+                    <div class="sub">Tap to send</div>
+                </div>
+            </a>
+            <a class="support-card" href="https://paypal.me/michaelcordell609" target="_blank" rel="noopener">
+                <div class="emoji">🅿️</div>
+                <div class="info">
+                    <div class="name">PayPal</div>
+                    <div class="handle">@michaelcordell609</div>
+                    <div class="sub">Tap to send</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- SOCIAL -->
+    <div class="panel">
+        <div class="panel-title">🐦 Follow Along</div>
+        <a class="social-card" href="https://x.com/typescripture" target="_blank" rel="noopener">
+            <div class="emoji">🐦</div>
+            <div class="info">
+                <div class="name">Michael | TypeScripture</div>
+                <div class="handle">@typescripture on X</div>
+                <div class="sub">Updates, new features &amp; behind the scenes</div>
+            </div>
+        </a>
+    </div>
+
+    <!-- CTA -->
+    <div class="panel" style="text-align:center;">
+        <div class="panel-title" style="text-align:center;">⌨️ Ready to type the Word?</div>
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:20px;">Free to use. No sign-up needed. Just pick a verse and start typing.</p>
+        <a class="cta-btn" href="/">⌨️ Start Typing</a>
+    </div>
+
+</div>
+</body>
+</html>
