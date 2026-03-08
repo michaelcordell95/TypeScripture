@@ -95,6 +95,7 @@
         #bookmark-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
         #bookmark-btn:hover { border-color: #f0b429; color: #f0b429; }
         #bookmark-btn.bookmarked { border-color: #f0b429; color: #f0b429; }
+        #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
         .next-btn { padding: 12px 32px; font-size: 1em; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
         .next-btn:hover { opacity: 0.85; }
         #last-verse-box {
@@ -267,8 +268,8 @@
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:16px 20px; justify-content:center; align-items:center; gap:24px; z-index:100;">
         <button id="read-bookmark-btn" onclick="toggleBookmark()" aria-label="Bookmark this verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">⭐</button>
         <button id="read-share-btn" onclick="shareVerse()" aria-label="Copy verse to share" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">📋</button>
-        <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">◀️</button>
-        <button id="read-next-btn" onclick="goToNextVerse()" aria-label="Next verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">▶️</button>
+        <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">&#9664;</button>
+        <button id="read-next-btn" onclick="goToNextVerse()" aria-label="Next verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">&#9654;</button>
     </div>
     <input type="text" id="hidden-input" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none">
 
