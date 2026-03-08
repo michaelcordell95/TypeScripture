@@ -44,8 +44,8 @@
         .logo-text span { color: var(--text-bright); }
         #auth-container { margin-bottom: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; align-items: center; }
         #auth-container { margin-bottom: 0; }
-        #google-login-btn { display: flex; align-items: center; gap: 6px; background: #21262d; color: var(--text-muted); font-weight: 500; border: 1px solid #30363d; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
-        #google-login-btn:hover { border-color: var(--accent); color: var(--text-main); }
+        #google-login-btn { display: flex; align-items: center; gap: 6px; background: rgba(88,166,255,0.12); color: var(--accent); font-weight: 600; border: 1px solid var(--accent); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        #google-login-btn:hover { background: rgba(88,166,255,0.22); color: var(--text-bright); }
         #google-login-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
         #logout-btn { background: transparent; color: var(--text-muted); display: none; border: 1px solid #30363d; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
         #logout-btn:hover { border-color: var(--error); color: var(--error); }
@@ -72,7 +72,7 @@
         }
         #read-ref-box .ref-main { font-size: 15px; font-weight: 700; color: var(--accent); }
         #read-ref-box .ref-sep { color: #30363d; }
-        #read-ref-box .ref-sub { font-size: 13px; color: var(--text-muted); }
+        #read-ref-box .ref-sub { font-size: 13px; color: var(--accent); font-weight: 600; }
         .stat-box { text-align: center; background: var(--panel-bg); padding: 10px 15px; border-radius: 8px; border: 1px solid #30363d; min-width: 85px; }
         .stat-value { font-size: 22px; font-weight: bold; color: var(--accent); display: block; }
         .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
@@ -267,8 +267,8 @@
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:16px 20px; justify-content:center; align-items:center; gap:24px; z-index:100;">
         <button id="read-bookmark-btn" onclick="toggleBookmark()" aria-label="Bookmark this verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">⭐</button>
         <button id="read-share-btn" onclick="shareVerse()" aria-label="Copy verse to share" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">📋</button>
-        <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">👈</button>
-        <button id="read-next-btn" onclick="goToNextVerse()" aria-label="Next verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">👉</button>
+        <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">◀️</button>
+        <button id="read-next-btn" onclick="goToNextVerse()" aria-label="Next verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:32px; width:72px; height:72px; cursor:pointer; transition:all 0.15s;">▶️</button>
     </div>
     <input type="text" id="hidden-input" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none">
 
