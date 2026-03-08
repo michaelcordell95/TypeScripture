@@ -1120,16 +1120,17 @@
                     completedSet.add(`KJV_${bookName}_${chapNum}_${verseNum}`);
                     localStorage.setItem('typeScriptureProgressSet', JSON.stringify(Array.from(completedSet)));
                     if (currentUserId) {
+                        // Get current best WPM so we don't overwrite it with 0
+                        const existingWpm = parseInt(localStorage.getItem(`best_KJV_${bookName}_${chapNum}_${verseNum}`)) || 0;
                         supabaseClient?.from('verse_progress').upsert({
                             user_id: currentUserId,
                             book_name: bookName,
                             chapter_num: chapNum,
                             verse_num: verseNum,
-                            best_wpm: 0,
+                            best_wpm: existingWpm,
                             completed: true,
                             completed_at: new Date().toISOString()
-                        }, { onConflict: 'user_id,book_name,chapter_num,verse_num',
-                             ignoreDuplicates: true });
+                        }, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
                     }
                     updateBibleProgress();
                     updateBooks();
