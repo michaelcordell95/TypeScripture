@@ -270,7 +270,7 @@
         try {
             const { createClient } = supabase;
             supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
-                auth: { flowType: 'pkce' }
+                auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' }
             });
         } catch(e) {
             console.warn('Supabase not available — running in offline mode:', e.message);
