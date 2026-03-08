@@ -59,6 +59,17 @@
         .settings-group label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
         select, button { background: #21262d; border: 1px solid #30363d; color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; }
         #stats-bar { display: flex; gap: 12px; margin-bottom: 1.5vh; justify-content: center; }
+        #read-ref-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 8px 16px;
+            display: inline-block;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        #read-ref-box .ref-main { font-size: 16px; font-weight: 700; color: var(--accent); }
+        #read-ref-box .ref-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
         .stat-box { text-align: center; background: var(--panel-bg); padding: 10px 15px; border-radius: 8px; border: 1px solid #30363d; min-width: 85px; }
         .stat-value { font-size: 22px; font-weight: bold; color: var(--accent); display: block; }
         .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
@@ -247,6 +258,7 @@
         <div class="stat-box"><span class="stat-value" id="progress">0/0</span><span class="stat-label">Verse</span></div>
     </div>
     <div id="last-verse-box"></div>
+    <div id="read-ref-box" style="display:none; text-align:center; margin-bottom:1.5vh;"></div>
     <div id="accuracy-warning"></div>
     <div id="display"></div>
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:16px 20px; display:none; justify-content:center; align-items:center; gap:24px; z-index:100;">
@@ -807,12 +819,16 @@
             }
             if(currentVerseIdx && verseSel.options[currentVerseIdx]) verseSel.value = currentVerseIdx;
             if (autoLoad) fetchVerses();
+            updateReadRefBox();
         }
 
         function toggleReadMode() {
             const isRead = document.getElementById('read-mode').checked;
             // Stats bar
             document.getElementById('stats-bar').style.display = isRead ? 'none' : 'flex';
+            // Hide last verse message in read mode, show ref box instead
+            document.getElementById('last-verse-box').style.display = isRead ? 'none' : '';
+            updateReadRefBox();
             // Turn off easy mode when reading (not helpful for reading)
             if (isRead) document.getElementById('easy-mode').checked = false;
             // Hide typing buttons in nav, they move to bottom bar
@@ -829,6 +845,24 @@
             syncReadBookmark();
             // Re-render current verse text in appropriate style
             if (activeVerseText) renderDisplay(isRead ? activeVerseText : '');
+        }
+
+        function updateReadRefBox() {
+            const isRead = document.getElementById('read-mode').checked;
+            const box = document.getElementById('read-ref-box');
+            if (!isRead) { box.style.display = 'none'; return; }
+            const bookName = document.getElementById('book-select').value.replace(' ✅', '');
+            const chapNum = parseInt(document.getElementById('chapter-select').value);
+            const verseIdx = parseInt(document.getElementById('verse-select').value);
+            const verseNum = verseIdx + 1;
+            // Get total verses in chapter
+            const book = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            const chap = book ? book.chapters.find(c => c.chapter === chapNum) : null;
+            const totalVerses = chap ? chap.verses.length : '?';
+            box.style.display = 'block';
+            box.innerHTML =
+                '<div class="ref-main">' + bookName + ' ' + chapNum + ':' + verseNum + '</div>' +
+                '<div class="ref-sub">Verse ' + verseNum + ' of ' + totalVerses + '</div>';
         }
 
         function syncReadBookmark() {
