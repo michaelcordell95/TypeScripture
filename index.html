@@ -64,12 +64,15 @@
             border: 1px solid #30363d;
             border-radius: 8px;
             padding: 8px 16px;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
             font-size: 14px;
             color: var(--text-muted);
         }
-        #read-ref-box .ref-main { font-size: 16px; font-weight: 700; color: var(--accent); }
-        #read-ref-box .ref-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+        #read-ref-box .ref-main { font-size: 15px; font-weight: 700; color: var(--accent); }
+        #read-ref-box .ref-sep { color: #30363d; }
+        #read-ref-box .ref-sub { font-size: 13px; color: var(--text-muted); }
         .stat-box { text-align: center; background: var(--panel-bg); padding: 10px 15px; border-radius: 8px; border: 1px solid #30363d; min-width: 85px; }
         .stat-value { font-size: 22px; font-weight: bold; color: var(--accent); display: block; }
         .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
@@ -847,22 +850,22 @@
             if (activeVerseText) renderDisplay(isRead ? activeVerseText : '');
         }
 
-        function updateReadRefBox() {
+        function updateReadRefBox(overrideVerseIdx) {
             const isRead = document.getElementById('read-mode').checked;
             const box = document.getElementById('read-ref-box');
             if (!isRead) { box.style.display = 'none'; return; }
             const bookName = document.getElementById('book-select').value.replace(' ✅', '');
             const chapNum = parseInt(document.getElementById('chapter-select').value);
-            const verseIdx = parseInt(document.getElementById('verse-select').value);
+            const verseIdx = overrideVerseIdx !== undefined ? overrideVerseIdx : parseInt(document.getElementById('verse-select').value);
             const verseNum = verseIdx + 1;
-            // Get total verses in chapter
             const book = KJV_EMBEDDED.books.find(b => b.name === bookName);
             const chap = book ? book.chapters.find(c => c.chapter === chapNum) : null;
             const totalVerses = chap ? chap.verses.length : '?';
-            box.style.display = 'block';
+            box.style.display = 'flex';
             box.innerHTML =
-                '<div class="ref-main">' + bookName + ' ' + chapNum + ':' + verseNum + '</div>' +
-                '<div class="ref-sub">Verse ' + verseNum + ' of ' + totalVerses + '</div>';
+                '<span class="ref-main">' + bookName + ' ' + chapNum + '</span>' +
+                '<span class="ref-sep">·</span>' +
+                '<span class="ref-sub">Verse ' + verseNum + ' of ' + totalVerses + '</span>';
         }
 
         function syncReadBookmark() {
@@ -914,6 +917,7 @@
             if (verseIdx > 0) {
                 verseSel.value = verseIdx - 1;
                 fetchVerses();
+                updateReadRefBox(verseIdx - 1);
             } else if (chapNum > 1) {
                 chapSel.value = chapNum - 1;
                 updateVerses();
@@ -994,6 +998,7 @@
                 // Next verse in same chapter
                 verseSel.value = verseIdx + 1;
                 fetchVerses();
+                updateReadRefBox(verseIdx + 1);
             } else if (chapNum < totalChaps) {
                 // First verse of next chapter
                 chapSel.value = chapNum + 1;
