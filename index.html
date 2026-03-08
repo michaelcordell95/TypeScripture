@@ -557,6 +557,7 @@
         // Load user progress from Supabase
         async function loadUserProgress() {
             if (!currentUserId) return;
+            await flushPendingProgress();
             await flushPendingBookmarks();
             await refreshBookmarkCache();
 
@@ -593,6 +594,43 @@
             }
         }
 
+        // ===== OFFLINE PROGRESS QUEUE =====
+        function progressPendingKey() { return 'tsProgressPending_' + currentUserId; }
+        function getProgressQueue() {
+            try { return JSON.parse(localStorage.getItem(progressPendingKey())) || []; }
+            catch(e) { return []; }
+        }
+        function saveProgressQueue(queue) {
+            localStorage.setItem(progressPendingKey(), JSON.stringify(queue));
+        }
+
+        async function flushPendingProgress() {
+            if (!currentUserId || !supabaseClient || !navigator.onLine) return;
+            const queue = getProgressQueue();
+            if (queue.length === 0) return;
+            console.log('Flushing', queue.length, 'pending progress saves...');
+            const remaining = [];
+            for (const item of queue) {
+                try {
+                    const { error } = await supabaseClient.from('verse_progress').upsert({
+                        user_id: currentUserId,
+                        book_name: item.book,
+                        chapter_num: item.chap,
+                        verse_num: item.verse,
+                        best_wpm: item.wpm,
+                        completed: true,
+                        completed_at: item.completedAt
+                    }, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
+                    if (error) throw error;
+                    console.log('✓ Synced progress:', item.book, item.chap + ':' + item.verse, 'WPM:', item.wpm);
+                } catch(e) {
+                    console.warn('Failed to sync progress, keeping in queue:', e);
+                    remaining.push(item);
+                }
+            }
+            saveProgressQueue(remaining);
+        }
+
         // Save verse to Supabase database
         async function saveVerseToDatabase(bookName, chapNum, verseNum, wpm) {
             if (!currentUserId) {
@@ -600,39 +638,64 @@
                 return;
             }
 
+            const payload = {
+                user_id: currentUserId,
+                book_name: bookName,
+                chapter_num: chapNum,
+                verse_num: verseNum,
+                best_wpm: wpm,
+                completed: true,
+                completed_at: new Date().toISOString()
+            };
+
+            if (!navigator.onLine) {
+                // Queue for later sync
+                const queue = getProgressQueue();
+                // Keep only the highest WPM for this verse in the queue
+                const idx = queue.findIndex(q => q.book === bookName && q.chap === chapNum && q.verse === verseNum);
+                const entry = { book: bookName, chap: chapNum, verse: verseNum, wpm, completedAt: payload.completed_at };
+                if (idx >= 0) {
+                    if (wpm > queue[idx].wpm) queue[idx] = entry;
+                } else {
+                    queue.push(entry);
+                }
+                saveProgressQueue(queue);
+                console.log('📶 Offline — queued progress save for', bookName, chapNum + ':' + verseNum);
+                return;
+            }
+
             try {
                 console.log('Saving to Supabase:', { bookName, chapNum, verseNum, wpm, userId: currentUserId });
-                
-                const { data, error } = await supabaseClient
+                const { error } = await supabaseClient
                     .from('verse_progress')
-                    .upsert({
-                        user_id: currentUserId,
-                        book_name: bookName,
-                        chapter_num: chapNum,
-                        verse_num: verseNum,
-                        best_wpm: wpm,
-                        completed: true,
-                        completed_at: new Date().toISOString()
-                    }, { 
-                        onConflict: 'user_id,book_name,chapter_num,verse_num'
-                    });
-
+                    .upsert(payload, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
                 if (error) {
                     console.error('❌ Supabase upsert error:', error);
                     if (error.code === '42501') {
-                        console.error('→ RLS policy blocking write. In Supabase: Authentication > Policies > verse_progress, add INSERT and UPDATE policies for authenticated users.');
+                        console.error('→ RLS policy blocking write.');
                     }
                     throw error;
                 }
                 console.log('✓ Saved to Supabase:', bookName, chapNum + ':' + verseNum, '- WPM:', wpm);
             } catch (err) {
-                console.error('❌ Error saving verse to database:', err);
+                console.error('❌ Error saving verse to database, queuing:', err);
+                const queue = getProgressQueue();
+                const idx = queue.findIndex(q => q.book === bookName && q.chap === chapNum && q.verse === verseNum);
+                const entry = { book: bookName, chap: chapNum, verse: verseNum, wpm, completedAt: payload.completed_at };
+                if (idx >= 0) { if (wpm > queue[idx].wpm) queue[idx] = entry; }
+                else queue.push(entry);
+                saveProgressQueue(queue);
             }
         }
 
         // Get best WPM from database
         async function getBestWpmFromDatabase(bookName, chapNum, verseNum) {
             if (!currentUserId) return 0;
+
+            // Check pending queue first — may have a higher WPM not yet synced
+            const queued = getProgressQueue().find(q => q.book === bookName && q.chap === chapNum && q.verse === verseNum);
+
+            if (!navigator.onLine) return queued?.wpm || 0;
 
             try {
                 const { data, error } = await supabaseClient
@@ -642,12 +705,12 @@
                     .eq('book_name', bookName)
                     .eq('chapter_num', chapNum)
                     .eq('verse_num', verseNum)
-                    .maybeSingle(); // maybeSingle returns null instead of 406 error when no row exists
-
+                    .maybeSingle();
                 if (error) throw error;
-                return data?.best_wpm || 0;
+                const dbWpm = data?.best_wpm || 0;
+                return Math.max(dbWpm, queued?.wpm || 0);
             } catch (err) {
-                return 0;
+                return queued?.wpm || 0;
             }
         }
 
@@ -1086,8 +1149,9 @@
             navigator.serviceWorker.register('/sw.js');
         }
 
-        // Flush pending bookmarks when back online
+        // Flush pending data when back online
         window.addEventListener('online', () => {
+            flushPendingProgress();
             flushPendingBookmarks();
         });
 
