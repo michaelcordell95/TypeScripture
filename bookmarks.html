@@ -63,6 +63,21 @@
             cursor: pointer; font-size: 12px; white-space: nowrap;
         }
         .remove-btn:hover { border-color: var(--error); color: var(--error); }
+        .note-btn {
+            background: transparent; border: 1px solid #30363d;
+            color: var(--text-muted); padding: 5px 10px; border-radius: 6px;
+            cursor: pointer; font-size: 12px; white-space: nowrap;
+        }
+        .note-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .note-btn.has-note { border-color: #f0b429; color: #f0b429; }
+        .note-area {
+            display: none; width: 100%; margin-top: 10px;
+            background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+            color: var(--text-main); font-size: 13px; padding: 10px;
+            resize: vertical; min-height: 72px; font-family: inherit; line-height: 1.5;
+        }
+        .note-area:focus { outline: none; border-color: var(--accent); }
+        .note-area.open { display: block; }
         .loading { text-align: center; color: var(--text-muted); padding: 40px; }
         .empty { text-align: center; color: var(--text-muted); padding: 60px 20px; font-size: 14px; }
         .empty .emoji { font-size: 40px; display: block; margin-bottom: 12px; }
@@ -208,13 +223,22 @@
                     : 'Cached';
                 const verseText = getVerseText(b.book_name, b.chapter_num, b.verse_num);
                 const verseUrl = '/?book=' + encodeURIComponent(b.book_name) + '&chapter=' + b.chapter_num + '&verse=' + b.verse_num;
-                return '<div class="bookmark-card" id="bm-' + b.book_name.replace(/\s/g,'_') + '_' + b.chapter_num + '_' + b.verse_num + '">' +
-                    '<div style="flex:1;">' +
+                const noteKey = 'tsNote_' + currentUserId + '_' + b.book_name + '_' + b.chapter_num + '_' + b.verse_num;
+                const savedNote = localStorage.getItem(noteKey) || (b.notes || '');
+                const hasNote = savedNote.trim().length > 0;
+                const cardId = 'bm-' + b.book_name.replace(/\s/g,'_') + '_' + b.chapter_num + '_' + b.verse_num;
+                return '<div class="bookmark-card" id="' + cardId + '" style="flex-wrap:wrap;">' +
+                    '<div style="flex:1;min-width:0;">' +
                         '<a href="' + verseUrl + '" style="text-decoration:none;"><div class="bookmark-ref" style="cursor:pointer;">↗ ' + ref + '</div></a>' +
                         (verseText ? '<div class="bookmark-text">' + verseText + '</div>' : '') +
+                        '<textarea class="note-area" id="note-' + cardId + '" placeholder="Add a note..." ' +
+                            'onblur="saveNote(this, \'' + b.book_name.replace(/'/g,"\'") + '\',' + b.chapter_num + ',' + b.verse_num + ')">' + savedNote + '</textarea>' +
                     '</div>' +
-                    '<span class="bookmark-date">Saved ' + date + '</span>' +
-                    '<button class="remove-btn" onclick="removeBookmark(\'' + b.book_name.replace(/'/g,"\'") + '\',' + b.chapter_num + ',' + b.verse_num + ')">Remove</button>' +
+                    '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">' +
+                        '<span class="bookmark-date">Saved ' + date + '</span>' +
+                        '<button class="note-btn' + (hasNote ? ' has-note' : '') + '" id="notebtn-' + cardId + '" onclick="toggleNote(\'' + cardId + '\')">📝</button>' +
+                        '<button class="remove-btn" onclick="removeBookmark(\'' + b.book_name.replace(/'/g,"\'") + '\',' + b.chapter_num + ',' + b.verse_num + ')">✕</button>' +
+                    '</div>' +
                 '</div>';
             }).join('');
             document.getElementById('bookmark-list').innerHTML = offlineBadge + '<div class="bookmark-list">' + cards + '</div>';
@@ -294,6 +318,50 @@
         async function handleLogout() {
             await sb.auth.signOut();
             window.location.reload();
+        }
+
+        function toggleNote(cardId) {
+            const area = document.getElementById('note-' + cardId);
+            const btn = document.getElementById('notebtn-' + cardId);
+            if (!area) return;
+            area.classList.toggle('open');
+            if (area.classList.contains('open')) {
+                area.focus();
+                btn.style.borderColor = 'var(--accent)';
+                btn.style.color = 'var(--accent)';
+            } else {
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }
+        }
+
+        async function saveNote(textarea, bookName, chapNum, verseNum) {
+            const note = textarea.value.trim();
+            const noteKey = 'tsNote_' + currentUserId + '_' + bookName + '_' + chapNum + '_' + verseNum;
+            // Save to localStorage immediately
+            localStorage.setItem(noteKey, note);
+            // Update note button style
+            const cardId = 'bm-' + bookName.replace(/\s/g,'_') + '_' + chapNum + '_' + verseNum;
+            const btn = document.getElementById('notebtn-' + cardId);
+            if (btn) {
+                if (note.length > 0) {
+                    btn.classList.add('has-note');
+                } else {
+                    btn.classList.remove('has-note');
+                }
+            }
+            // Sync to Supabase
+            if (navigator.onLine && currentUserId) {
+                try {
+                    await sb.from('bookmarks').update({ notes: note })
+                        .eq('user_id', currentUserId)
+                        .eq('book_name', bookName)
+                        .eq('chapter_num', chapNum)
+                        .eq('verse_num', verseNum);
+                } catch(e) {
+                    console.warn('Could not save note to DB:', e);
+                }
+            }
         }
 
         init();
