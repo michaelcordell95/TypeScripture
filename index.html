@@ -862,10 +862,7 @@
             const chap = book ? book.chapters.find(c => c.chapter === chapNum) : null;
             const totalVerses = chap ? chap.verses.length : '?';
             box.style.display = 'flex';
-            box.innerHTML =
-                '<span class="ref-main">' + bookName + ' ' + chapNum + '</span>' +
-                '<span class="ref-sep">·</span>' +
-                '<span class="ref-sub">Verse ' + verseNum + ' of ' + totalVerses + '</span>';
+            box.innerHTML = '<span class="ref-sub">Verse ' + verseNum + ' of ' + totalVerses + '</span>';
         }
 
         function syncReadBookmark() {
