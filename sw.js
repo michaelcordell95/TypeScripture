@@ -1,7 +1,7 @@
 // TypeScripture Service Worker
 // Caches key files for offline use
 
-const CACHE_NAME = 'typescripture-v1';
+const CACHE_NAME = 'typescripture-v2';
 
 const PRECACHE_FILES = [
   '/',
@@ -13,6 +13,8 @@ const PRECACHE_FILES = [
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
+  '/icon-192-maskable.png',
+  '/icon-512-maskable.png',
 ];
 
 // Install: pre-cache all key files
