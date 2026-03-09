@@ -57,6 +57,7 @@
         .nav-group { display: flex; align-items: center; gap: 8px; }
         .settings-group { border-left: 1px solid #30363d; padding-left: 15px; display: flex; gap: 15px; font-size: 13px; color: var(--text-muted); }
         .settings-group label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .hidden { display: none !important; }
         select, button { background: #21262d; border: 1px solid #30363d; color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; }
         #stats-bar { display: flex; gap: 12px; margin-bottom: 1.5vh; justify-content: center; }
         #read-ref-box {
@@ -237,7 +238,9 @@
     </div>
 
     <div id="bible-progress-container"><div id="bible-progress-fill"></div></div>
-    <div id="progress-text">Bible Completion: 0%</div>
+    <div id="progress-text">Bible Typed: 0%</div>
+    <div id="read-progress-container" style="display:none; width:90%; max-width:900px; background:var(--progress-bg); height:8px; border-radius:10px; margin-bottom:5px; border:1px solid #30363d;"><div id="read-progress-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#2ea043,var(--accent)); transition:width 0.5s ease-out;"></div></div>
+    <div id="read-progress-text" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:1vh; font-weight:bold;">Bible Read: 0%</div>
     <div id="nav-header">
         <div class="nav-group" id="select-group">
             <select id="book-select" onchange="updateChapters(true)" aria-label="Book"></select>
@@ -248,11 +251,11 @@
             <button id="reset-btn" onclick="verseStreak=0; loadVerse();" title="Restart verse" aria-label="Restart verse">🔄</button>
             <button id="next-verse-btn" onclick="goToNextVerse()" title="Next verse" aria-label="Next verse">👉</button>
             <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
+            <button id="read-mode-btn" onclick="toggleReadMode()" title="Read Mode" aria-label="Toggle Read Mode" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">📖 Read</button>
         </div>
-        <div class="settings-group">
+        <div class="settings-group" id="typing-settings">
             <label><input type="checkbox" id="easy-mode" checked onchange="fetchVerses()"> Easy Mode</label>
             <label><input type="checkbox" id="repeat-mode"> Repeat</label>
-            <label><input type="checkbox" id="read-mode" onchange="toggleReadMode()"> Read Mode</label>
         </div>
     </div>
     <div id="stats-bar">
@@ -321,6 +324,7 @@
                 localStorage.removeItem('typeScriptureUserId');
                 completedSet = new Set();
                 updateBibleProgress();
+                await loadReadProgressFromDB();
                 updateBooks();
             } catch (err) {
                 console.error('Logout error:', err);
@@ -753,7 +757,7 @@
             const minVisible = completedSet.size > 0 ? Math.max(progress, 0.3) : 0;
             document.getElementById('bible-progress-fill').style.width = minVisible + '%';
             const display = progress < 0.1 ? progress.toFixed(3) : progress < 1 ? progress.toFixed(2) : Math.round(progress);
-            document.getElementById('progress-text').innerText = `Bible Completion: ${completedSet.size} / ${TOTAL_VERSES_BIBLE} verses (${display}%)`;
+            document.getElementById('progress-text').innerText = `Bible Typed: ${completedSet.size} / ${TOTAL_VERSES_BIBLE} verses (${display}%)`;
         }
 
         function isBookComplete(bookName) {
@@ -826,17 +830,37 @@
             updateReadRefBox();
         }
 
+        let readModeActive = false;
+
         function toggleReadMode() {
-            const isRead = document.getElementById('read-mode').checked;
+            readModeActive = !readModeActive;
+            const isRead = readModeActive;
+
+            // Update button appearance
+            const btn = document.getElementById('read-mode-btn');
+            btn.style.borderColor = isRead ? 'var(--accent)' : '#30363d';
+            btn.style.color = isRead ? 'var(--accent)' : 'var(--text-muted)';
+            btn.style.background = isRead ? 'rgba(88,166,255,0.1)' : 'transparent';
+
+            // Swap progress bars
+            document.getElementById('bible-progress-container').style.display = isRead ? 'none' : '';
+            document.getElementById('progress-text').style.display = isRead ? 'none' : '';
+            document.getElementById('read-progress-container').style.display = isRead ? '' : 'none';
+            document.getElementById('read-progress-text').style.display = isRead ? '' : 'none';
+            if (isRead) updateReadProgress();
+
             // Stats bar
-            document.getElementById('stats-bar').style.display = isRead ? 'none' : 'flex';
+            document.getElementById('stats-bar').classList.toggle('hidden', isRead);
             // Hide last verse message in read mode, show ref box instead
-            document.getElementById('last-verse-box').style.display = isRead ? 'none' : '';
+            document.getElementById('last-verse-box').classList.toggle('hidden', isRead);
             updateReadRefBox();
             // Turn off easy mode when reading (not helpful for reading)
             if (isRead) document.getElementById('easy-mode').checked = false;
-            // Hide typing buttons in nav, they move to bottom bar
-            document.getElementById('btn-group').style.display = isRead ? 'none' : 'flex';
+            // Hide typing settings in read mode
+            document.getElementById('typing-settings').classList.toggle('hidden', isRead);
+            // Hide typing-only buttons, they move to bottom bar
+            document.getElementById('reset-btn').classList.toggle('hidden', isRead);
+            document.getElementById('next-verse-btn').classList.toggle('hidden', isRead);
             // Hidden input - disable and hide to prevent it blocking read nav buttons
             inputEl.disabled = isRead;
             inputEl.style.height = isRead ? '1px' : '44px';
@@ -852,15 +876,125 @@
             if (activeVerseText) renderDisplay(isRead ? activeVerseText : '');
         }
 
+        // ===== READING TRACKER =====
+        let readCompletedSet = new Set(); // "book|chap|verse" keys
+
+        function getReadKey(book, chap, verse) { return book + '|' + chap + '|' + verse; }
+
+        let verseReadStartTime = null;
+
+        function onVerseLoaded() {
+            verseReadStartTime = Date.now();
+        }
+
+        async function markVerseRead() {
+            // Integrity threshold: must have been on verse for at least 400ms
+            const elapsed = verseReadStartTime ? Date.now() - verseReadStartTime : 0;
+            if (elapsed < 400) {
+                console.log('Skipping read mark - too fast (' + elapsed + 'ms)');
+                return;
+            }
+            const bookName = bookSel.value.replace(' ✅', '');
+            const chapNum = parseInt(chapSel.value);
+            const verseNum = parseInt(verseSel.value) + 1;
+            const key = getReadKey(bookName, chapNum, verseNum);
+            if (readCompletedSet.has(key)) return; // already read
+
+            readCompletedSet.add(key);
+            saveReadProgress();
+            updateReadProgress();
+
+            if (!currentUserId || !supabaseClient) return;
+
+            // Check if chapter is now complete
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            const chapEntry = bookEntry && bookEntry.chapters.find(c => c.chapter === chapNum);
+            if (chapEntry) {
+                const allRead = chapEntry.verses.every(v => readCompletedSet.has(getReadKey(bookName, chapNum, v.verse)));
+                if (allRead) {
+                    await zipChapter(bookName, chapNum, chapEntry.verses.length);
+                    return;
+                }
+            }
+
+            // Save verse read to DB
+            try {
+                await supabaseClient.from('verses_read').upsert({
+                    user_id: currentUserId, book_name: bookName,
+                    chapter_num: chapNum, verse_num: verseNum
+                }, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
+            } catch(e) { console.warn('Could not save verse read:', e); }
+        }
+
+        async function zipChapter(bookName, chapNum, verseCount) {
+            if (!currentUserId || !supabaseClient) return;
+            try {
+                // Delete individual verse rows for this chapter
+                await supabaseClient.from('verses_read').delete()
+                    .eq('user_id', currentUserId).eq('book_name', bookName).eq('chapter_num', chapNum);
+                // Insert chapter completion row
+                await supabaseClient.from('chapters_read').upsert({
+                    user_id: currentUserId, book_name: bookName, chapter_num: chapNum, verse_count: verseCount
+                }, { onConflict: 'user_id,book_name,chapter_num' });
+                console.log('✓ Zipped chapter:', bookName, chapNum);
+            } catch(e) { console.warn('Could not zip chapter:', e); }
+        }
+
+        function saveReadProgress() {
+            localStorage.setItem('tsReadProgress', JSON.stringify(Array.from(readCompletedSet)));
+        }
+
+        function loadReadProgressLocal() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('tsReadProgress') || '[]');
+                readCompletedSet = new Set(saved);
+            } catch(e) { readCompletedSet = new Set(); }
+        }
+
+        async function loadReadProgressFromDB() {
+            if (!currentUserId || !supabaseClient) return;
+            try {
+                // Load individual verses not yet zipped
+                const { data: verses } = await supabaseClient.from('verses_read')
+                    .select('book_name,chapter_num,verse_num').eq('user_id', currentUserId);
+                // Load completed chapters
+                const { data: chapters } = await supabaseClient.from('chapters_read')
+                    .select('book_name,chapter_num').eq('user_id', currentUserId);
+
+                readCompletedSet = new Set();
+                if (verses) verses.forEach(v => readCompletedSet.add(getReadKey(v.book_name, v.chapter_num, v.verse_num)));
+                // For zipped chapters, add all their verses
+                if (chapters && KJV_EMBEDDED) {
+                    chapters.forEach(c => {
+                        const book = KJV_EMBEDDED.books.find(b => b.name === c.book_name);
+                        const chap = book && book.chapters.find(ch => ch.chapter === c.chapter_num);
+                        if (chap) chap.verses.forEach(v => readCompletedSet.add(getReadKey(c.book_name, c.chapter_num, v.verse)));
+                    });
+                }
+                saveReadProgress();
+                updateReadProgress();
+            } catch(e) { console.warn('Could not load read progress:', e); }
+        }
+
+        function updateReadProgress() {
+            const total = TOTAL_VERSES_BIBLE;
+            const read = readCompletedSet.size;
+            const pct = (read / total) * 100;
+            const minVisible = read > 0 ? Math.max(pct, 0.3) : 0;
+            document.getElementById('read-progress-fill').style.width = minVisible + '%';
+            const display = pct < 0.1 ? pct.toFixed(3) : pct < 1 ? pct.toFixed(2) : Math.round(pct);
+            document.getElementById('read-progress-text').innerText = `Bible Read: ${read} / ${total} verses (${display}%)`;
+        }
+
         function updateReadRefBox(overrideVerseIdx) {
-            const isRead = document.getElementById('read-mode').checked;
+            const isRead = readModeActive;
             const box = document.getElementById('read-ref-box');
             if (!isRead) { box.style.display = 'none'; return; }
             const bookName = document.getElementById('book-select').value.replace(' ✅', '');
             const chapNum = parseInt(document.getElementById('chapter-select').value);
             const verseIdx = overrideVerseIdx !== undefined ? overrideVerseIdx : parseInt(document.getElementById('verse-select').value);
             const verseNum = verseIdx + 1;
-            const book = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            const book = (typeof KJV_EMBEDDED !== 'undefined') ? KJV_EMBEDDED.books.find(b => b.name === bookName) : null;
             const chap = book ? book.chapters.find(c => c.chapter === chapNum) : null;
             const totalVerses = chap ? chap.verses.length : '?';
             box.style.display = 'flex';
@@ -915,7 +1049,8 @@
 
             if (verseIdx > 0) {
                 verseSel.value = verseIdx - 1;
-                fetchVerses();
+                loadReadProgressLocal();
+        fetchVerses();
                 updateReadRefBox(verseIdx - 1);
             } else if (chapNum > 1) {
                 chapSel.value = chapNum - 1;
@@ -983,6 +1118,7 @@
         }
 
         function goToNextVerse() {
+            if (readModeActive) markVerseRead();
             const bookName = bookSel.value.replace(" ✅", "");
             const bookIdx = books.indexOf(bookName);
             let chapNum = parseInt(chapSel.value);
@@ -1055,11 +1191,12 @@
             displayEl.scrollTop = 0;
             document.getElementById('accuracy').innerText = '100';
             inputEl.focus({ preventScroll: true });
+            if (readModeActive) onVerseLoaded();
             loadBookmarkState();
         }
 
         function renderDisplay(typed) {
-            const isRead = document.getElementById('read-mode').checked;
+            const isRead = readModeActive;
             if (isRead) {
                 displayEl.innerHTML = activeVerseText.split('').map(char =>
                     `<span class="correct">${char}</span>`
@@ -1119,6 +1256,10 @@
                 // Only count verse as completed if accuracy >= 50%
                 if (accuracy >= 50) {
                     verseStreak++;
+                    // Typing a verse counts as reading it
+                    readCompletedSet.add(getReadKey(bookName, chapNum, verseNum));
+                    saveReadProgress();
+                    updateReadProgress();
                     completedSet.add(`KJV_${bookName}_${chapNum}_${verseNum}`);
                     localStorage.setItem('typeScriptureProgressSet', JSON.stringify(Array.from(completedSet)));
                     if (currentUserId) {
@@ -1196,7 +1337,6 @@
         // Auto-enable Read Mode on mobile (after fetchVerses so it's last)
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 600;
         if (isMobile) {
-            document.getElementById('read-mode').checked = true;
             toggleReadMode();
         }
 
