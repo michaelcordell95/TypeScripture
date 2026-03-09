@@ -81,7 +81,7 @@
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
         .current-char { border-left: 3px solid var(--accent); animation: blink 1s infinite; background: rgba(88, 166, 255, 0.1); }
         @keyframes blink { 50% { border-color: transparent; } }
-        .correct { color: var(--correct) !important; }
+        .correct { color: #79c0ff !important; }
         .incorrect { color: var(--error) !important; background: rgba(248, 81, 73, 0.1); text-decoration: underline; }
         #hidden-input { position: fixed; bottom: 0; left: 0; width: 100%; height: 44px; opacity: 0.001; font-size: 16px; -webkit-text-size-adjust: 100%; border: none; background: transparent; color: transparent; caret-color: transparent; z-index: 50; }
         #display::-webkit-scrollbar { width: 8px; }
@@ -100,7 +100,8 @@
         @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
         .syn-dim    { color: #484f58; }
-        .syn-name   { color: #79c0ff; }
+        .syn-prep   { color: #7ee787; }
+        .syn-name   { color: #f0f6fc; }  /* white - stands out from blue regular text */
         .syn-god    { color: #ffd700; font-weight: 600; }
         .syn-logic  { color: #d2a8ff; }
         .syn-speech { color: #ffa657; }
@@ -1280,6 +1281,15 @@
             'said','saith','spake','unto','thus','now','yet'
         ]);
 
+        const synPrepWords = new Set([
+            'in','on','at','by','to','of','from','with','into','unto','upon',
+            'through','throughout','over','under','above','below','before','after',
+            'behind','beside','between','among','against','toward','towards',
+            'within','without','beyond','around','along','across','through',
+            'during','until','till','since','despite','except','out','off','down',
+            'up','about','concerning','regarding','according','because','therefore'
+        ]);
+
         const synGodWords = new Set([
             'lord','god','jesus','christ','father','son','spirit','holy','almighty',
             'jehovah','immanuel','emmanuel','messiah','saviour','savior','redeemer',
@@ -1356,6 +1366,8 @@
                     cls = 'syn-name';
                 } else if (synLogicWords.has(bare)) {
                     cls = 'syn-logic';
+                } else if (synPrepWords.has(bare)) {
+                    cls = 'syn-prep';
                 } else if (synDimWords.has(bare)) {
                     cls = 'syn-dim';
                 } else if (inSpeech(tokenStart)) {
@@ -1493,14 +1505,15 @@
                 wordCount++;
                 const bare = token.replace(/[^a-zA-Z']/g, '').toLowerCase();
                 let synCls = '';
-                if (!isPast && !isCurrent && useSyntax) {
+                if (useSyntax && !isPast) {
                     if (synGodWords.has(bare)) synCls = 'syn-god';
                     else if (synNames.has(bare)) synCls = 'syn-name';
                     else if (synLogicWords.has(bare)) synCls = 'syn-logic';
+                    else if (synPrepWords.has(bare)) synCls = 'syn-prep';
                     else if (synDimWords.has(bare)) synCls = 'syn-dim';
                 }
                 const stateCls = isCurrent ? 'active-word' : (isPast && !useSyntax) ? 'past-word' : '';
-                return `<span class="speed-word ${stateCls} ${synCls}">${token}</span>`;
+                return `<span class="speed-word correct ${stateCls} ${synCls}">${token}</span>`;
             }).join('');
             displayEl.innerHTML = html;
 
