@@ -1315,6 +1315,7 @@
         function startSpeedReading() {
             if (!activeVerseText) return;
             const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 500;
+            localStorage.setItem('tsSpeedWpm', wpm); // save as user default
             const msPerWord = (60 / wpm) * 1000;
 
             speedWords = activeVerseText.split(/(\s+)/).filter(w => w.trim().length > 0);
@@ -1331,12 +1332,19 @@
                 if (!speedReadActive) return;
                 speedWordIndex++;
                 if (speedWordIndex >= speedWords.length) {
-                    // Verse done — advance seamlessly without touching button UI
+                    // Verse done — advance and pause briefly for eyes to adjust
                     markVerseRead();
                     goToNextVerse();
-                    speedWordIndex = 0;
-                    speedWords = activeVerseText.split(/(\s+)/).filter(w => w.trim().length > 0);
+                    speedWordIndex = -1; // -1 = waiting state
                     renderSpeedDisplay(0);
+                    clearInterval(speedReadTimer);
+                    setTimeout(() => {
+                        if (!speedReadActive) return;
+                        speedWordIndex = 0;
+                        speedWords = activeVerseText.split(/(\s+)/).filter(w => w.trim().length > 0);
+                        renderSpeedDisplay(0);
+                        speedReadTimer = setInterval(tick, msPerWord);
+                    }, Math.max(msPerWord * 2, 300)); // 2 word-lengths or 300ms min
                     return;
                 }
                 renderSpeedDisplay(speedWordIndex);
