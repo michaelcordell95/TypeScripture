@@ -276,7 +276,7 @@
             </div>
             <div class="nav-btn-wrap">
                 <button id="voice-btn" onclick="startVoiceSearch()" title="Voice search — say a verse like John 3 16" aria-label="Voice search" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 10px; border-radius:6px; cursor:pointer; font-size:16px; line-height:1; transition:all 0.2s;">🎙️</button>
-                <span class="nav-btn-label">Voice</span>
+                <span class="nav-btn-label">Search</span>
             </div>
             <div class="nav-btn-wrap">
                 <button id="read-mode-btn" onclick="toggleReadMode()" title="Read Mode" aria-label="Toggle Read Mode" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">📖 Read</button>
@@ -302,7 +302,7 @@
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:12px 20px; justify-content:center; align-items:center; flex-direction:column; gap:10px; z-index:100;">
         <div id="speed-controls">
             <span>⚡ Speed Read</span>
-            <input type="number" id="speed-wpm-input" value="500" min="50" max="700" title="Words per minute">
+            <input type="number" id="speed-wpm-input" value="300" min="50" max="700" title="Words per minute">
             <span>WPM</span>
             <button id="speed-toggle-btn" onclick="toggleSpeedReading()">▶ Start</button>
         </div>
@@ -1316,7 +1316,7 @@
 
         function startSpeedReading() {
             if (!activeVerseText) return;
-            const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 500;
+            const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 300;
             localStorage.setItem('tsSpeedWpm', wpm); // save as user default
             const msPerWord = (60 / wpm) * 1000;
 
