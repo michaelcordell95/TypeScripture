@@ -818,9 +818,12 @@
                 if (chapterObj) {
                     chapterObj.verses.forEach((v, i) => {
                         const verseKey = `KJV_${bookName}_${chapNum}_${v.verse}`;
+                        const readKey = getReadKey(bookName, chapNum, v.verse);
+                        const isTyped = completedSet.has(verseKey);
+                        const isRead = !isTyped && readCompletedSet && readCompletedSet.has(readKey);
                         let opt = document.createElement('option');
                         opt.value = i;
-                        opt.innerText = `Verse ${v.verse}${completedSet.has(verseKey) ? " ✅" : ""}`;
+                        opt.innerText = `Verse ${v.verse}${isTyped ? " ✅" : isRead ? " 📖" : ""}`;
                         verseSel.appendChild(opt);
                     });
                 }
