@@ -1519,7 +1519,7 @@
                     else synCls = 'syn-regular';
                 }
                 const stateCls = isCurrent ? 'active-word' : (isPast && !useSyntax) ? 'past-word' : '';
-                return `<span class="speed-word correct ${stateCls} ${synCls}">${token}</span>`;
+                return `<span class="speed-word ${synCls || 'correct'} ${stateCls}">${token}</span>`;
             }).join('');
             displayEl.innerHTML = html;
 
