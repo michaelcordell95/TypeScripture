@@ -81,7 +81,7 @@
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
         .current-char { border-left: 3px solid var(--accent); animation: blink 1s infinite; background: rgba(88, 166, 255, 0.1); }
         @keyframes blink { 50% { border-color: transparent; } }
-        .correct { color: #79c0ff !important; }
+        .correct { color: var(--correct) !important; }
         .incorrect { color: var(--error) !important; background: rgba(248, 81, 73, 0.1); text-decoration: underline; }
         #hidden-input { position: fixed; bottom: 0; left: 0; width: 100%; height: 44px; opacity: 0.001; font-size: 16px; -webkit-text-size-adjust: 100%; border: none; background: transparent; color: transparent; caret-color: transparent; z-index: 50; }
         #display::-webkit-scrollbar { width: 8px; }
@@ -99,12 +99,13 @@
         #voice-btn.listening { border-color: var(--error) !important; color: var(--error) !important; animation: pulse-mic 1s infinite; }
         @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
-        .syn-dim    { color: #484f58; }
-        .syn-prep   { color: #7ee787; }
-        .syn-name   { color: #f0f6fc; }  /* white - stands out from blue regular text */
-        .syn-god    { color: #ffd700; font-weight: 600; }
-        .syn-logic  { color: #d2a8ff; }
-        .syn-speech { color: #ffa657; }
+        .syn-dim      { color: #484f58; }
+        .syn-name     { color: #f0f6fc; }
+        .syn-god      { color: #ffd700; font-weight: 600; }
+        .syn-logic    { color: #d2a8ff; }
+        .syn-pronoun  { color: #f97583; }
+        .syn-speech   { color: #ffa657; }
+        .syn-regular  { color: #79c0ff; }
         .read-nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .read-nav-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         .nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -1281,13 +1282,17 @@
             'said','saith','spake','unto','thus','now','yet'
         ]);
 
-        const synPrepWords = new Set([
-            'in','on','at','by','to','of','from','with','into','unto','upon',
-            'through','throughout','over','under','above','below','before','after',
-            'behind','beside','between','among','against','toward','towards',
-            'within','without','beyond','around','along','across','through',
-            'during','until','till','since','despite','except','out','off','down',
-            'up','about','concerning','regarding','according','because','therefore'
+        const synPronounWords = new Set([
+            'i','me','my','mine','myself',
+            'you','your','yours','yourself','yourselves',
+            'he','him','his','himself',
+            'she','her','hers','herself',
+            'it','its','itself',
+            'we','us','our','ours','ourselves',
+            'they','them','their','theirs','themselves',
+            'who','whom','whose','which','what',
+            'this','that','these','those',
+            'thou','thee','thy','thine','thyself','ye'
         ]);
 
         const synGodWords = new Set([
@@ -1366,10 +1371,14 @@
                     cls = 'syn-name';
                 } else if (synLogicWords.has(bare)) {
                     cls = 'syn-logic';
-                } else if (synPrepWords.has(bare)) {
-                    cls = 'syn-prep';
+                } else if (synPronounWords.has(bare)) {
+                    cls = 'syn-pronoun';
                 } else if (synDimWords.has(bare)) {
                     cls = 'syn-dim';
+                } else if (inSpeech(tokenStart)) {
+                    cls = 'syn-speech';
+                } else {
+                    cls = 'syn-regular';
                 } else if (inSpeech(tokenStart)) {
                     cls = 'syn-speech';
                 }
@@ -1509,8 +1518,9 @@
                     if (synGodWords.has(bare)) synCls = 'syn-god';
                     else if (synNames.has(bare)) synCls = 'syn-name';
                     else if (synLogicWords.has(bare)) synCls = 'syn-logic';
-                    else if (synPrepWords.has(bare)) synCls = 'syn-prep';
+                    else if (synPronounWords.has(bare)) synCls = 'syn-pronoun';
                     else if (synDimWords.has(bare)) synCls = 'syn-dim';
+                    else synCls = 'syn-regular';
                 }
                 const stateCls = isCurrent ? 'active-word' : (isPast && !useSyntax) ? 'past-word' : '';
                 return `<span class="speed-word correct ${stateCls} ${synCls}">${token}</span>`;
