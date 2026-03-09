@@ -96,6 +96,8 @@
         #bookmark-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
         #bookmark-btn:hover { border-color: #f0b429; color: #f0b429; }
         #bookmark-btn.bookmarked { border-color: #f0b429; color: #f0b429; }
+        #voice-btn.listening { border-color: var(--error) !important; color: var(--error) !important; animation: pulse-mic 1s infinite; }
+        @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
         .next-btn { padding: 12px 32px; font-size: 1em; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
         .next-btn:hover { opacity: 0.85; }
@@ -251,6 +253,7 @@
             <button id="reset-btn" onclick="verseStreak=0; loadVerse();" title="Restart verse" aria-label="Restart verse">🔄</button>
             <button id="next-verse-btn" onclick="goToNextVerse()" title="Next verse" aria-label="Next verse">👉</button>
             <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
+            <button id="voice-btn" onclick="startVoiceSearch()" title="Voice search — say a verse like John 3 16" aria-label="Voice search" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 10px; border-radius:6px; cursor:pointer; font-size:16px; line-height:1; transition:all 0.2s;">🎙️</button>
             <button id="read-mode-btn" onclick="toggleReadMode()" title="Read Mode" aria-label="Toggle Read Mode" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">📖 Read</button>
         </div>
         <div class="settings-group" id="typing-settings">
@@ -1231,6 +1234,182 @@
                     cursor.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }
+        }
+
+        // ===== VOICE SEARCH =====
+        function startVoiceSearch() {
+            const btn = document.getElementById('voice-btn');
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Voice search is not supported in this browser. Try Chrome.');
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 3;
+
+            btn.classList.add('listening');
+            btn.innerText = '🔴';
+
+            recognition.onresult = (e) => {
+                btn.classList.remove('listening');
+                btn.innerText = '🎙️';
+                // Try each alternative until one parses
+                for (let i = 0; i < e.results[0].length; i++) {
+                    const transcript = e.results[0][i].transcript.trim();
+                    console.log('Voice transcript:', transcript);
+                    if (parseVoiceVerse(transcript)) return;
+                }
+                showVoiceFeedback('Could not understand. Try: "John 3 16"', true);
+            };
+
+            recognition.onerror = (e) => {
+                btn.classList.remove('listening');
+                btn.innerText = '🎙️';
+                if (e.error !== 'no-speech') showVoiceFeedback('Mic error: ' + e.error, true);
+            };
+
+            recognition.onend = () => {
+                btn.classList.remove('listening');
+                btn.innerText = '🎙️';
+            };
+
+            recognition.start();
+        }
+
+        function parseVoiceVerse(transcript) {
+            // Normalize: lowercase, replace ordinals, common substitutions
+            let t = transcript.toLowerCase()
+                .replace(/first/g, '1').replace(/second/g, '2').replace(/third/g, '3')
+                .replace(/one/g, '1').replace(/two/g, '2').replace(/three/g, '3')
+                .replace(/four/g, '4').replace(/five/g, '5').replace(/six/g, '6')
+                .replace(/seven/g, '7').replace(/eight/g, '8').replace(/nine/g, '9')
+                .replace(/ten/g, '10').replace(/[:.,]/g, ' ').replace(/\s+/g, ' ').trim();
+
+            // Book name aliases
+            const aliases = {
+                'song of solomon': 'Song of Solomon', 'song of songs': 'Song of Solomon',
+                'psalms': 'Psalms', 'psalm': 'Psalms',
+                'proverbs': 'Proverbs', 'proverb': 'Proverbs',
+                'revelation': 'Revelation', 'revelations': 'Revelation',
+                'genesis': 'Genesis', 'exodus': 'Exodus', 'leviticus': 'Leviticus',
+                'numbers': 'Numbers', 'deuteronomy': 'Deuteronomy', 'joshua': 'Joshua',
+                'judges': 'Judges', 'ruth': 'Ruth', 'job': 'Job', 'isaiah': 'Isaiah',
+                'jeremiah': 'Jeremiah', 'lamentations': 'Lamentations', 'ezekiel': 'Ezekiel',
+                'daniel': 'Daniel', 'hosea': 'Hosea', 'joel': 'Joel', 'amos': 'Amos',
+                'obadiah': 'Obadiah', 'jonah': 'Jonah', 'micah': 'Micah', 'nahum': 'Nahum',
+                'habakkuk': 'Habakkuk', 'zephaniah': 'Zephaniah', 'haggai': 'Haggai',
+                'zechariah': 'Zechariah', 'malachi': 'Malachi', 'matthew': 'Matthew',
+                'mark': 'Mark', 'luke': 'Luke', 'john': 'John', 'acts': 'Acts',
+                'romans': 'Romans', 'galatians': 'Galatians', 'ephesians': 'Ephesians',
+                'philippians': 'Philippians', 'colossians': 'Colossians', 'titus': 'Titus',
+                'philemon': 'Philemon', 'hebrews': 'Hebrews', 'james': 'James', 'jude': 'Jude',
+                '1 samuel': '1 Samuel', '2 samuel': '2 Samuel', '1 kings': '1 Kings',
+                '2 kings': '2 Kings', '1 chronicles': '1 Chronicles', '2 chronicles': '2 Chronicles',
+                'ezra': 'Ezra', 'nehemiah': 'Nehemiah', 'esther': 'Esther',
+                '1 corinthians': '1 Corinthians', '2 corinthians': '2 Corinthians',
+                '1 thessalonians': '1 Thessalonians', '2 thessalonians': '2 Thessalonians',
+                '1 timothy': '1 Timothy', '2 timothy': '2 Timothy',
+                '1 peter': '1 Peter', '2 peter': '2 Peter',
+                '1 john': '1 John', '2 john': '2 John', '3 john': '3 John',
+                '1 chronicles': '1 Chronicles', '2 chronicles': '2 Chronicles',
+            };
+
+            // Try to match "BookName chapter verse" pattern
+            // e.g. "john 3 16", "1 corinthians 13 4", "song of solomon 1 1"
+            let matchedBook = null, matchedChap = null, matchedVerse = null;
+
+            // Try each book alias (longest first to avoid partial matches)
+            const sortedAliases = Object.keys(aliases).sort((a, b) => b.length - a.length);
+            for (const alias of sortedAliases) {
+                if (t.startsWith(alias)) {
+                    const rest = t.slice(alias.length).trim();
+                    const nums = rest.match(/(\d+)\s+(\d+)/);
+                    if (nums) {
+                        matchedBook = aliases[alias];
+                        matchedChap = parseInt(nums[1]);
+                        matchedVerse = parseInt(nums[2]);
+                        break;
+                    }
+                    // Just chapter, no verse
+                    const chap = rest.match(/^(\d+)$/);
+                    if (chap) {
+                        matchedBook = aliases[alias];
+                        matchedChap = parseInt(chap[1]);
+                        break;
+                    }
+                }
+            }
+
+            // Also try books array directly
+            if (!matchedBook) {
+                for (const book of books) {
+                    const bookLower = book.toLowerCase();
+                    if (t.startsWith(bookLower)) {
+                        const rest = t.slice(bookLower.length).trim();
+                        const nums = rest.match(/(\d+)\s+(\d+)/);
+                        if (nums) {
+                            matchedBook = book;
+                            matchedChap = parseInt(nums[1]);
+                            matchedVerse = parseInt(nums[2]);
+                            break;
+                        }
+                        const chap = rest.match(/^(\d+)$/);
+                        if (chap) {
+                            matchedBook = book;
+                            matchedChap = parseInt(chap[1]);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!matchedBook) return false;
+
+            // Validate chapter
+            const bookIdx = books.indexOf(matchedBook);
+            const totalChaps = chapCounts[bookIdx] || 1;
+            if (matchedChap < 1 || matchedChap > totalChaps) {
+                showVoiceFeedback(matchedBook + ' only has ' + totalChaps + ' chapters', true);
+                return true;
+            }
+
+            // Navigate to book + chapter
+            for (let i = 0; i < bookSel.options.length; i++) {
+                if (bookSel.options[i].value.replace(' ✅','') === matchedBook) {
+                    bookSel.selectedIndex = i; break;
+                }
+            }
+            updateChapters();
+            chapSel.value = matchedChap;
+            updateVerses();
+
+            // Navigate to verse if provided
+            if (matchedVerse) {
+                const totalVerses = verseSel.options.length;
+                if (matchedVerse < 1 || matchedVerse > totalVerses) {
+                    showVoiceFeedback(matchedBook + ' ' + matchedChap + ' only has ' + totalVerses + ' verses', true);
+                    return true;
+                }
+                verseSel.value = matchedVerse - 1;
+            }
+
+            fetchVerses();
+            const ref = matchedBook + ' ' + matchedChap + (matchedVerse ? ':' + matchedVerse : '');
+            showVoiceFeedback('📖 ' + ref, false);
+            return true;
+        }
+
+        function showVoiceFeedback(msg, isError) {
+            const el = document.getElementById('accuracy-warning');
+            el.style.color = isError ? 'var(--error)' : '#2ea043';
+            el.innerText = msg;
+            setTimeout(() => {
+                el.style.color = 'var(--error)';
+                el.innerText = '';
+            }, 3000);
         }
 
         inputEl.addEventListener('input', () => {
