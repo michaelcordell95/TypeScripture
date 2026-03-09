@@ -296,6 +296,7 @@
     </div>
     <div id="last-verse-box"></div>
     <div id="read-ref-box" style="display:none; text-align:center; margin-bottom:1.5vh;"></div>
+    <div id="blb-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Hold verse to open in Blue Letter Bible</div>
     <div id="accuracy-warning"></div>
     <div id="display"></div>
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:12px 20px; justify-content:center; align-items:center; flex-direction:column; gap:10px; z-index:100;">
@@ -928,6 +929,7 @@
             // Read nav bar at bottom
             const readNav = document.getElementById('read-nav');
             readNav.style.display = isRead ? 'flex' : 'none';
+            document.getElementById('blb-hint').style.display = isRead ? 'block' : 'none';
             // Add bottom padding so display isn't hidden behind nav bar
             document.getElementById('display').style.marginBottom = isRead ? '140px' : '';
             document.body.style.paddingBottom = isRead ? '140px' : '';
@@ -1642,6 +1644,64 @@
                 if (!document.getElementById('repeat-mode').checked) currentIndex++;
                 setTimeout(loadVerse, 100);
             }
+        });
+
+        // ===== BLUE LETTER BIBLE INTEGRATION =====
+        const blbBookMap = {
+            "Genesis":"gen","Exodus":"exo","Leviticus":"lev","Numbers":"num","Deuteronomy":"deu",
+            "Joshua":"jos","Judges":"jdg","Ruth":"rth","1 Samuel":"1sa","2 Samuel":"2sa",
+            "1 Kings":"1ki","2 Kings":"2ki","1 Chronicles":"1ch","2 Chronicles":"2ch",
+            "Ezra":"ezr","Nehemiah":"neh","Esther":"est","Job":"job","Psalms":"psa",
+            "Proverbs":"pro","Ecclesiastes":"ecc","Song of Solomon":"sng","Isaiah":"isa",
+            "Jeremiah":"jer","Lamentations":"lam","Ezekiel":"eze","Daniel":"dan",
+            "Hosea":"hos","Joel":"joe","Amos":"amo","Obadiah":"oba","Jonah":"jon",
+            "Micah":"mic","Nahum":"nah","Habakkuk":"hab","Zephaniah":"zep","Haggai":"hag",
+            "Zechariah":"zec","Malachi":"mal","Matthew":"mat","Mark":"mar","Luke":"luk",
+            "John":"jhn","Acts":"act","Romans":"rom","1 Corinthians":"1co","2 Corinthians":"2co",
+            "Galatians":"gal","Ephesians":"eph","Philippians":"phl","Colossians":"col",
+            "1 Thessalonians":"1th","2 Thessalonians":"2th","1 Timothy":"1ti","2 Timothy":"2ti",
+            "Titus":"tit","Philemon":"phm","Hebrews":"heb","James":"jas","1 Peter":"1pe",
+            "2 Peter":"2pe","1 John":"1jo","2 John":"2jo","3 John":"3jo","Jude":"jde",
+            "Revelation":"rev"
+        };
+
+        function openBLB() {
+            const bookName = bookSel.value.replace(' ✅', '');
+            const chapNum = chapSel.value;
+            const verseNum = parseInt(verseSel.value) + 1;
+            const abbr = blbBookMap[bookName];
+            if (!abbr) return;
+            const url = `https://www.blueletterbible.org/kjv/${abbr}/${chapNum}/${verseNum}/`;
+            window.open(url, '_blank');
+        }
+
+        // Long press on display to open BLB (500ms threshold)
+        let longPressTimer = null;
+        let longPressTriggered = false;
+
+        displayEl.addEventListener('touchstart', (e) => {
+            longPressTriggered = false;
+            longPressTimer = setTimeout(() => {
+                longPressTriggered = true;
+                openBLB();
+                // Brief visual feedback
+                displayEl.style.opacity = '0.7';
+                setTimeout(() => displayEl.style.opacity = '1', 200);
+            }, 500);
+        }, { passive: true });
+
+        displayEl.addEventListener('touchend', () => {
+            clearTimeout(longPressTimer);
+        });
+
+        displayEl.addEventListener('touchmove', () => {
+            clearTimeout(longPressTimer);
+        });
+
+        // Desktop: right-click or long mousedown
+        displayEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            openBLB();
         });
 
         window.addEventListener('click', (e) => {
