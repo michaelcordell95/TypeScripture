@@ -1518,7 +1518,7 @@
                     else if (synDimWords.has(bare)) synCls = 'syn-dim';
                     else synCls = 'syn-regular';
                 }
-                const stateCls = isCurrent ? 'active-word' : (isPast && !useSyntax) ? 'past-word' : '';
+                const stateCls = !useSyntax ? (isCurrent ? 'active-word' : isPast ? 'past-word' : '') : (isCurrent ? 'active-word' : '');
                 return `<span class="speed-word ${synCls || 'correct'} ${stateCls}">${token}</span>`;
             }).join('');
             displayEl.innerHTML = html;
