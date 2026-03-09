@@ -1335,11 +1335,8 @@
                     btn.innerText = '▶ Start';
                     btn.classList.remove('active');
                     markVerseRead();
-                    setTimeout(() => {
-                        goToNextVerse();
-                        // Auto-restart on next verse
-                        setTimeout(() => startSpeedReading(), 400);
-                    }, 600);
+                    goToNextVerse();
+                    setTimeout(() => startSpeedReading(), 50);
                     return;
                 }
                 renderSpeedDisplay(speedWordIndex);
