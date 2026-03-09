@@ -75,6 +75,7 @@
             <button class="tab active" onclick="switchTab('bible')">&#128214; Bible Completion</button>
             <button class="tab" onclick="switchTab('scores')">&#127963; Scores</button>
             <button class="tab" onclick="switchTab('personal')">&#128100; My Stats</button>
+            <button class="tab" onclick="switchTab('read')">&#128214; Most Read</button>
             <button class="tab" onclick="switchTab('search')">&#128269; Player Search</button>
         </div>
 
@@ -107,6 +108,16 @@
         </div>
 
         <!-- PLAYER SEARCH TAB -->
+        <div id="tab-read" style="display:none;">
+            <div class="lb-panel">
+                <div class="lb-header">
+                    <h3>Most Bible Read</h3>
+                    <span id="read-lb-count"></span>
+                </div>
+                <div id="read-lb-body"><div class="loading">Loading...</div></div>
+            </div>
+        </div>
+
         <div id="tab-search" style="display:none;">
             <div class="browse-row" style="gap:10px;">
                 <input id="search-input" type="text" placeholder="Enter username..." style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:8px 14px;border-radius:6px;font-size:14px;min-width:220px;" />
@@ -132,13 +143,19 @@
                 <div class="lb-panel"><div class="empty">Sign in to see your personal stats</div></div>
             </div>
             <div id="personal-content" style="display:none;">
+                <h4 style="color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px;font-weight:600;">&#9000;&#65039; Typing</h4>
                 <div class="stats-grid">
-                    <div class="stat-card"><div class="value" id="stat-completion">0%</div><div class="label">Bible Completion</div></div>
-                    <div class="stat-card"><div class="value" id="stat-verses">0</div><div class="label">Verses Completed</div></div>
-                    <div class="stat-card"><div class="value" id="stat-books">0</div><div class="label">Books Completed</div></div>
-                    <div class="stat-card"><div class="value" id="stat-chapters">0</div><div class="label">Chapters Completed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-completion">0%</div><div class="label">Bible Typed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-verses">0</div><div class="label">Verses Typed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-books">0</div><div class="label">Books Typed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-chapters">0</div><div class="label">Chapters Typed</div></div>
                     <div class="stat-card"><div class="value" id="stat-avg">0</div><div class="label">Average WPM</div></div>
                     <div class="stat-card"><div class="value" id="stat-best">0</div><div class="label">Best WPM Ever</div></div>
+                </div>
+                <h4 style="color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px;font-weight:600;">&#128214; Reading</h4>
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="value" id="stat-read-pct">0%</div><div class="label">Bible Read</div></div>
+                    <div class="stat-card"><div class="value" id="stat-read-books">0 / 66</div><div class="label">Books Fully Read</div></div>
                 </div>
             </div>
         </div>
@@ -170,12 +187,14 @@
 
         function switchTab(tab) {
             var tabs = document.querySelectorAll('.tab');
-            var tabNames = ['bible', 'scores', 'personal', 'search'];
+            var tabNames = ['bible', 'scores', 'personal', 'read', 'search'];
             tabs.forEach(function(t, i) { t.classList.toggle('active', tabNames[i] === tab); });
             document.getElementById('tab-bible').style.display = tab === 'bible' ? 'block' : 'none';
             document.getElementById('tab-scores').style.display = tab === 'scores' ? 'block' : 'none';
             document.getElementById('tab-personal').style.display = tab === 'personal' ? 'block' : 'none';
             document.getElementById('tab-search').style.display = tab === 'search' ? 'block' : 'none';
+            document.getElementById('tab-read').style.display = tab === 'read' ? 'block' : 'none';
+            if (tab === 'read') loadReadLeaderboard();
             if (tab === 'bible') loadBibleCompletionLeaderboard();
             if (tab === 'scores') populateScoresBookSelect();
             if (tab === 'personal') loadPersonalStats();
@@ -537,8 +556,110 @@
                 document.getElementById('stat-avg').innerText = avgWpm;
                 document.getElementById('stat-best').innerText = bestWpm;
 
+                // Load reading stats
+                var vReadResult = await supabaseClient.from('verses_read').select('book_name, chapter_num, verse_num').eq('user_id', currentUserId);
+                var cReadResult = await supabaseClient.from('chapters_read').select('book_name, chapter_num, verse_count').eq('user_id', currentUserId);
+
+                var readVerseCount = (vReadResult.data || []).length;
+                // Add zipped chapter verse counts
+                (cReadResult.data || []).forEach(function(r) { readVerseCount += (r.verse_count || 0); });
+
+                var readPct = (readVerseCount / TOTAL_VERSES_BIBLE) * 100;
+                var readDisplayPct = readPct < 0.1 ? readPct.toFixed(3) + '%' : readPct < 1 ? readPct.toFixed(2) + '%' : Math.round(readPct) + '%';
+
+                // Count fully read books using chapters_read + verses_read
+                var readChapKeys = new Set();
+                (cReadResult.data || []).forEach(function(r) { readChapKeys.add(r.book_name + '|' + r.chapter_num); });
+                var readVerseKeys = new Set();
+                (vReadResult.data || []).forEach(function(r) { readVerseKeys.add(r.book_name + '|' + r.chapter_num + '|' + r.verse_num); });
+
+                var booksFullyRead = books.filter(function(book) {
+                    var chapters = verseCounts[book]; if (!chapters) return false;
+                    for (var c = 0; c < chapters.length; c++) {
+                        var chapNum = c + 1;
+                        if (readChapKeys.has(book + '|' + chapNum)) continue; // zipped = complete
+                        for (var v = 1; v <= chapters[c]; v++) {
+                            if (!readVerseKeys.has(book + '|' + chapNum + '|' + v)) return false;
+                        }
+                    }
+                    return true;
+                }).length;
+
+                document.getElementById('stat-read-pct').innerText = readDisplayPct;
+                document.getElementById('stat-read-books').innerText = booksFullyRead + ' / 66';
+
             } catch(err) {
                 console.error('Personal stats error:', err);
+            }
+        }
+
+        // ===== MOST READ LEADERBOARD =====
+        async function loadReadLeaderboard() {
+            document.getElementById('read-lb-body').innerHTML = '<div class="loading">Loading...</div>';
+            try {
+                // Load individual verses read
+                var vResult = await supabaseClient.from('verses_read').select('user_id, book_name');
+                // Load zipped chapters
+                var cResult = await supabaseClient.from('chapters_read').select('user_id, book_name, verse_count');
+
+                var userData = {};
+
+                (vResult.data || []).forEach(function(r) {
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0 };
+                    userData[r.user_id].verseCount++;
+                });
+                (cResult.data || []).forEach(function(r) {
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0 };
+                    userData[r.user_id].verseCount += (r.verse_count || 0);
+                });
+
+                if (Object.keys(userData).length === 0) {
+                    document.getElementById('read-lb-count').innerText = '';
+                    document.getElementById('read-lb-body').innerHTML = '<div class="empty">No reading data yet — be the first!</div>';
+                    return;
+                }
+
+                var sorted = Object.keys(userData).sort(function(a, b) {
+                    return userData[b].verseCount - userData[a].verseCount;
+                }).slice(0, 50);
+
+                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', sorted);
+                var usernameMap = {};
+                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+
+                document.getElementById('read-lb-count').innerText = sorted.length + ' reader' + (sorted.length !== 1 ? 's' : '');
+
+                var rows = sorted.map(function(userId, i) {
+                    var rank = i + 1;
+                    var u = userData[userId];
+                    var username = usernameMap[userId] || 'Anonymous';
+                    var isYou = userId === currentUserId;
+                    var pct = (u.verseCount / TOTAL_VERSES_BIBLE) * 100;
+                    var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
+                    var barWidth = Math.max(pct, 0.5);
+                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                    var isFull = u.verseCount >= TOTAL_VERSES_BIBLE;
+                    var medal = isFull ? '&#128081;' : (rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank);
+                    return '<tr>' +
+                        '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                        '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                        '<td style="text-align:right;">' +
+                            '<span style="font-weight:800;color:var(--accent);">' + displayPct + '</span>' +
+                            '<span style="color:var(--text-muted);font-size:11px;"> (' + u.verseCount.toLocaleString() + ')</span>' +
+                            '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%;"></div></div>' +
+                        '</td>' +
+                    '</tr>';
+                }).join('');
+
+                document.getElementById('read-lb-body').innerHTML =
+                    '<table class="lb-table">' +
+                        '<thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Bible Read</th></tr></thead>' +
+                        '<tbody>' + rows + '</tbody>' +
+                    '</table>';
+
+            } catch(err) {
+                console.error('Read leaderboard error:', err);
+                document.getElementById('read-lb-body').innerHTML = '<div class="empty">Error loading leaderboard.</div>';
             }
         }
 
