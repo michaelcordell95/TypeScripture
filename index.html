@@ -99,18 +99,18 @@
         #voice-btn.listening { border-color: var(--error) !important; color: var(--error) !important; animation: pulse-mic 1s infinite; }
         @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
-        .syn-dim    { color: #484f58 !important; }
-        .syn-name   { color: #79c0ff !important; }
-        .syn-god    { color: #ffd700 !important; font-weight: 600; }
-        .syn-logic  { color: #d2a8ff !important; }
-        .syn-speech { color: #ffa657 !important; }
+        .syn-dim    { color: #484f58; }
+        .syn-name   { color: #79c0ff; }
+        .syn-god    { color: #ffd700; font-weight: 600; }
+        .syn-logic  { color: #d2a8ff; }
+        .syn-speech { color: #ffa657; }
         .read-nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .read-nav-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         .nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
         .nav-btn-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
         .speed-word { position: relative; display: inline; }
         .speed-word.active-word::after { content: ''; position: absolute; bottom: -3px; left: 0; width: 100%; height: 3px; background: var(--accent); border-radius: 2px; box-shadow: 0 0 8px rgba(88,166,255,0.6); }
-        .speed-word.past-word { color: var(--text-muted) !important; }
+        .speed-word.past-word { color: var(--text-muted) !important; font-weight: normal !important; }
         #speed-controls { display:none; align-items:center; gap:10px; font-size:13px; color:var(--text-muted); }
         #speed-wpm-input { width:60px; background:#21262d; border:1px solid #30363d; color:var(--text-main); padding:4px 8px; border-radius:6px; font-size:13px; text-align:center; }
         #speed-wpm-input:focus { outline:none; border-color:var(--accent); }
@@ -1499,7 +1499,7 @@
                     else if (synLogicWords.has(bare)) synCls = 'syn-logic';
                     else if (synDimWords.has(bare)) synCls = 'syn-dim';
                 }
-                const stateCls = isCurrent ? 'active-word' : isPast ? 'past-word' : '';
+                const stateCls = isCurrent ? 'active-word' : (isPast && !useSyntax) ? 'past-word' : '';
                 return `<span class="speed-word ${stateCls} ${synCls}">${token}</span>`;
             }).join('');
             displayEl.innerHTML = html;
