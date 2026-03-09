@@ -81,6 +81,10 @@
 
         <!-- SCORES TAB -->
         <div id="tab-scores" style="display:none;">
+            <div style="display:flex; gap:8px; justify-content:center; margin-bottom:12px;">
+                <button id="scores-mode-typed" onclick="setScoresMode('typed')" style="background:rgba(88,166,255,0.12); border:1px solid var(--accent); color:var(--accent); padding:6px 18px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit;">⌨️ Typed</button>
+                <button id="scores-mode-read" onclick="setScoresMode('read')" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 18px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit;">📖 Read</button>
+            </div>
             <div class="browse-row">
                 <select id="scores-book" onchange="onScoresBookChange()">
                     <option value="">&#8212; Select Book &#8212;</option>
@@ -185,6 +189,29 @@
             }
         }
 
+        let scoresMode = 'typed'; // 'typed' or 'read'
+
+        function setScoresMode(mode) {
+            scoresMode = mode;
+            var typedBtn = document.getElementById('scores-mode-typed');
+            var readBtn = document.getElementById('scores-mode-read');
+            typedBtn.style.background = mode === 'typed' ? 'rgba(88,166,255,0.12)' : 'transparent';
+            typedBtn.style.borderColor = mode === 'typed' ? 'var(--accent)' : '#30363d';
+            typedBtn.style.color = mode === 'typed' ? 'var(--accent)' : 'var(--text-muted)';
+            readBtn.style.background = mode === 'read' ? 'rgba(88,166,255,0.12)' : 'transparent';
+            readBtn.style.borderColor = mode === 'read' ? 'var(--accent)' : '#30363d';
+            readBtn.style.color = mode === 'read' ? 'var(--accent)' : 'var(--text-muted)';
+            // Hide verse select in read mode (reading tracked at verse level but no WPM)
+            document.getElementById('scores-verse').style.display = mode === 'read' ? 'none' : '';
+            document.getElementById('scores-title').innerText = 'Select a book to see ' + (mode === 'typed' ? 'scores' : 'reading progress');
+            document.getElementById('scores-body').innerHTML = '<div class="loading">Select a book above</div>';
+            document.getElementById('scores-count').innerText = '';
+            document.getElementById('scores-personal').style.display = 'none';
+            // Re-run with current book/chapter selection
+            var book = document.getElementById('scores-book').value;
+            if (book) loadScoresLeaderboard();
+        }
+
         function switchTab(tab) {
             var tabs = document.querySelectorAll('.tab');
             var tabNames = ['bible', 'scores', 'personal', 'read', 'search'];
@@ -270,8 +297,10 @@
             var verse = parseInt(document.getElementById('scores-verse').value) || 0;
             if (!book) return;
 
-            document.getElementById('scores-body').innerHTML = '<div class="loading">Loading scores...</div>';
+            document.getElementById('scores-body').innerHTML = '<div class="loading">Loading...</div>';
             document.getElementById('scores-count').innerText = '';
+
+            if (scoresMode === 'read') { loadReadScores(book, chap); return; }
 
             try {
                 if (verse && chap) {
@@ -660,6 +689,92 @@
             } catch(err) {
                 console.error('Read leaderboard error:', err);
                 document.getElementById('read-lb-body').innerHTML = '<div class="empty">Error loading leaderboard.</div>';
+            }
+        }
+
+        async function loadReadScores(book, chap) {
+            var label = chap ? book + ' — Chapter ' + chap : book;
+            document.getElementById('scores-title').innerText = label;
+
+            try {
+                // Load individual verses read + zipped chapters for this book
+                var vQuery = supabaseClient.from('verses_read').select('user_id, chapter_num, verse_num').eq('book_name', book);
+                var cQuery = supabaseClient.from('chapters_read').select('user_id, chapter_num, verse_count').eq('book_name', book);
+                if (chap) { vQuery = vQuery.eq('chapter_num', chap); cQuery = cQuery.eq('chapter_num', chap); }
+
+                var vResult = await vQuery;
+                var cResult = await cQuery;
+
+                // Build per-user verse counts
+                var userData = {};
+                (vResult.data || []).forEach(function(r) {
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0 };
+                    userData[r.user_id].verseCount++;
+                });
+                (cResult.data || []).forEach(function(r) {
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0 };
+                    userData[r.user_id].verseCount += (r.verse_count || 0);
+                });
+
+                // Calculate total verses for book/chapter
+                var total = 0;
+                if (chap) {
+                    total = (verseCounts[book] && verseCounts[book][chap - 1]) || 0;
+                } else {
+                    total = (verseCounts[book] || []).reduce(function(s, v) { return s + v; }, 0);
+                }
+
+                // Show user's own progress
+                var myCount = currentUserId && userData[currentUserId] ? userData[currentUserId].verseCount : 0;
+                showPersonalStat('verses read', myCount, total);
+
+                if (Object.keys(userData).length === 0) {
+                    document.getElementById('scores-body').innerHTML = '<div class="empty">Nobody has read ' + label + ' yet — be the first!</div>';
+                    return;
+                }
+
+                // Sort by verse count descending
+                var sorted = Object.keys(userData).sort(function(a, b) {
+                    return userData[b].verseCount - userData[a].verseCount;
+                }).slice(0, 50);
+
+                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', sorted);
+                var usernameMap = {};
+                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+
+                document.getElementById('scores-count').innerText = sorted.length + ' reader' + (sorted.length !== 1 ? 's' : '');
+
+                var rows = sorted.map(function(userId, i) {
+                    var rank = i + 1;
+                    var u = userData[userId];
+                    var username = usernameMap[userId] || 'Anonymous';
+                    var isYou = userId === currentUserId;
+                    var pct = total > 0 ? (u.verseCount / total) * 100 : 0;
+                    var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
+                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                    var isFull = u.verseCount >= total && total > 0;
+                    var medal = isFull ? '&#128081;' : (rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank);
+                    var barWidth = Math.max(pct, 0.5);
+                    return '<tr>' +
+                        '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                        '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                        '<td style="text-align:right;">' +
+                            '<span style="font-weight:800;color:var(--accent);">' + displayPct + '</span>' +
+                            '<span style="color:var(--text-muted);font-size:11px;"> (' + u.verseCount + '/' + total + ')</span>' +
+                            '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%;"></div></div>' +
+                        '</td>' +
+                    '</tr>';
+                }).join('');
+
+                document.getElementById('scores-body').innerHTML =
+                    '<table class="lb-table">' +
+                        '<thead><tr><th>#</th><th>Player</th><th style="text-align:right;">' + (chap ? 'Chapter' : 'Book') + ' Read</th></tr></thead>' +
+                        '<tbody>' + rows + '</tbody>' +
+                    '</table>';
+
+            } catch(err) {
+                console.error('Read scores error:', err);
+                document.getElementById('scores-body').innerHTML = '<div class="empty">Error loading data.</div>';
             }
         }
 
