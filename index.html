@@ -101,7 +101,6 @@
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
         .syn-dim    { color: #484f58 !important; }
         .syn-prep   { color: #f97583 !important; }
-        .syn-regular { color: #79c0ff !important; }
         .syn-name   { color: #f0f6fc !important; }
         .syn-god    { color: #ffd700 !important; font-weight: 600; }
         .syn-logic  { color: #d2a8ff !important; }
@@ -1502,26 +1501,41 @@
 
         function renderSpeedDisplay(wordIdx) {
             const useSyntax = document.getElementById('syntax-mode')?.checked;
-            let wordCount = 0;
-            const html = activeVerseText.split(/(\s+)/).map(token => {
-                if (!token.trim()) return token;
-                const isCurrent = wordCount === wordIdx;
-                const isPast = wordCount < wordIdx;
-                wordCount++;
-                const bare = token.replace(/[^a-zA-Z']/g, '').toLowerCase();
-                let synCls = '';
-                if (useSyntax) {
-                    if (synGodWords.has(bare)) synCls = 'syn-god';
-                    else if (synNames.has(bare)) synCls = 'syn-name';
-                    else if (synLogicWords.has(bare)) synCls = 'syn-logic';
-                    else if (synPrepWords.has(bare)) synCls = 'syn-prep';
-                    else if (synDimWords.has(bare)) synCls = 'syn-dim';
-                    else synCls = 'syn-regular';
+
+            if (useSyntax) {
+                // Syntax mode: build DOM once at start of verse, then only toggle active-word
+                if (wordIdx === 0 || !displayEl.querySelector('.speed-word')) {
+                    let wc = 0;
+                    const html = activeVerseText.split(/(\s+)/).map(token => {
+                        if (!token.trim()) return token;
+                        const bare = token.replace(/[^a-zA-Z']/g, '').toLowerCase();
+                        let cls = 'correct';
+                        if (synGodWords.has(bare)) cls = 'syn-god';
+                        else if (synNames.has(bare)) cls = 'syn-name';
+                        else if (synLogicWords.has(bare)) cls = 'syn-logic';
+                        else if (synPrepWords.has(bare)) cls = 'syn-prep';
+                        else if (synDimWords.has(bare)) cls = 'syn-dim';
+                        return `<span class="speed-word ${cls}" data-wi="${wc++}">${token}</span>`;
+                    }).join('');
+                    displayEl.innerHTML = html;
                 }
-                const stateCls = !useSyntax ? (isCurrent ? 'active-word' : isPast ? 'past-word' : '') : (isCurrent ? 'active-word' : '');
-                return `<span class="speed-word ${synCls || 'correct'} ${stateCls}">${token}</span>`;
-            }).join('');
-            displayEl.innerHTML = html;
+                // Only move the active-word underline — no color changes
+                displayEl.querySelectorAll('.speed-word').forEach(el => {
+                    el.classList.toggle('active-word', parseInt(el.dataset.wi) === wordIdx);
+                });
+            } else {
+                // Normal mode: re-render with past-word dimming
+                let wordCount = 0;
+                const html = activeVerseText.split(/(\s+)/).map(token => {
+                    if (!token.trim()) return token;
+                    const isCurrent = wordCount === wordIdx;
+                    const isPast = wordCount < wordIdx;
+                    wordCount++;
+                    const stateCls = isCurrent ? 'active-word' : isPast ? 'past-word' : '';
+                    return `<span class="speed-word correct ${stateCls}">${token}</span>`;
+                }).join('');
+                displayEl.innerHTML = html;
+            }
 
             // Scroll current word into view
             const activeEl = displayEl.querySelector('.active-word');
