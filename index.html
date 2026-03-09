@@ -1236,8 +1236,9 @@
             const vKey = `best_KJV_${bookName}_${chapNum}_${verseNum}`;
             
             // Try database first if logged in, then localStorage
+            // Skip DB call in speed reading mode — no need for best WPM
             let bestWpm = localStorage.getItem(vKey) || 0;
-            if (currentUserId) {
+            if (currentUserId && !speedReadActive) {
                 const dbWpm = await getBestWpmFromDatabase(bookName, chapNum, verseNum);
                 if (dbWpm > 0) bestWpm = dbWpm;
             }
