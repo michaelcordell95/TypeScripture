@@ -99,13 +99,13 @@
         #voice-btn.listening { border-color: var(--error) !important; color: var(--error) !important; animation: pulse-mic 1s infinite; }
         @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
-        .syn-dim    { color: #484f58; }
-        .syn-prep   { color: #f97583; }
-        .syn-regular { color: #79c0ff; }
-        .syn-name   { color: #f0f6fc; }  /* white - stands out from blue regular text */
-        .syn-god    { color: #ffd700; font-weight: 600; }
-        .syn-logic  { color: #d2a8ff; }
-        .syn-speech { color: #ffa657; }
+        .syn-dim    { color: #484f58 !important; }
+        .syn-prep   { color: #f97583 !important; }
+        .syn-regular { color: #79c0ff !important; }
+        .syn-name   { color: #f0f6fc !important; }
+        .syn-god    { color: #ffd700 !important; font-weight: 600; }
+        .syn-logic  { color: #d2a8ff !important; }
+        .syn-speech { color: #ffa657 !important; }
         .read-nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .read-nav-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         .nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -1283,12 +1283,16 @@
         ]);
 
         const synPrepWords = new Set([
-            'in','on','at','by','to','of','from','with','into','unto','upon',
-            'through','throughout','over','under','above','below','before','after',
-            'behind','beside','between','among','against','toward','towards',
-            'within','without','beyond','around','along','across','through',
-            'during','until','till','since','despite','except','out','off','down',
-            'up','about','concerning','regarding','according','because','therefore'
+            'i','me','my','mine','myself',
+            'you','your','yours','yourself','yourselves',
+            'he','him','his','himself',
+            'she','her','hers','herself',
+            'it','its','itself',
+            'we','us','our','ours','ourselves',
+            'they','them','their','theirs','themselves',
+            'who','whom','whose','which','what',
+            'this','that','these','those',
+            'thou','thee','thy','thine','thyself','ye'
         ]);
 
         const synGodWords = new Set([
