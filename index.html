@@ -301,7 +301,7 @@
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:12px 20px; justify-content:center; align-items:center; flex-direction:column; gap:10px; z-index:100;">
         <div id="speed-controls">
             <span>⚡ Speed Read</span>
-            <input type="number" id="speed-wpm-input" value="250" min="50" max="700" title="Words per minute">
+            <input type="number" id="speed-wpm-input" value="500" min="50" max="700" title="Words per minute">
             <span>WPM</span>
             <button id="speed-toggle-btn" onclick="toggleSpeedReading()">▶ Start</button>
         </div>
@@ -1314,34 +1314,35 @@
 
         function startSpeedReading() {
             if (!activeVerseText) return;
-            const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 250;
+            const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 500;
             const msPerWord = (60 / wpm) * 1000;
 
-            // Split verse into words, preserving spaces for display
             speedWords = activeVerseText.split(/(\s+)/).filter(w => w.trim().length > 0);
             speedWordIndex = 0;
             speedReadActive = true;
 
             const btn = document.getElementById('speed-toggle-btn');
-            btn.innerText = '⏹ Stop';
+            btn.innerText = '⏸ Pause';
             btn.classList.add('active');
 
-            renderSpeedDisplay(speedWordIndex);
-            speedReadTimer = setInterval(() => {
+            renderSpeedDisplay(0);
+
+            function tick() {
+                if (!speedReadActive) return;
                 speedWordIndex++;
                 if (speedWordIndex >= speedWords.length) {
-                    // Verse complete — mark as read and advance
-                    clearInterval(speedReadTimer);
-                    speedReadActive = false;
-                    btn.innerText = '▶ Start';
-                    btn.classList.remove('active');
+                    // Verse done — advance seamlessly without touching button UI
                     markVerseRead();
                     goToNextVerse();
-                    setTimeout(() => startSpeedReading(), 50);
+                    speedWordIndex = 0;
+                    speedWords = activeVerseText.split(/(\s+)/).filter(w => w.trim().length > 0);
+                    renderSpeedDisplay(0);
                     return;
                 }
                 renderSpeedDisplay(speedWordIndex);
-            }, msPerWord);
+            }
+
+            speedReadTimer = setInterval(tick, msPerWord);
         }
 
         function stopSpeedReading() {
