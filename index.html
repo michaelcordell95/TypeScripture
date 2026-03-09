@@ -323,8 +323,9 @@
                 localStorage.removeItem('typeScriptureProgressSet');
                 localStorage.removeItem('typeScriptureUserId');
                 completedSet = new Set();
+                readCompletedSet = new Set();
                 updateBibleProgress();
-                await loadReadProgressFromDB();
+                updateReadProgress();
                 updateBooks();
             } catch (err) {
                 console.error('Logout error:', err);
@@ -606,6 +607,7 @@
 
                 updateBooks();
                 updateBibleProgress();
+                await loadReadProgressFromDB();
             } catch (err) {
                 console.error('Error loading progress from Supabase:', err);
                 // Fall back to localStorage
@@ -851,7 +853,7 @@
             document.getElementById('progress-text').style.display = isRead ? 'none' : '';
             document.getElementById('read-progress-container').style.display = isRead ? '' : 'none';
             document.getElementById('read-progress-text').style.display = isRead ? '' : 'none';
-            if (isRead) updateReadProgress();
+            updateReadProgress();
 
             // Stats bar
             document.getElementById('stats-bar').classList.toggle('hidden', isRead);
@@ -859,7 +861,12 @@
             document.getElementById('last-verse-box').classList.toggle('hidden', isRead);
             updateReadRefBox();
             // Turn off easy mode when reading (not helpful for reading)
-            if (isRead) document.getElementById('easy-mode').checked = false;
+            if (isRead) {
+                const em = document.getElementById('easy-mode');
+                em.removeEventListener && em.removeEventListener('change', fetchVerses);
+                em.checked = false;
+                // Don't call fetchVerses — we're in read mode, no need to reload
+            }
             // Hide typing settings in read mode
             document.getElementById('typing-settings').classList.toggle('hidden', isRead);
             // Hide typing-only buttons, they move to bottom bar
@@ -878,6 +885,8 @@
             syncReadBookmark();
             // Re-render current verse text in appropriate style
             if (activeVerseText) renderDisplay(isRead ? activeVerseText : '');
+            // Refresh verse markers (📖 vs ✅) without rebuilding book list
+            updateVerses();
         }
 
         // ===== READING TRACKER =====
