@@ -1510,7 +1510,7 @@
                 wordCount++;
                 const bare = token.replace(/[^a-zA-Z']/g, '').toLowerCase();
                 let synCls = '';
-                if (useSyntax && !isPast) {
+                if (useSyntax) {
                     if (synGodWords.has(bare)) synCls = 'syn-god';
                     else if (synNames.has(bare)) synCls = 'syn-name';
                     else if (synLogicWords.has(bare)) synCls = 'syn-logic';
