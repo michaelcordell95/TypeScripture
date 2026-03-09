@@ -1376,10 +1376,10 @@
                     cls = 'syn-pronoun';
                 } else if (synDimWords.has(bare)) {
                     cls = 'syn-dim';
-                } else {
-                    cls = 'syn-regular';
                 } else if (inSpeech(tokenStart)) {
                     cls = 'syn-speech';
+                } else {
+                    cls = 'syn-regular';
                 }
 
                 return cls ? `<span class="${cls}">${token}</span>` : token;
