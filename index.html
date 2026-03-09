@@ -742,6 +742,7 @@
 
 // Bible data loaded from bible.js
         let completedSet = new Set(); // will be populated after auth check
+        let readCompletedSet = new Set(); // read verses
         let currentVerses = [], currentIndex = 0, activeVerseText = "";
         let verseStartTime = null, verseWpms = [];
 
@@ -880,7 +881,6 @@
         }
 
         // ===== READING TRACKER =====
-        let readCompletedSet = new Set(); // "book|chap|verse" keys
 
         function getReadKey(book, chap, verse) { return book + '|' + chap + '|' + verse; }
 
@@ -976,6 +976,7 @@
                 }
                 saveReadProgress();
                 updateReadProgress();
+                updateBooks(); // refresh dropdowns to show 📖 markers
             } catch(e) { console.warn('Could not load read progress:', e); }
         }
 
@@ -1053,6 +1054,8 @@
             if (verseIdx > 0) {
                 verseSel.value = verseIdx - 1;
                 loadReadProgressLocal();
+        updateReadProgress();
+        updateBooks();
         fetchVerses();
                 updateReadRefBox(verseIdx - 1);
             } else if (chapNum > 1) {
@@ -1276,6 +1279,13 @@
                             best_wpm: existingWpm,
                             completed: true,
                             completed_at: new Date().toISOString()
+                        }, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
+                        // Dual tracking: typing also counts as reading in DB
+                        supabaseClient?.from('verses_read').upsert({
+                            user_id: currentUserId,
+                            book_name: bookName,
+                            chapter_num: chapNum,
+                            verse_num: verseNum
                         }, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
                     }
                     updateBibleProgress();
