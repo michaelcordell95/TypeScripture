@@ -99,6 +99,11 @@
         #voice-btn.listening { border-color: var(--error) !important; color: var(--error) !important; animation: pulse-mic 1s infinite; }
         @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
+        .syn-dim    { color: #484f58 !important; }
+        .syn-name   { color: #79c0ff !important; }
+        .syn-god    { color: #ffd700 !important; font-weight: 600; }
+        .syn-logic  { color: #d2a8ff !important; }
+        .syn-speech { color: #ffa657 !important; }
         .read-nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .read-nav-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         .nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -286,6 +291,9 @@
         <div class="settings-group" id="typing-settings">
             <label><input type="checkbox" id="easy-mode" checked onchange="fetchVerses()"> Easy Mode</label>
             <label><input type="checkbox" id="repeat-mode"> Repeat</label>
+        </div>
+        <div class="settings-group hidden" id="read-settings" style="border-top:none; border-left:none; padding-left:0;">
+            <label><input type="checkbox" id="syntax-mode" onchange="onSyntaxToggle()"> Syntax</label>
         </div>
     </div>
     <div id="stats-bar">
@@ -920,6 +928,7 @@
             }
             // Hide typing settings in read mode
             document.getElementById('typing-settings').classList.toggle('hidden', isRead);
+            document.getElementById('read-settings').classList.toggle('hidden', !isRead);
             // Hide typing-only buttons, they move to bottom bar
             document.getElementById('reset-btn-wrap').classList.toggle('hidden', isRead);
             document.getElementById('next-verse-btn-wrap').classList.toggle('hidden', isRead);
@@ -1258,12 +1267,120 @@
             loadBookmarkState();
         }
 
+        // ===== SYNTAX HIGHLIGHTING =====
+        const synDimWords = new Set([
+            'the','a','an','of','and','but','for','in','to','at','by','with','as',
+            'it','is','are','was','were','be','been','being','that','this','which',
+            'he','she','they','his','her','their','him','them','we','our','us','i',
+            'my','me','its','so','or','nor','not','if','then','when','who','whom',
+            'what','there','where','upon','into','out','up','down','from','about',
+            'also','even','shall','will','would','should','may','might','have',
+            'hath','hast','hadst','doth','dost','thy','thou','thee','ye','thine',
+            'thereof','therein','thereunto','hereunto','whereby','wherein','therewith',
+            'said','saith','spake','unto','thus','now','yet'
+        ]);
+
+        const synGodWords = new Set([
+            'lord','god','jesus','christ','father','son','spirit','holy','almighty',
+            'jehovah','immanuel','emmanuel','messiah','saviour','savior','redeemer',
+            'comforter','counsellor','counselor'
+        ]);
+
+        const synLogicWords = new Set([
+            'therefore','wherefore','nevertheless','notwithstanding','moreover',
+            'furthermore','likewise','indeed','verily','behold','lo','yea','nay',
+            'because','though','although','lest','except','unless','until','while',
+            'after','before','since','again','truly','amen'
+        ]);
+
+        // Biblical proper names and places (major set)
+        const synNames = new Set([
+            'aaron','abel','abigail','abimelech','abraham','absalom','adam','ahab',
+            'ahaz','amaziah','amos','ananias','andrew','anna','annas','apollos',
+            'aquila','asia','assyria','babylon','balaam','balak','barnabas',
+            'bartholomew','bathsheba','benjamin','bethany','bethel','bethlehem',
+            'boaz','caesarea','caiaphas','cain','caleb','capernaum','cornelius',
+            'cyrene','damascus','daniel','david','deborah','delilah','egypt',
+            'eli','elijah','elisha','elizabeth','enoch','ephesus','ephraim',
+            'esau','esther','ethiopia','eve','ezekiel','ezra','felix','festus',
+            'gabriel','galilee','gethsemane','gideon','golgotha','goliath',
+            'gomorrah','habakkuk','hagar','haggai','hannah','herod','hezekiah',
+            'hosea','isaac','isaiah','ishmael','israel','jacob','james','jeremiah',
+            'jericho','jerusalem','jesse','joab','job','joel','john','jonah',
+            'jonathan','jordan','joseph','joshua','judah','judas','laban','lazarus',
+            'leah','levi','lot','luke','lydia','malachi','mark','martha','mary',
+            'matthew','micah','miriam','mordecai','moses','naaman','naomi','nathan',
+            'nathanael','nazareth','nehemiah','nicodemus','nineveh','noah','obadiah',
+            'paul','persia','peter','pharaoh','philemon','philip','philippi',
+            'pilate','priscilla','rachel','rahab','rebekah','rome','ruth','samaria',
+            'samson','samuel','sapphira','sarah','saul','silas','simeon','simon',
+            'sinai','sidon','solomon','stephen','syria','tabitha','thessalonica',
+            'thomas','timothy','titus','tyre','uriah','zacchaeus','zechariah',
+            'zion','zephaniah','zerubbabel','zilpah'
+        ]);
+
+        function syntaxHighlight(text) {
+            // Detect speech segments — after "saying," / "said," / ": " patterns
+            // Mark speech spans by scanning for colon or "saying" triggers
+            const speechRanges = [];
+            const speechTrigger = /(said|saith|saying|spake|answered|replied|declared|proclaimed|commanded|wrote)[^:]*:/gi;
+            let m;
+            while ((m = speechTrigger.exec(text)) !== null) {
+                // Speech starts after the colon, ends at next sentence-ending punctuation
+                const start = m.index + m[0].length;
+                const rest = text.slice(start);
+                const endMatch = rest.search(/[.!?;]/);
+                const end = start + (endMatch >= 0 ? endMatch + 1 : rest.length);
+                speechRanges.push([start, end]);
+            }
+
+            function inSpeech(pos) {
+                return speechRanges.some(([s, e]) => pos >= s && pos < e);
+            }
+
+            // Tokenize preserving whitespace and punctuation attached to words
+            const tokens = text.split(/(\s+)/);
+            let pos = 0;
+            return tokens.map(token => {
+                const tokenStart = pos;
+                pos += token.length;
+                if (!token.trim()) return token; // whitespace
+
+                // Strip punctuation for classification
+                const bare = token.replace(/[^a-zA-Z']/g, '').toLowerCase();
+
+                let cls = '';
+                if (synGodWords.has(bare)) {
+                    cls = 'syn-god';
+                } else if (synNames.has(bare)) {
+                    cls = 'syn-name';
+                } else if (synLogicWords.has(bare)) {
+                    cls = 'syn-logic';
+                } else if (synDimWords.has(bare)) {
+                    cls = 'syn-dim';
+                } else if (inSpeech(tokenStart)) {
+                    cls = 'syn-speech';
+                }
+
+                return cls ? `<span class="${cls}">${token}</span>` : token;
+            }).join('');
+        }
+
+        function onSyntaxToggle() {
+            if (readModeActive && activeVerseText) renderDisplay(activeVerseText);
+        }
+
         function renderDisplay(typed) {
             const isRead = readModeActive;
             if (isRead) {
-                displayEl.innerHTML = activeVerseText.split('').map(char =>
-                    `<span class="correct">${char}</span>`
-                ).join('');
+                const useSyntax = document.getElementById('syntax-mode')?.checked;
+                if (useSyntax) {
+                    displayEl.innerHTML = syntaxHighlight(activeVerseText);
+                } else {
+                    displayEl.innerHTML = activeVerseText.split('').map(char =>
+                        `<span class="correct">${char}</span>`
+                    ).join('');
+                }
                 return;
             }
             displayEl.innerHTML = activeVerseText.split('').map((char, i) => {
@@ -1367,14 +1484,23 @@
         }
 
         function renderSpeedDisplay(wordIdx) {
-            // Build spans for each word, highlight current with blue underline
+            const useSyntax = document.getElementById('syntax-mode')?.checked;
             let wordCount = 0;
             const html = activeVerseText.split(/(\s+)/).map(token => {
-                if (!token.trim()) return token; // preserve spaces
+                if (!token.trim()) return token;
                 const isCurrent = wordCount === wordIdx;
+                const isPast = wordCount < wordIdx;
                 wordCount++;
-                const cls = isCurrent ? 'active-word' : wordCount < wordIdx ? 'past-word' : '';
-                return `<span class="speed-word correct ${cls}">${token}</span>`;
+                const bare = token.replace(/[^a-zA-Z']/g, '').toLowerCase();
+                let synCls = '';
+                if (!isPast && !isCurrent && useSyntax) {
+                    if (synGodWords.has(bare)) synCls = 'syn-god';
+                    else if (synNames.has(bare)) synCls = 'syn-name';
+                    else if (synLogicWords.has(bare)) synCls = 'syn-logic';
+                    else if (synDimWords.has(bare)) synCls = 'syn-dim';
+                }
+                const stateCls = isCurrent ? 'active-word' : isPast ? 'past-word' : '';
+                return `<span class="speed-word ${stateCls} ${synCls}">${token}</span>`;
             }).join('');
             displayEl.innerHTML = html;
 
