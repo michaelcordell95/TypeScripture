@@ -1451,13 +1451,31 @@
             }
         }
 
+        let speedMsPerWord = 200;
+
+        function speedTick() {
+            if (!speedReadActive) return;
+            speedWordIndex++;
+            if (speedWordIndex >= speedWords.length) {
+                markVerseRead();
+                clearInterval(speedReadTimer);
+                goToNextVerse(true);
+                speedWordIndex = 0;
+                speedWords = activeVerseText.split(/\s+/).filter(w => w.trim().length > 0);
+                renderSpeedDisplay(0);
+                speedReadTimer = setInterval(speedTick, speedMsPerWord);
+                return;
+            }
+            renderSpeedDisplay(speedWordIndex);
+        }
+
         function startSpeedReading() {
             if (!activeVerseText) return;
             const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 300;
-            localStorage.setItem('tsSpeedWpm', wpm); // save as user default
-            const msPerWord = (60 / wpm) * 1000;
+            localStorage.setItem('tsSpeedWpm', wpm);
+            speedMsPerWord = (60 / wpm) * 1000;
 
-            speedWords = activeVerseText.split(/(\s+)/).filter(w => w.trim().length > 0);
+            speedWords = activeVerseText.split(/\s+/).filter(w => w.trim().length > 0);
             speedWordIndex = 0;
             speedReadActive = true;
 
@@ -1466,25 +1484,7 @@
             btn.classList.add('active');
 
             renderSpeedDisplay(0);
-
-            function tick() {
-                if (!speedReadActive) return;
-                speedWordIndex++;
-                if (speedWordIndex >= speedWords.length) {
-                    // Verse done — advance and pause briefly for eyes to adjust
-                    markVerseRead();
-                    clearInterval(speedReadTimer);
-                    goToNextVerse(true);
-                    speedWordIndex = 0;
-                    speedWords = activeVerseText.split(/\s+/).filter(w => w.trim().length > 0);
-                    renderSpeedDisplay(0);
-                    speedReadTimer = setInterval(tick, msPerWord);
-                    return;
-                }
-                renderSpeedDisplay(speedWordIndex);
-            }
-
-            speedReadTimer = setInterval(tick, msPerWord);
+            speedReadTimer = setInterval(speedTick, speedMsPerWord);
         }
 
         function stopSpeedReading() {
