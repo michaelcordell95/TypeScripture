@@ -77,7 +77,7 @@
         .stat-box { text-align: center; background: var(--panel-bg); padding: 10px 15px; border-radius: 8px; border: 1px solid #30363d; min-width: 85px; }
         .stat-value { font-size: 22px; font-weight: bold; color: var(--accent); display: block; }
         .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
-        #display { -webkit-overflow-scrolling: touch; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(24px, 3.5vh, 42px); line-height: 1.5; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+        #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(24px, 3.5vh, 42px); line-height: 1.5; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
         .current-char { border-left: 3px solid var(--accent); animation: blink 1s infinite; background: rgba(88, 166, 255, 0.1); }
         @keyframes blink { 50% { border-color: transparent; } }
@@ -151,6 +151,26 @@
         #username-error { color: var(--error); font-size: 12px; min-height: 16px; }
         #save-username-btn { background: var(--accent); color: var(--bg-dark); font-weight: bold; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 15px; }
 
+
+
+        #verse-search-input:focus { outline: none; border-color: var(--accent); }
+        #verse-search-input::placeholder { color: var(--text-muted); font-style: italic; }
+        /* iOS install banner */
+        #ios-install-banner {
+            display: none;
+            background: var(--panel-bg);
+            border: 1px solid #2ea043;
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-size: 12px;
+            color: var(--text-main);
+            text-align: center;
+            margin-bottom: 8px;
+            width: 90%;
+            max-width: 900px;
+        }
+        #ios-install-banner span { color: #2ea043; font-weight: 700; }
+        #ios-install-close { float: right; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 0; margin-left: 8px; }
         /* ═══════════════════════════════
            MOBILE RESPONSIVE STYLES
            ═══════════════════════════════ */
@@ -257,6 +277,11 @@
         </div>
     </div>
 
+
+    <div id="ios-install-banner">
+        <button id="ios-install-close" onclick="this.parentElement.style.display='none'">✕</button>
+        📲 Install TypeScripture: tap <span>Share ↑</span> then <span>"Add to Home Screen"</span>
+    </div>
     <div id="bible-progress-container"><div id="bible-progress-fill"></div></div>
     <div id="progress-text">Bible Typed: 0%</div>
     <div id="read-progress-container" style="display:none; width:90%; max-width:900px; background:var(--progress-bg); height:8px; border-radius:10px; margin-bottom:5px; border:1px solid #30363d;"><div id="read-progress-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#2ea043,var(--accent)); transition:width 0.5s ease-out;"></div></div>
@@ -280,21 +305,31 @@
                 <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
                 <span class="nav-btn-label">Bookmark</span>
             </div>
-            <div class="nav-btn-wrap">
+            <div class="nav-btn-wrap" id="voice-btn-wrap">
                 <button id="voice-btn" onclick="startVoiceSearch()" title="Voice search — say a verse like John 3 16" aria-label="Voice search" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 10px; border-radius:6px; cursor:pointer; font-size:16px; line-height:1; transition:all 0.2s;">🎙️</button>
-                <span class="nav-btn-label">Search</span>
+                <span class="nav-btn-label">Voice</span>
+            </div>
+            <div class="nav-btn-wrap" id="search-btn-wrap" style="flex-direction:row; align-items:center; gap:4px;">
+                <input id="verse-search-input" type="text" placeholder="e.g. Jn 3:16"
+                    autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                    style="width:90px; background:#21262d; border:1px solid #30363d; color:var(--text-main); padding:5px 8px; border-radius:6px; font-size:12px; font-family:inherit;"
+                    onkeydown="if(event.key==='Enter'){doVerseSearch();event.preventDefault();}">
+                <button onclick="doVerseSearch()" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 8px; border-radius:6px; cursor:pointer; font-size:13px; line-height:1; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">→</button>
             </div>
             <div class="nav-btn-wrap">
                 <button id="read-mode-btn" onclick="toggleReadMode()" title="Read Mode" aria-label="Toggle Read Mode" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">📖 Read</button>
                 <span class="nav-btn-label">Mode</span>
             </div>
+            <div class="nav-btn-wrap hidden" id="syntax-btn-wrap">
+                <label style="display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer;">
+                    <input type="checkbox" id="syntax-mode" onchange="onSyntaxToggle()" style="width:18px; height:18px; accent-color:var(--accent); cursor:pointer;">
+                    <span class="nav-btn-label">Syntax</span>
+                </label>
+            </div>
         </div>
         <div class="settings-group" id="typing-settings">
             <label><input type="checkbox" id="easy-mode" checked onchange="fetchVerses()"> Easy Mode</label>
             <label><input type="checkbox" id="repeat-mode"> Repeat</label>
-        </div>
-        <div class="settings-group hidden" id="read-settings" style="border-top:none; border-left:none; padding-left:0;">
-            <label><input type="checkbox" id="syntax-mode" onchange="onSyntaxToggle()"> Syntax</label>
         </div>
     </div>
     <div id="stats-bar">
@@ -334,7 +369,7 @@
             </div>
         </div>
     </div>
-    <input type="text" id="hidden-input" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none">
+    <input type="text" id="hidden-input" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none" autocomplete="off" inputmode="text" enterkeyhint="next">
 
     <script src="/bible.js"></script>
     <script>
@@ -949,7 +984,7 @@
             }
             // Hide typing settings in read mode
             document.getElementById('typing-settings').classList.toggle('hidden', isRead);
-            document.getElementById('read-settings').classList.toggle('hidden', !isRead);
+            document.getElementById('syntax-btn-wrap').classList.toggle('hidden', !isRead);
             // Hide typing-only buttons, they move to bottom bar
             document.getElementById('reset-btn-wrap').classList.toggle('hidden', isRead);
             document.getElementById('next-verse-btn-wrap').classList.toggle('hidden', isRead);
@@ -1570,6 +1605,29 @@
         }
 
         // ===== VOICE SEARCH =====
+
+        // ===== VERSE SEARCH BOX =====
+        function doVerseSearch() {
+            const input = document.getElementById('verse-search-input');
+            const errEl = document.getElementById('verse-search-error');
+            const query = input.value.trim();
+            if (!query) return;
+            errEl.innerText = '';
+            const ok = parseVoiceVerse(query);
+            if (ok) {
+                input.value = '';
+                input.blur();
+            } else {
+                errEl.innerText = "Couldn't find that verse. Try: John 3:16 or Ps 23 1";
+            }
+        }
+
+        // Hide voice button on iOS
+        if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) {
+            const vw = document.getElementById('voice-btn-wrap');
+            if (vw) vw.style.display = 'none';
+        }
+
         function startVoiceSearch() {
             const btn = document.getElementById('voice-btn');
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1856,19 +1914,24 @@
             longPressTriggered = false;
             longPressTimer = setTimeout(() => {
                 longPressTriggered = true;
-                openBLB();
-                // Brief visual feedback
+                // Visual feedback first
                 displayEl.style.opacity = '0.7';
                 setTimeout(() => displayEl.style.opacity = '1', 200);
+                // iOS requires window.open to be called directly from a user gesture
+                // so we open immediately in the timeout which counts as user-initiated
+                openBLB();
             }, 500);
-        }, { passive: true });
+        }, { passive: false });
 
-        displayEl.addEventListener('touchend', () => {
+        displayEl.addEventListener('touchend', (e) => {
             clearTimeout(longPressTimer);
+            // Prevent click firing if long press triggered
+            if (longPressTriggered) e.preventDefault();
         });
 
         displayEl.addEventListener('touchmove', () => {
             clearTimeout(longPressTimer);
+            longPressTriggered = false;
         });
 
         // Desktop: right-click or long mousedown
@@ -1877,8 +1940,19 @@
             openBLB();
         });
 
+        // iOS requires focus() called directly in touchend, not in click
+        document.addEventListener('touchend', (e) => {
+            const tag = e.target.tagName;
+            const isInteractive = ['SELECT', 'BUTTON', 'INPUT', 'A', 'LABEL'].includes(tag);
+            const isNavArea = e.target.closest('#nav-header, #stats-bar, .brand-container, #ios-install-banner');
+            if (!isInteractive && !isNavArea) {
+                setTimeout(() => inputEl.focus({ preventScroll: true }), 50);
+            }
+        }, { passive: true });
+
+        // Desktop fallback
         window.addEventListener('click', (e) => {
-            if (!['SELECT', 'BUTTON', 'INPUT'].includes(e.target.tagName)) inputEl.focus({ preventScroll: true });
+            if (!['SELECT', 'BUTTON', 'INPUT', 'A'].includes(e.target.tagName)) inputEl.focus({ preventScroll: true });
         });
 
         // Arrow keys: left = reset, right = next verse (only when not typing in a select)
@@ -1968,6 +2042,17 @@
             flushPendingProgress();
             flushPendingBookmarks();
         });
+
+
+        // Show iOS install banner if on iOS and not in standalone mode
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = window.navigator.standalone === true;
+        if (isIOS && !isStandalone && !localStorage.getItem('ios-banner-dismissed')) {
+            document.getElementById('ios-install-banner').style.display = 'block';
+            document.getElementById('ios-install-close').addEventListener('click', () => {
+                localStorage.setItem('ios-banner-dismissed', '1');
+            });
+        }
 
         // PWA install prompt
         let deferredInstallPrompt = null;
