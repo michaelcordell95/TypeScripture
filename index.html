@@ -978,6 +978,7 @@
             saveReadProgress();
             updateReadProgress();
             updateVerses();
+            updateBooks();
 
             if (!currentUserId || !supabaseClient) return;
 
@@ -1120,10 +1121,7 @@
 
             if (verseIdx > 0) {
                 verseSel.value = verseIdx - 1;
-                loadReadProgressLocal();
-        updateReadProgress();
-        updateBooks();
-        fetchVerses();
+                fetchVerses();
                 updateReadRefBox(verseIdx - 1);
             } else if (chapNum > 1) {
                 chapSel.value = chapNum - 1;
@@ -1190,8 +1188,8 @@
             }
         }
 
-        function goToNextVerse() {
-            if (readModeActive) markVerseRead();
+        function goToNextVerse(skipMark = false) {
+            if (readModeActive && !skipMark) markVerseRead();
             const bookName = bookSel.value.replace(" ✅", "");
             const bookIdx = books.indexOf(bookName);
             let chapNum = parseInt(chapSel.value);
@@ -1470,17 +1468,23 @@
                 if (speedWordIndex >= speedWords.length) {
                     // Verse done — advance and pause briefly for eyes to adjust
                     markVerseRead();
-                    goToNextVerse();
-                    speedWordIndex = -1; // -1 = waiting state
-                    renderSpeedDisplay(0);
                     clearInterval(speedReadTimer);
-                    setTimeout(() => {
+                    speedReadActive = true; // keep active during transition
+                    goToNextVerse(true);
+                    // Wait for fetchVerses to complete before reading activeVerseText
+                    const waitForVerse = (attempts) => {
                         if (!speedReadActive) return;
-                        speedWordIndex = 0;
-                        speedWords = activeVerseText.split(/(\s+)/).filter(w => w.trim().length > 0);
-                        renderSpeedDisplay(0);
-                        speedReadTimer = setInterval(tick, msPerWord);
-                    }, Math.max(msPerWord * 2, 300)); // 2 word-lengths or 300ms min
+                        const words = activeVerseText.split(/\s+/).filter(w => w.trim().length > 0);
+                        if (words.length > 0 && attempts > 0) {
+                            speedWordIndex = 0;
+                            speedWords = words;
+                            renderSpeedDisplay(0);
+                            speedReadTimer = setInterval(tick, msPerWord);
+                        } else {
+                            setTimeout(() => waitForVerse(attempts - 1), 50);
+                        }
+                    };
+                    setTimeout(() => waitForVerse(20), 100);
                     return;
                 }
                 renderSpeedDisplay(speedWordIndex);
