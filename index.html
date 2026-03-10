@@ -155,6 +155,16 @@
 
         #verse-search-input:focus { outline: none; border-color: var(--accent); }
         #verse-search-input::placeholder { color: var(--text-muted); font-style: italic; }
+
+        /* BLB tap banner for iOS */
+        #blb-tap-banner {
+            display: none; position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+            background: #1c2128; border: 1px solid var(--accent); border-radius: 10px;
+            padding: 10px 20px; z-index: 200; text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        #blb-tap-banner a { color: var(--accent); font-weight: 700; font-size: 14px; text-decoration: none; }
+        #blb-tap-banner .blb-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
         /* iOS install banner */
         #ios-install-banner {
             display: none;
@@ -1607,21 +1617,6 @@
         // ===== VOICE SEARCH =====
 
         // ===== VERSE SEARCH BOX =====
-        function doVerseSearch() {
-            const input = document.getElementById('verse-search-input');
-            const errEl = document.getElementById('verse-search-error');
-            const query = input.value.trim();
-            if (!query) return;
-            errEl.innerText = '';
-            const ok = parseVoiceVerse(query);
-            if (ok) {
-                input.value = '';
-                input.blur();
-            } else {
-                errEl.innerText = "Couldn't find that verse. Try: John 3:16 or Ps 23 1";
-            }
-        }
-
         // Hide voice button on iOS
         if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) {
             const vw = document.getElementById('voice-btn-wrap');
@@ -1793,6 +1788,19 @@
             return true;
         }
 
+        function doVerseSearch() {
+            const input = document.getElementById('verse-search-input');
+            const query = input.value.trim();
+            if (!query) return;
+            const ok = parseVoiceVerse(query);
+            if (ok) {
+                input.value = '';
+                input.blur();
+            } else {
+                showVoiceFeedback("Couldn't find that verse. Try: John 3:16 or Ps 23 1", true);
+            }
+        }
+
         function showVoiceFeedback(msg, isError) {
             const el = document.getElementById('accuracy-warning');
             el.style.color = isError ? 'var(--error)' : '#2ea043';
@@ -1896,6 +1904,8 @@
             "Revelation":"rev"
         };
 
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
         function openBLB() {
             const bookName = bookSel.value.replace(' ✅', '');
             const chapNum = chapSel.value;
@@ -1903,7 +1913,16 @@
             const abbr = blbBookMap[bookName];
             if (!abbr) return;
             const url = `https://www.blueletterbible.org/kjv/${abbr}/${chapNum}/${verseNum}/`;
-            window.open(url, '_blank');
+            if (isIOS) {
+                // iOS blocks window.open in setTimeout — show a tappable banner instead
+                const banner = document.getElementById('blb-tap-banner');
+                const link = document.getElementById('blb-tap-link');
+                link.href = url;
+                banner.style.display = 'block';
+                setTimeout(() => banner.style.display = 'none', 4000);
+            } else {
+                window.open(url, '_blank');
+            }
         }
 
         // Long press on display to open BLB (500ms threshold)
@@ -2078,5 +2097,7 @@
             deferredInstallPrompt = null;
         });
     </script>
+
+    <div id="blb-tap-banner"><a id="blb-tap-link" href="#" target="_blank">📖 Open in Blue Letter Bible</a><div class="blb-sub">Tap to open · hold again to dismiss</div></div>
 </body>
 </html>
