@@ -83,7 +83,7 @@
         @keyframes blink { 50% { border-color: transparent; } }
         .correct { color: var(--correct) !important; }
         .incorrect { color: var(--error) !important; background: rgba(248, 81, 73, 0.1); text-decoration: underline; }
-        #hidden-input { position: fixed; bottom: 0; left: 0; width: 100%; height: 44px; opacity: 0.001; font-size: 16px; -webkit-text-size-adjust: 100%; border: none; background: transparent; color: transparent; caret-color: transparent; z-index: 50; }
+        #hidden-input { position: fixed; bottom: 0; left: 0; width: 100%; height: 44px; font-size: 16px; -webkit-text-size-adjust: 100%; border: none; background: transparent; color: transparent; caret-color: transparent; z-index: 50; opacity: 0; pointer-events: none; }
         #display::-webkit-scrollbar { width: 8px; }
         #display::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
         .complete-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 18px; text-align: center; }
@@ -1327,7 +1327,7 @@
             verseStartTime = null;
             displayEl.scrollTop = 0;
             document.getElementById('accuracy').innerText = '100';
-            inputEl.focus({ preventScroll: true });
+            inputEl.style.opacity = "1"; inputEl.style.pointerEvents = "auto"; inputEl.focus({ preventScroll: true }); setTimeout(() => { inputEl.style.opacity = "0"; inputEl.style.pointerEvents = "none"; }, 100);
             if (readModeActive) onVerseLoaded();
             loadBookmarkState();
         }
@@ -1944,8 +1944,21 @@
 
         displayEl.addEventListener('touchend', (e) => {
             clearTimeout(longPressTimer);
-            // Prevent click firing if long press triggered
-            if (longPressTriggered) e.preventDefault();
+            if (longPressTriggered) {
+                e.preventDefault();
+                return;
+            }
+            // Normal tap — focus hidden input to bring up keyboard
+            // iOS requires focus() called synchronously in user event handler
+            if (!inputEl.disabled) {
+                inputEl.style.opacity = '1';
+                inputEl.style.pointerEvents = 'auto';
+                inputEl.style.opacity = "1"; inputEl.style.pointerEvents = "auto"; inputEl.focus({ preventScroll: true }); setTimeout(() => { inputEl.style.opacity = "0"; inputEl.style.pointerEvents = "none"; }, 100);
+                setTimeout(() => {
+                    inputEl.style.opacity = '0';
+                    inputEl.style.pointerEvents = 'none';
+                }, 100);
+            }
         });
 
         displayEl.addEventListener('touchmove', () => {
@@ -1959,19 +1972,26 @@
             openBLB();
         });
 
-        // iOS requires focus() called directly in touchend, not in click
+        // Focus on tap anywhere outside nav/buttons
         document.addEventListener('touchend', (e) => {
             const tag = e.target.tagName;
             const isInteractive = ['SELECT', 'BUTTON', 'INPUT', 'A', 'LABEL'].includes(tag);
             const isNavArea = e.target.closest('#nav-header, #stats-bar, .brand-container, #ios-install-banner');
-            if (!isInteractive && !isNavArea) {
-                setTimeout(() => inputEl.focus({ preventScroll: true }), 50);
+            const isDisplay = e.target.closest('#display');
+            if (!isInteractive && !isNavArea && !isDisplay && !inputEl.disabled) {
+                inputEl.style.opacity = '1';
+                inputEl.style.pointerEvents = 'auto';
+                inputEl.style.opacity = "1"; inputEl.style.pointerEvents = "auto"; inputEl.focus({ preventScroll: true }); setTimeout(() => { inputEl.style.opacity = "0"; inputEl.style.pointerEvents = "none"; }, 100);
+                setTimeout(() => {
+                    inputEl.style.opacity = '0';
+                    inputEl.style.pointerEvents = 'none';
+                }, 100);
             }
         }, { passive: true });
 
         // Desktop fallback
         window.addEventListener('click', (e) => {
-            if (!['SELECT', 'BUTTON', 'INPUT', 'A'].includes(e.target.tagName)) inputEl.focus({ preventScroll: true });
+            if (!['SELECT', 'BUTTON', 'INPUT', 'A'].includes(e.target.tagName)) inputEl.style.opacity = "1"; inputEl.style.pointerEvents = "auto"; inputEl.focus({ preventScroll: true }); setTimeout(() => { inputEl.style.opacity = "0"; inputEl.style.pointerEvents = "none"; }, 100);
         });
 
         // Arrow keys: left = reset, right = next verse (only when not typing in a select)
