@@ -823,12 +823,17 @@
             document.getElementById('progress-text').innerText = `Bible Typed: ${completedSet.size} / ${TOTAL_VERSES_BIBLE} verses (${display}%)`;
         }
 
+        function isVerseDone(bookName, chapNum, verseNum) {
+            return completedSet.has(`KJV_${bookName}_${chapNum}_${verseNum}`) ||
+                   readCompletedSet.has(getReadKey(bookName, chapNum, verseNum));
+        }
+
         function isBookComplete(bookName) {
             const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
             if (!bookEntry) return false;
             for (const chap of bookEntry.chapters) {
                 for (const v of chap.verses) {
-                    if (!completedSet.has(`KJV_${bookName}_${chap.chapter}_${v.verse}`)) return false;
+                    if (!isVerseDone(bookName, chap.chapter, v.verse)) return false;
                 }
             }
             return bookEntry.chapters.length > 0;
@@ -839,7 +844,7 @@
             if (!bookEntry) return false;
             const chap = bookEntry.chapters.find(c => c.chapter === chapNum);
             if (!chap || chap.verses.length === 0) return false;
-            return chap.verses.every(v => completedSet.has(`KJV_${bookName}_${chapNum}_${v.verse}`));
+            return chap.verses.every(v => isVerseDone(bookName, chapNum, v.verse));
         }
 
         function updateBooks() {
@@ -1469,22 +1474,11 @@
                     // Verse done — advance and pause briefly for eyes to adjust
                     markVerseRead();
                     clearInterval(speedReadTimer);
-                    speedReadActive = true; // keep active during transition
                     goToNextVerse(true);
-                    // Wait for fetchVerses to complete before reading activeVerseText
-                    const waitForVerse = (attempts) => {
-                        if (!speedReadActive) return;
-                        const words = activeVerseText.split(/\s+/).filter(w => w.trim().length > 0);
-                        if (words.length > 0 && attempts > 0) {
-                            speedWordIndex = 0;
-                            speedWords = words;
-                            renderSpeedDisplay(0);
-                            speedReadTimer = setInterval(tick, msPerWord);
-                        } else {
-                            setTimeout(() => waitForVerse(attempts - 1), 50);
-                        }
-                    };
-                    setTimeout(() => waitForVerse(20), 100);
+                    speedWordIndex = 0;
+                    speedWords = activeVerseText.split(/\s+/).filter(w => w.trim().length > 0);
+                    renderSpeedDisplay(0);
+                    speedReadTimer = setInterval(tick, msPerWord);
                     return;
                 }
                 renderSpeedDisplay(speedWordIndex);
