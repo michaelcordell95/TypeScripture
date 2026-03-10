@@ -828,15 +828,30 @@
                    readCompletedSet.has(getReadKey(bookName, chapNum, verseNum));
         }
 
+        function isBookTyped(bookName) {
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            if (!bookEntry) return false;
+            for (const chap of bookEntry.chapters)
+                for (const v of chap.verses)
+                    if (!completedSet.has(`KJV_${bookName}_${chap.chapter}_${v.verse}`)) return false;
+            return bookEntry.chapters.length > 0;
+        }
+
         function isBookComplete(bookName) {
             const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
             if (!bookEntry) return false;
-            for (const chap of bookEntry.chapters) {
-                for (const v of chap.verses) {
+            for (const chap of bookEntry.chapters)
+                for (const v of chap.verses)
                     if (!isVerseDone(bookName, chap.chapter, v.verse)) return false;
-                }
-            }
             return bookEntry.chapters.length > 0;
+        }
+
+        function isChapterTyped(bookName, chapNum) {
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            if (!bookEntry) return false;
+            const chap = bookEntry.chapters.find(c => c.chapter === chapNum);
+            if (!chap || chap.verses.length === 0) return false;
+            return chap.verses.every(v => completedSet.has(`KJV_${bookName}_${chapNum}_${v.verse}`));
         }
 
         function isChapterComplete(bookName, chapNum) {
@@ -853,7 +868,7 @@
             books.forEach(book => {
                 let opt = document.createElement('option');
                 opt.value = book;
-                opt.innerText = book + (isBookComplete(book) ? " ✅" : "");
+                opt.innerText = book + (isBookTyped(book) ? " ✅" : isBookComplete(book) ? " 📖" : "");
                 bookSel.appendChild(opt);
             });
             if (savedBook) bookSel.value = savedBook; // restore selection
@@ -868,7 +883,7 @@
             for (let i = 1; i <= chapCount; i++) {
                 let opt = document.createElement('option');
                 opt.value = i;
-                opt.innerText = `Chapter ${i}` + (isChapterComplete(bookName, i) ? " ✅" : "");
+                opt.innerText = `Chapter ${i}` + (isChapterTyped(bookName, i) ? " ✅" : isChapterComplete(bookName, i) ? " 📖" : "");
                 chapSel.appendChild(opt);
             }
             if (savedChap && parseInt(savedChap) <= chapCount) chapSel.value = savedChap; // restore selection
