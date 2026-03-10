@@ -891,10 +891,10 @@
         }
 
         function updateVerses(autoLoad = false) {
+            const currentVerseIdx = verseSel.value; // save BEFORE clearing
             verseSel.innerHTML = '';
             const bookName = bookSel.value.replace(" ✅", "");
             const chapNum = parseInt(chapSel.value);
-            const currentVerseIdx = verseSel.value;
             const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
             if (bookEntry) {
                 const chapterObj = bookEntry.chapters.find(c => c.chapter === chapNum);
