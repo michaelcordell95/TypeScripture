@@ -13,8 +13,10 @@
     <meta name="apple-mobile-web-app-title" content="TypeScripture">
     <link rel="apple-touch-icon" href="/icon-192-maskable.png">
     <title>TypeScripture</title>
+    <meta name="description" content="Type through the Bible verse by verse. Track your progress, improve your speed, and memorize Scripture with TypeScripture.">
     <!-- Supabase Library -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preload" href="/bible.js" as="script">
+    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --bg-dark: #0d1117;
@@ -53,13 +55,15 @@
         #user-email { color: var(--text-muted); align-self: center; font-size: 12px; }
         #bible-progress-container { width: 90%; max-width: 900px; background: var(--progress-bg); height: 8px; border-radius: 10px; margin-bottom: 5px; border: 1px solid #30363d; }
         #bible-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2ea043, var(--accent)); transition: width 0.5s ease-out; }
-        #progress-text { font-size: 11px; color: var(--text-muted); margin-bottom: 1vh; font-weight: bold; }
+        #progress-text { font-size: 11px; color: var(--text-muted); margin-bottom: 1vh; font-weight: bold; min-height: 16px; }
         #nav-header { background: var(--panel-bg); padding: 12px 20px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 1.5vh; display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; align-items: center; }
         .nav-group { display: flex; align-items: center; gap: 8px; }
         .settings-group { border-left: 1px solid #30363d; padding-left: 15px; display: flex; gap: 15px; font-size: 13px; color: var(--text-muted); }
         .settings-group label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
         .hidden { display: none !important; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
         select, button { background: #21262d; border: 1px solid #30363d; color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+        select { min-width: 80px; min-height: 38px; }
         #stats-bar { display: flex; gap: 12px; margin-bottom: 1.5vh; justify-content: center; }
         #read-ref-box {
             background: #161b22;
@@ -87,6 +91,20 @@
         #hidden-input { position: fixed; bottom: 0; left: 0; width: 1px; height: 1px; font-size: 16px; -webkit-text-size-adjust: 100%; border: none; background: transparent; color: transparent; caret-color: transparent; z-index: 50; opacity: 0; pointer-events: none; }
         #display::-webkit-scrollbar { width: 8px; }
         #display::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
+
+        /* Skeleton loading screen */
+        .skeleton-line {
+            background: linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+            margin-bottom: 14px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        #skeleton-screen { padding: 10px 0; }
         .complete-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 18px; text-align: center; }
         .complete-screen .emoji { font-size: 2.5em; }
         .complete-screen h2 { color: var(--accent); font-size: 1.4em; font-weight: 800; letter-spacing: -0.5px; margin: 0; }
@@ -299,8 +317,11 @@
     <div id="read-progress-text" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:1vh; font-weight:bold;">Bible Read: 0%</div>
     <div id="nav-header">
         <div class="nav-group" id="select-group">
+            <label for="book-select" class="sr-only">Book</label>
             <select id="book-select" onchange="updateChapters(true)" aria-label="Book"></select>
+            <label for="chapter-select" class="sr-only">Chapter</label>
             <select id="chapter-select" onchange="updateVerses(true)" aria-label="Chapter"></select>
+            <label for="verse-select" class="sr-only">Verse</label>
             <select id="verse-select" onchange="fetchVerses()" aria-label="Verse"></select>
         </div>
         <div class="nav-group" id="btn-group">
@@ -353,7 +374,14 @@
     <div id="read-ref-box" style="display:none; text-align:center; margin-bottom:1.5vh;"></div>
     <div id="blb-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Hold verse to open in Blue Letter Bible</div>
     <div id="accuracy-warning"></div>
-    <div id="display"></div>
+    <div id="display"><div id="skeleton-screen">
+        <div class="skeleton-line" style="height:28px; width:95%;"></div>
+        <div class="skeleton-line" style="height:28px; width:88%;"></div>
+        <div class="skeleton-line" style="height:28px; width:92%;"></div>
+        <div class="skeleton-line" style="height:28px; width:75%;"></div>
+        <div class="skeleton-line" style="height:28px; width:85%;"></div>
+        <div class="skeleton-line" style="height:28px; width:60%;"></div>
+    </div></div>
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:12px 20px; justify-content:center; align-items:center; flex-direction:column; gap:10px; z-index:100;">
         <div id="speed-controls">
             <span>⚡ Speed Read</span>
@@ -1300,6 +1328,9 @@
         }
 
         async function loadVerse() {
+            // Hide skeleton on first load
+            const sk = document.getElementById('skeleton-screen');
+            if (sk) sk.style.display = 'none';
             if (currentIndex >= currentVerses.length) {
                 showChapterComplete();
                 return;
