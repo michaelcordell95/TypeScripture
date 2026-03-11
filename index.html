@@ -431,6 +431,7 @@
 
         // ===== AUTHENTICATION FUNCTIONS =====
         async function handleGoogleLogin() {
+            if (!supabaseClient) { alert('Auth not available. Please refresh the page.'); return; }
             try {
                 const { error } = await supabaseClient.auth.signInWithOAuth({
                     provider: 'google',
@@ -445,7 +446,7 @@
 
         async function handleLogout() {
             try {
-                await supabaseClient.auth.signOut();
+                if (supabaseClient) await supabaseClient.auth.signOut();
                 currentUserId = null;
                 isLoggedIn = false;
                 document.getElementById('google-login-btn').style.display = 'flex';
@@ -624,10 +625,12 @@
         }
 
         async function checkAuth() {
+            if (!supabaseClient) return;
+
             // Handle PKCE magic link redirect (?code= in URL)
             const params = new URLSearchParams(window.location.search);
             if (params.get('code')) {
-                const { error } = await supabaseClient?.auth.exchangeCodeForSession(window.location.href);
+                const { error } = await supabaseClient.auth.exchangeCodeForSession(window.location.href);
                 if (!error) {
                     window.history.replaceState({}, document.title, window.location.pathname);
                 } else {
@@ -635,7 +638,6 @@
                 }
             }
 
-            if (!supabaseClient) return;
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session) {
                 currentUserId = session.user.id;
