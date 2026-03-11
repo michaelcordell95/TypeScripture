@@ -1747,7 +1747,8 @@
                     const utt = new SpeechSynthesisUtterance(cleanText);
                     utt.lang = 'en-US';
                     const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 300;
-                    utt.rate = Math.min(10, Math.max(0.5, wpm / 150));
+                    const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+                    utt.rate = isMobile ? Math.min(2, Math.max(0.5, wpm / 250)) : Math.min(10, Math.max(0.5, wpm / 150));
                     speechSynthesis.speak(utt);
                 }
                 return;
@@ -1780,7 +1781,8 @@
                 const utt = new SpeechSynthesisUtterance(cleanText);
                 utt.lang = 'en-US';
                 // SpeechSynthesis rate: 1 = ~150wpm, scale accordingly
-                utt.rate = Math.min(10, Math.max(0.5, wpm / 150));
+                const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+                    utt.rate = isMobile ? Math.min(2, Math.max(0.5, wpm / 250)) : Math.min(10, Math.max(0.5, wpm / 150));
                 speechSynthesis.speak(utt);
             }
         }
@@ -1907,11 +1909,18 @@
         function parseVoiceVerse(transcript) {
             // Normalize: lowercase, replace ordinals, common substitutions
             let t = transcript.toLowerCase()
-                .replace(/first/g, '1').replace(/second/g, '2').replace(/third/g, '3')
-                .replace(/one/g, '1').replace(/two/g, '2').replace(/three/g, '3')
-                .replace(/four/g, '4').replace(/five/g, '5').replace(/six/g, '6')
-                .replace(/seven/g, '7').replace(/eight/g, '8').replace(/nine/g, '9')
-                .replace(/ten/g, '10').replace(/[:.,]/g, ' ').replace(/\s+/g, ' ').trim();
+                .replace(/\bfirst\b/g, '1').replace(/\bsecond\b/g, '2').replace(/\bthird\b/g, '3')
+                .replace(/\bone\b/g, '1').replace(/\btwo\b/g, '2').replace(/\bthree\b/g, '3')
+                .replace(/\bfour\b/g, '4').replace(/\bfive\b/g, '5').replace(/\bsix\b/g, '6')
+                .replace(/\bseven\b/g, '7').replace(/\beight\b/g, '8').replace(/\bnine\b/g, '9')
+                .replace(/\bten\b/g, '10').replace(/[:.,]/g, ' ').replace(/\s+/g, ' ').trim();
+
+            // iOS omits colon: "John 3:16" becomes "John 316" — split compact 3-4 digit numbers
+            t = t.replace(/(\d{3,4})/g, (match) => {
+                if (match.length === 3) return match[0] + ' ' + match.slice(1);
+                if (match.length === 4) return match.slice(0, 2) + ' ' + match.slice(2);
+                return match;
+            });
 
             // Book name aliases
             const aliases = {
