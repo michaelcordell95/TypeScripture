@@ -1733,7 +1733,8 @@
                 // Restart TTS for new verse
                 if (speedTtsEnabled && speechSynthesis) {
                     speechSynthesis.cancel();
-                    const utt = new SpeechSynthesisUtterance(activeVerseText);
+                    const cleanText = activeVerseText.replace(/[,;:]/g, ' ').replace(/[.!?]/g, ' ').replace(/\s+/g, ' ').trim();
+                    const utt = new SpeechSynthesisUtterance(cleanText);
                     utt.lang = 'en-US';
                     const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 300;
                     utt.rate = Math.min(10, Math.max(0.5, wpm / 150));
@@ -1765,7 +1766,8 @@
             // Start TTS for full verse at matched rate if enabled
             if (speedTtsEnabled && speechSynthesis) {
                 speechSynthesis.cancel();
-                const utt = new SpeechSynthesisUtterance(activeVerseText);
+                const cleanText = activeVerseText.replace(/[,;:]/g, ' ').replace(/[.!?]/g, ' ').replace(/\s+/g, ' ').trim();
+                const utt = new SpeechSynthesisUtterance(cleanText);
                 utt.lang = 'en-US';
                 // SpeechSynthesis rate: 1 = ~150wpm, scale accordingly
                 utt.rate = Math.min(10, Math.max(0.5, wpm / 150));
