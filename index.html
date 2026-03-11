@@ -56,32 +56,61 @@
         #bible-progress-container { width: 90%; max-width: 900px; background: var(--progress-bg); height: 8px; border-radius: 10px; margin-bottom: 5px; border: 1px solid #30363d; }
         #bible-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2ea043, var(--accent)); transition: width 0.5s ease-out; }
         #progress-text { font-size: 11px; color: var(--text-muted); margin-bottom: 1vh; font-weight: bold; min-height: 16px; }
-        #nav-header { background: var(--panel-bg); padding: 12px 20px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 1.5vh; display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; align-items: center; }
+        #nav-header { background: var(--panel-bg); padding: 10px 16px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 1.5vh; display: flex; flex-direction: column; gap: 8px; align-items: center; min-height: 62px; box-sizing: border-box; }
+        .nav-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; }
+        .nav-divider { width: 1px; height: 28px; background: #30363d; margin: 0 4px; flex-shrink: 0; }
         .nav-group { display: flex; align-items: center; gap: 8px; }
-        .settings-group { border-left: 1px solid #30363d; padding-left: 15px; display: flex; gap: 15px; font-size: 13px; color: var(--text-muted); }
-        .settings-group label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .settings-group { display: none; }
+        /* Focus mode */
+        body.focus-mode .brand-container,
+        body.focus-mode #stats-bar,
+        body.focus-mode #bible-progress-container,
+        body.focus-mode #progress-text,
+        body.focus-mode #read-progress-container,
+        body.focus-mode #read-progress-text,
+        body.focus-mode #last-verse-box,
+        body.focus-mode #blb-hint,
+        body.focus-mode #accuracy-warning { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+        body.focus-mode #display { border-color: transparent; box-shadow: none; background: var(--bg-dark); transition: all 0.4s ease; }
+        body.focus-mode #nav-header { opacity: 0.15; transition: opacity 0.3s ease; }
+        body.focus-mode #nav-header:hover { opacity: 1; }
+        #read-mode-btn { background: rgba(88,166,255,0.08); border: 1.5px solid rgba(88,166,255,0.35); color: rgba(88,166,255,0.5); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 700; transition: all 0.2s; }
+        #read-mode-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.15); }
+        .toggle-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-muted); user-select: none; }
+        .toggle-label input[type=checkbox] { display: none; }
+        .toggle-track { width: 32px; height: 18px; background: #30363d; border-radius: 9px; position: relative; transition: background 0.2s; flex-shrink: 0; }
+        .toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: #666; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+        .toggle-label input:checked + .toggle-track { background: rgba(88,166,255,0.3); }
+        .toggle-label input:checked + .toggle-track::after { transform: translateX(14px); background: var(--accent); }
+        /* Search box in nav */
+        .nav-search-wrap { display: flex; align-items: center; gap: 0; background: #21262d; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; transition: border-color 0.2s; }
+        .nav-search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+        .nav-search-wrap input { background: transparent; border: none; color: var(--text-main); padding: 5px 8px; font-size: 12px; font-family: inherit; outline: none; width: 110px; min-width: 0; }
+        .nav-search-wrap input::placeholder { color: var(--text-muted); font-style: italic; }
+        @media (max-width: 600px) { .nav-search-wrap input { width: 70px; } .nav-search-wrap input::placeholder { font-size: 11px; } }
+        .nav-search-wrap button { background: transparent; border: none; border-left: 1px solid #30363d; color: var(--text-muted); padding: 5px 8px; cursor: pointer; font-size: 13px; transition: color 0.2s; }
+        .nav-search-wrap button:hover { color: var(--accent); }
         .hidden { display: none !important; }
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
         select, button { background: #21262d; border: 1px solid #30363d; color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; }
         select { min-width: 80px; min-height: 38px; }
         #stats-bar { display: flex; gap: 12px; margin-bottom: 1.5vh; justify-content: center; }
         #read-ref-box {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 8px 16px;
+            background: transparent;
+            border: 1.5px solid rgba(88,166,255,0.3);
+            border-radius: 20px;
+            padding: 4px 16px;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            font-size: 14px;
+            justify-content: center;
+            gap: 6px;
+            font-size: 13px;
             color: var(--text-muted);
         }
-        #read-ref-box .ref-main { font-size: 15px; font-weight: 700; color: var(--accent); }
-        #read-ref-box .ref-sep { color: #30363d; }
-        #read-ref-box .ref-sub { font-size: 13px; color: var(--accent); font-weight: 600; }
-        .stat-box { text-align: center; background: var(--panel-bg); padding: 10px 15px; border-radius: 8px; border: 1px solid #30363d; min-width: 85px; }
-        .stat-value { font-size: 22px; font-weight: bold; color: var(--accent); display: block; }
-        .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+        #read-ref-box .ref-sub { font-size: 13px; color: var(--accent); font-weight: 600; letter-spacing: 0.3px; }
+        .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; }
+        .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); display: block; }
+        .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(24px, 3.5vh, 42px); line-height: 1.5; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
         .current-char { border-left: 3px solid var(--accent); animation: blink 1s infinite; background: rgba(88, 166, 255, 0.1); }
@@ -112,9 +141,10 @@
         .complete-screen .avg strong { color: var(--accent); font-size: 1.2em; }
         #reset-btn, #next-verse-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 16px; line-height: 1; }
         #reset-btn:hover, #next-verse-btn:hover { border-color: var(--accent); color: var(--accent); }
-        #bookmark-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
-        #bookmark-btn:hover { border-color: #f0b429; color: #f0b429; }
-        #bookmark-btn.bookmarked { border-color: #f0b429; color: #f0b429; }
+        #bookmark-btn, #bookmark-btn-read, #listen-btn, #blb-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+        #bookmark-btn:hover, #bookmark-btn-read:hover { border-color: #f0b429; color: #f0b429; }
+        #listen-btn:hover, #blb-btn:hover { border-color: var(--accent); color: var(--accent); }
+        #bookmark-btn.bookmarked, #bookmark-btn-read.bookmarked { border-color: #f0b429; color: #f0b429; }
         #voice-btn.listening { border-color: var(--error) !important; color: var(--error) !important; animation: pulse-mic 1s infinite; }
         @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
@@ -131,9 +161,6 @@
         .speed-word { position: relative; display: inline; }
         .speed-word.active-word::after { content: ''; position: absolute; bottom: -3px; left: 0; width: 100%; height: 3px; background: var(--accent); border-radius: 2px; box-shadow: 0 0 8px rgba(88,166,255,0.6); }
         .speed-word.past-word { color: var(--text-muted) !important; font-weight: normal !important; }
-        #speed-controls { display:none; align-items:center; gap:10px; font-size:13px; color:var(--text-muted); }
-        #speed-wpm-input { width:60px; background:#21262d; border:1px solid #30363d; color:var(--text-main); padding:4px 8px; border-radius:6px; font-size:13px; text-align:center; }
-        #speed-wpm-input:focus { outline:none; border-color:var(--accent); }
         #speed-toggle-btn { background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.2s; font-family:inherit; }
         #speed-toggle-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,0.1); }
         .next-btn { padding: 12px 32px; font-size: 1em; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
@@ -234,8 +261,9 @@
 
             /* Nav: stack selects */
             #nav-header { width: 96%; padding: 10px; gap: 8px; }
+            .nav-row { gap: 6px; }
+            .nav-divider { display: none; }
             .nav-group { flex-wrap: wrap; justify-content: center; }
-            .settings-group { border-left: none; padding-left: 0; border-top: 1px solid #30363d; padding-top: 8px; justify-content: center; }
             select { font-size: 13px; max-width: 90px; }
             #select-group { width: 100%; justify-content: center; }
             #select-group select { flex: 1; max-width: none; min-width: 0; }
@@ -316,62 +344,121 @@
     <div id="read-progress-container" style="display:none; width:90%; max-width:900px; background:var(--progress-bg); height:8px; border-radius:10px; margin-bottom:5px; border:1px solid #30363d;"><div id="read-progress-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#2ea043,var(--accent)); transition:width 0.5s ease-out;"></div></div>
     <div id="read-progress-text" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:1vh; font-weight:bold;">Bible Read: 0%</div>
     <div id="nav-header">
-        <div class="nav-group" id="select-group">
-            <label for="book-select" class="sr-only">Book</label>
-            <select id="book-select" onchange="updateChapters(true)" aria-label="Book"></select>
-            <label for="chapter-select" class="sr-only">Chapter</label>
-            <select id="chapter-select" onchange="updateVerses(true)" aria-label="Chapter"></select>
-            <label for="verse-select" class="sr-only">Verse</label>
-            <select id="verse-select" onchange="fetchVerses()" aria-label="Verse"></select>
-        </div>
-        <div class="nav-group" id="btn-group">
-            <div class="nav-btn-wrap" id="reset-btn-wrap">
-                <button id="reset-btn" onclick="verseStreak=0; loadVerse();" title="Restart verse" aria-label="Restart verse">🔄</button>
-                <span class="nav-btn-label">Restart</span>
-            </div>
-            <div class="nav-btn-wrap" id="next-verse-btn-wrap">
-                <button id="next-verse-btn" onclick="goToNextVerse()" title="Next verse" aria-label="Next verse">👉</button>
-                <span class="nav-btn-label">Next</span>
-            </div>
-            <div class="nav-btn-wrap">
-                <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
-                <span class="nav-btn-label">Bookmark</span>
-            </div>
-            <div class="nav-btn-wrap" id="voice-btn-wrap">
-                <button id="voice-btn" onclick="startVoiceSearch()" title="Voice search — say a verse like John 3 16" aria-label="Voice search" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 10px; border-radius:6px; cursor:pointer; font-size:16px; line-height:1; transition:all 0.2s;">🎙️</button>
-                <span class="nav-btn-label">Voice</span>
-            </div>
-            <div class="nav-btn-wrap" id="search-btn-wrap" style="flex-direction:row; align-items:center; gap:4px;">
-                <input id="verse-search-input" type="text" placeholder="e.g. Jn 3:16"
+        <div class="nav-row">
+            <!-- Search: input + voice grouped together -->
+            <div class="nav-search-wrap" id="search-btn-wrap">
+                <input id="verse-search-input" type="text"
                     autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
-                    style="width:90px; background:#21262d; border:1px solid #30363d; color:var(--text-main); padding:5px 8px; border-radius:6px; font-size:12px; font-family:inherit;"
-                    onkeydown="if(event.key==='Enter'){doVerseSearch();event.preventDefault();}">
-                <button onclick="doVerseSearch()" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 8px; border-radius:6px; cursor:pointer; font-size:13px; line-height:1; transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">→</button>
+                    onkeydown="if(event.key==='Enter'){doVerseSearch();event.preventDefault();}"
+                    placeholder="e.g. Jn 3:16">
+                <button onclick="doVerseSearch()" title="Search" aria-label="Search verse">🔍</button>
+                <span id="voice-btn-wrap" style="display:contents;"><button id="voice-btn" onclick="startVoiceSearch()" title="Voice search" aria-label="Voice search" style="border-left:1px solid #30363d;">🎙️</button></span>
             </div>
+
+            <div class="nav-divider"></div>
+
+            <!-- Book / Chapter / Verse -->
+            <div class="nav-group" id="select-group">
+                <label for="book-select" class="sr-only">Book</label>
+                <select id="book-select" onchange="updateChapters(true)" aria-label="Book"></select>
+                <label for="chapter-select" class="sr-only">Chapter</label>
+                <select id="chapter-select" onchange="updateVerses(true)" aria-label="Chapter"></select>
+                <label for="verse-select" class="sr-only">Verse</label>
+                <select id="verse-select" onchange="fetchVerses()" aria-label="Verse"></select>
+            </div>
+
+            <div class="nav-divider"></div>
+
+            <!-- TYPE MODE group (hidden in read mode) -->
+            <div id="type-mode-group" style="display:flex; align-items:center; gap:8px;">
+                <label class="toggle-label">
+                    <input type="checkbox" id="easy-mode" checked onchange="fetchVerses()">
+                    <span class="toggle-track"></span>
+                    EASY
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="repeat-mode">
+                    <span class="toggle-track"></span>
+                    REPEAT
+                </label>
+                <div class="nav-divider"></div>
+                <div class="nav-group" id="btn-group">
+                    <div class="nav-btn-wrap" id="reset-btn-wrap">
+                        <button id="reset-btn" onclick="verseStreak=0; loadVerse();" title="Restart verse" aria-label="Restart verse">🔄</button>
+                        <span class="nav-btn-label">Restart</span>
+                    </div>
+                    <div class="nav-btn-wrap" id="next-verse-btn-wrap">
+                        <button id="next-verse-btn" onclick="goToNextVerse()" title="Next verse" aria-label="Next verse">👉</button>
+                        <span class="nav-btn-label">Next</span>
+                    </div>
+                    <div class="nav-btn-wrap">
+                        <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
+                        <span class="nav-btn-label">Bookmark</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- READ MODE group (hidden in type mode) -->
+            <div id="read-mode-group" style="display:none; align-items:center; gap:8px;">
+                <label class="toggle-label">
+                    <input type="checkbox" id="syntax-mode" onchange="onSyntaxToggle()">
+                    <span class="toggle-track"></span>
+                    SYNTAX
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="focus-mode-toggle" onchange="toggleFocusMode()">
+                    <span class="toggle-track"></span>
+                    FOCUS
+                </label>
+                <div class="nav-divider"></div>
+                <div class="nav-group">
+                    <div class="nav-btn-wrap" id="listen-btn-wrap">
+                        <button id="listen-btn" onclick="toggleListen()" title="Listen to verse" aria-label="Listen to verse">🔊</button>
+                        <span class="nav-btn-label">Listen</span>
+                    </div>
+                    <div class="nav-btn-wrap" id="blb-btn-wrap">
+                        <button id="blb-btn" onclick="openBLB()" title="Open in Blue Letter Bible" aria-label="Open in Blue Letter Bible">📖</button>
+                        <span class="nav-btn-label">BLB</span>
+                    </div>
+                    <div class="nav-btn-wrap">
+                        <button id="bookmark-btn-read" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
+                        <span class="nav-btn-label">Bookmark</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-divider"></div>
+
+            <!-- Read/Type Mode button — always visible -->
             <div class="nav-btn-wrap">
-                <button id="read-mode-btn" onclick="toggleReadMode()" title="Read Mode" aria-label="Toggle Read Mode" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s;">📖 Read</button>
+                <button id="read-mode-btn" onclick="toggleReadMode()" title="Toggle Read Mode" aria-label="Toggle Read Mode">📖 Read</button>
                 <span class="nav-btn-label">Mode</span>
             </div>
-            <div class="nav-btn-wrap hidden" id="syntax-btn-wrap">
-                <label style="display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer;">
-                    <input type="checkbox" id="syntax-mode" onchange="onSyntaxToggle()" style="width:18px; height:18px; accent-color:var(--accent); cursor:pointer;">
-                    <span class="nav-btn-label">Syntax</span>
-                </label>
-            </div>
         </div>
-        <div class="settings-group" id="typing-settings">
-            <label><input type="checkbox" id="easy-mode" checked onchange="fetchVerses()"> Easy Mode</label>
-            <label><input type="checkbox" id="repeat-mode"> Repeat</label>
-        </div>
+
+        <!-- Hidden for JS compatibility -->
+        <div class="settings-group" id="typing-settings" style="display:none;"></div>
+        <div id="easy-repeat-group" style="display:none;"></div>
+        <div id="syntax-btn-wrap" style="display:none;"></div>
     </div>
     <div id="stats-bar">
-        <div class="stat-box"><span class="stat-value" id="wpm">0</span><span class="stat-label">WPM</span></div>
-        <div class="stat-box"><span class="stat-value" id="verse-best-display">0</span><span class="stat-label">Best</span></div>
-        <div class="stat-box"><span class="stat-value"><span id="accuracy">100</span>%</span><span class="stat-label">Acc</span></div>
-        <div class="stat-box"><span class="stat-value" id="progress">0/0</span><span class="stat-label">Verse</span></div>
+        <!-- Type mode stats -->
+        <div id="type-stats" style="display:flex; gap:12px;">
+            <div class="stat-box"><span class="stat-value" id="wpm">0</span><span class="stat-label">WPM</span></div>
+            <div class="stat-box"><span class="stat-value" id="verse-best-display">0</span><span class="stat-label">Best</span></div>
+            <div class="stat-box"><span class="stat-value"><span id="accuracy">100</span>%</span><span class="stat-label">Acc</span></div>
+            <div class="stat-box"><span class="stat-value" id="progress">0/0</span><span class="stat-label">Verse</span></div>
+        </div>
+        <!-- Read mode stats -->
+        <div id="read-stats" style="display:none; gap:12px;">
+            <div class="stat-box"><span class="stat-value" id="read-verse">—</span><span class="stat-label">Verse</span></div>
+            <div class="stat-box"><span class="stat-value" id="read-chapter">—</span><span class="stat-label">Chapter</span></div>
+            <div class="stat-box"><span class="stat-value" id="read-ch-time">—</span><span class="stat-label">Ch. Left</span></div>
+            <div class="stat-box"><span class="stat-value" id="read-bk-time">—</span><span class="stat-label">Bk. Left</span></div>
+        </div>
     </div>
     <div id="last-verse-box"></div>
-    <div id="read-ref-box" style="display:none; text-align:center; margin-bottom:1.5vh;"></div>
+    <div id="read-ref-box" style="display:none;"></div>
     <div id="blb-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Hold verse to open in Blue Letter Bible</div>
     <div id="accuracy-warning"></div>
     <div id="display"><div id="skeleton-screen">
@@ -382,21 +469,21 @@
         <div class="skeleton-line" style="height:28px; width:85%;"></div>
         <div class="skeleton-line" style="height:28px; width:60%;"></div>
     </div></div>
-    <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:12px 20px; justify-content:center; align-items:center; flex-direction:column; gap:10px; z-index:100;">
-        <div id="speed-controls">
-            <span>⚡ Speed Read</span>
-            <input type="number" id="speed-wpm-input" value="300" min="50" max="700" title="Words per minute">
-            <span>WPM</span>
-            <button id="speed-toggle-btn" onclick="toggleSpeedReading()">▶ Start</button>
+    <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:10px 20px; justify-content:center; align-items:center; flex-direction:column; gap:8px; z-index:100;">
+        <!-- WPM slider — always visible -->
+        <div style="display:flex; align-items:center; gap:10px; width:100%; max-width:500px;">
+            <span style="font-size:11px; color:var(--text-muted); font-weight:600; white-space:nowrap;">⚡ <span id="wpm-display">300</span> WPM</span>
+            <input type="range" id="speed-wpm-input" min="50" max="1000" value="300"
+                style="flex:1; accent-color:var(--accent); cursor:pointer; height:4px;"
+                oninput="document.getElementById('wpm-display').textContent=this.value; updateReadStats();"
+                onchange="updateReadStats();">
+            <button id="speed-toggle-btn" onclick="toggleSpeedReading()" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; transition:all 0.2s;">▶ Start</button>
         </div>
+        <!-- Nav buttons -->
         <div style="display:flex; align-items:center; gap:16px;">
             <div class="read-nav-btn-wrap">
                 <button id="read-share-btn" onclick="shareVerse()" aria-label="Copy verse to share" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:28px; width:62px; height:62px; cursor:pointer; transition:all 0.15s;">📋</button>
                 <span class="read-nav-label">Copy</span>
-            </div>
-            <div class="read-nav-btn-wrap">
-                <button id="speed-read-btn" onclick="toggleSpeedControls()" title="Speed reading" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:22px; width:62px; height:62px; cursor:pointer; transition:all 0.2s; font-weight:600;">⚡</button>
-                <span class="read-nav-label">Speed</span>
             </div>
             <div class="read-nav-btn-wrap">
                 <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid var(--accent); color:var(--accent); border-radius:12px; font-size:28px; width:62px; height:62px; cursor:pointer; transition:all 0.15s;">&#9664;</button>
@@ -573,6 +660,8 @@
             const btn = document.getElementById('bookmark-btn');
             btn.classList.toggle('bookmarked', currentBookmark);
             btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
+            const btnRead = document.getElementById('bookmark-btn-read');
+            if (btnRead) { btnRead.classList.toggle('bookmarked', currentBookmark); btnRead.title = btn.title; }
             syncReadBookmark();
         }
 
@@ -593,6 +682,8 @@
             const btn = document.getElementById('bookmark-btn');
             btn.classList.toggle('bookmarked', currentBookmark);
             btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
+            const btnRead = document.getElementById('bookmark-btn-read');
+            if (btnRead) { btnRead.classList.toggle('bookmarked', currentBookmark); btnRead.title = btn.title; }
             syncReadBookmark();
 
             // Try to sync to Supabase
@@ -998,11 +1089,10 @@
             readModeActive = !readModeActive;
             const isRead = readModeActive;
 
-            // Update button appearance
+            // Update button label
             const btn = document.getElementById('read-mode-btn');
-            btn.style.borderColor = isRead ? 'var(--accent)' : '#30363d';
-            btn.style.color = isRead ? 'var(--accent)' : 'var(--text-muted)';
-            btn.style.background = isRead ? 'rgba(88,166,255,0.1)' : 'transparent';
+            btn.textContent = isRead ? '⌨️ Type' : '📖 Read';
+            document.querySelector('#read-mode-btn + .nav-btn-label').textContent = 'Mode';
 
             // Swap progress bars
             document.getElementById('bible-progress-container').style.display = isRead ? 'none' : '';
@@ -1012,7 +1102,9 @@
             updateReadProgress();
 
             // Stats bar
-            document.getElementById('stats-bar').classList.toggle('hidden', isRead);
+            document.getElementById('type-stats').style.display = isRead ? 'none' : 'flex';
+            document.getElementById('read-stats').style.display = isRead ? 'flex' : 'none';
+            if (isRead) updateReadStats();
             // Hide last verse message in read mode, show ref box instead
             document.getElementById('last-verse-box').classList.toggle('hidden', isRead);
             updateReadRefBox();
@@ -1023,12 +1115,11 @@
                 em.checked = false;
                 // Don't call fetchVerses — we're in read mode, no need to reload
             }
-            // Hide typing settings in read mode
-            document.getElementById('typing-settings').classList.toggle('hidden', isRead);
-            document.getElementById('syntax-btn-wrap').classList.toggle('hidden', !isRead);
-            // Hide typing-only buttons, they move to bottom bar
-            document.getElementById('reset-btn-wrap').classList.toggle('hidden', isRead);
-            document.getElementById('next-verse-btn-wrap').classList.toggle('hidden', isRead);
+            // Swap type/read mode button groups
+            document.getElementById('type-mode-group').style.display = isRead ? 'none' : 'flex';
+            document.getElementById('read-mode-group').style.display = isRead ? 'flex' : 'none';
+            // Sync both bookmark buttons
+            loadBookmarkState();
             // Hidden input - disable and hide to prevent it blocking read nav buttons
             inputEl.disabled = isRead;
             inputEl.style.height = isRead ? '1px' : '44px';
@@ -1039,6 +1130,14 @@
             // Add bottom padding so display isn't hidden behind nav bar
             document.getElementById('display').style.marginBottom = isRead ? '140px' : '';
             document.body.style.paddingBottom = isRead ? '140px' : '';
+            // Stop TTS if leaving read mode
+            if (!isRead && speechSynthesis.speaking) speechSynthesis.cancel();
+            // Exit focus mode if leaving read mode
+            if (!isRead && focusModeActive) {
+                const cb = document.getElementById('focus-mode-toggle');
+                if (cb) cb.checked = false;
+                toggleFocusMode();
+            }
             // Stop speed reading if turning off read mode
             if (!isRead && speedReadActive) stopSpeedReading();
             // Re-render current verse text in appropriate style
@@ -1160,21 +1259,96 @@
         }
 
         function updateReadRefBox(overrideVerseIdx) {
-            const isRead = readModeActive;
-            const box = document.getElementById('read-ref-box');
-            if (!isRead) { box.style.display = 'none'; return; }
+            // kept for compatibility — read stats now shown in stat boxes
+            updateReadStats(overrideVerseIdx);
+        }
+
+        function updateReadStats(overrideVerseIdx) {
+            if (!readModeActive) return;
             const bookName = document.getElementById('book-select').value.replace(' ✅', '');
             const chapNum = parseInt(document.getElementById('chapter-select').value);
-            const verseIdx = overrideVerseIdx !== undefined ? overrideVerseIdx : parseInt(document.getElementById('verse-select').value);
-            const verseNum = verseIdx + 1;
+            const rawVal = document.getElementById('verse-select').value;
+            const verseIdx = overrideVerseIdx !== undefined ? overrideVerseIdx : parseInt(rawVal);
+            if (!bookName || isNaN(chapNum) || isNaN(verseIdx)) return;
+
             const book = (typeof KJV_EMBEDDED !== 'undefined') ? KJV_EMBEDDED.books.find(b => b.name === bookName) : null;
             const chap = book ? book.chapters.find(c => c.chapter === chapNum) : null;
-            const totalVerses = chap ? chap.verses.length : '?';
-            box.style.display = 'flex';
-            box.innerHTML = '<span class="ref-sub">Verse ' + verseNum + ' of ' + totalVerses + '</span>';
+            const totalChapVerses = chap ? chap.verses.length : 0;
+            const totalBookChaps = book ? book.chapters.length : 0;
+            const chapIdx = book ? book.chapters.findIndex(c => c.chapter === chapNum) : -1;
+
+            // Verse X of Y (in chapter)
+            document.getElementById('read-verse').textContent = (verseIdx + 1) + '/' + (totalChapVerses || '?');
+
+            // Chapter X of Y (in book)
+            document.getElementById('read-chapter').textContent = (chapIdx + 1) + '/' + (totalBookChaps || '?');
+
+            // Time calculations based on speed-read WPM
+            const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 300;
+
+            function wordsInVerses(verses) {
+                return verses.reduce((sum, v) => sum + v.text.split(/\s+/).length, 0);
+            }
+            function fmtTime(minutes) {
+                if (minutes < 1) return '<1m';
+                if (minutes < 60) return Math.round(minutes) + 'm';
+                const h = Math.floor(minutes / 60), m = Math.round(minutes % 60);
+                return h + 'h' + (m > 0 ? m + 'm' : '');
+            }
+
+            // Ch. Left — words remaining in chapter from current verse
+            if (chap) {
+                const remainingVerses = chap.verses.slice(verseIdx);
+                const chWords = wordsInVerses(remainingVerses);
+                document.getElementById('read-ch-time').textContent = fmtTime(chWords / wpm);
+            } else {
+                document.getElementById('read-ch-time').textContent = '—';
+            }
+
+            // Bk. Left — words remaining in book from current chapter onwards
+            if (book && chapIdx >= 0) {
+                const remainingChaps = book.chapters.slice(chapIdx);
+                let bkWords = 0;
+                remainingChaps.forEach((c, i) => {
+                    const startVerse = i === 0 ? verseIdx : 0;
+                    bkWords += wordsInVerses(c.verses.slice(startVerse));
+                });
+                document.getElementById('read-bk-time').textContent = fmtTime(bkWords / wpm);
+            } else {
+                document.getElementById('read-bk-time').textContent = '—';
+            }
+        }
+
+        let focusModeActive = false;
+        function toggleFocusMode() {
+            const checkbox = document.getElementById('focus-mode-toggle');
+            focusModeActive = checkbox ? checkbox.checked : !focusModeActive;
+            document.body.classList.toggle('focus-mode', focusModeActive);
         }
 
         function syncReadBookmark() { /* bookmark button removed from read nav */ }
+
+        let ttsUtterance = null;
+        function toggleListen() {
+            const btn = document.getElementById('listen-btn');
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+                btn.textContent = '🔊';
+                document.querySelector('#listen-btn-wrap .nav-btn-label').textContent = 'Listen';
+                return;
+            }
+            if (!activeVerseText) return;
+            ttsUtterance = new SpeechSynthesisUtterance(activeVerseText);
+            ttsUtterance.lang = 'en-US';
+            ttsUtterance.rate = 0.9;
+            ttsUtterance.onend = () => {
+                btn.textContent = '🔊';
+                document.querySelector('#listen-btn-wrap .nav-btn-label').textContent = 'Listen';
+            };
+            speechSynthesis.speak(ttsUtterance);
+            btn.textContent = '⏹️';
+            document.querySelector('#listen-btn-wrap .nav-btn-label').textContent = 'Stop';
+        }
 
         function shareVerse() {
             if (!activeVerseText) return;
@@ -1519,21 +1693,8 @@
         let speedControlsVisible = false;
 
         function toggleSpeedControls() {
-            if (speedControlsVisible) {
-                // Closing ⚡ always stops speed reading
-                stopSpeedReading();
-                speedControlsVisible = false;
-            } else {
-                speedControlsVisible = true;
-            }
-            const controls = document.getElementById('speed-controls');
-            const btn = document.getElementById('speed-read-btn');
-            controls.style.display = speedControlsVisible ? 'flex' : 'none';
-            btn.style.borderColor = speedControlsVisible ? 'var(--accent)' : '#30363d';
-            btn.style.color = speedControlsVisible ? 'var(--accent)' : 'var(--text-muted)';
-            btn.style.background = speedControlsVisible ? 'rgba(88,166,255,0.1)' : 'transparent';
-            document.getElementById('display').style.marginBottom = speedControlsVisible ? '160px' : '140px';
-            document.body.style.paddingBottom = speedControlsVisible ? '160px' : '140px';
+            // Speed controls now always visible as slider — just stop if running
+            if (speedReadActive) stopSpeedReading();
         }
 
         function toggleSpeedReading() {
