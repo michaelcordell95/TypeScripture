@@ -1730,17 +1730,19 @@
                 speedWords = activeVerseText.split(/\s+/).filter(w => w.trim().length > 0);
                 renderSpeedDisplay(0);
                 speedReadTimer = setInterval(speedTick, speedMsPerWord);
+                // Restart TTS for new verse
+                if (speedTtsEnabled && speechSynthesis) {
+                    speechSynthesis.cancel();
+                    const utt = new SpeechSynthesisUtterance(activeVerseText);
+                    utt.lang = 'en-US';
+                    const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 300;
+                    utt.rate = Math.min(10, Math.max(0.5, wpm / 150));
+                    speechSynthesis.speak(utt);
+                }
                 return;
             }
             renderSpeedDisplay(speedWordIndex);
-            // Speak current word if TTS sync is on
-            if (speedTtsEnabled && speechSynthesis) {
-                speechSynthesis.cancel();
-                const utt = new SpeechSynthesisUtterance(speedWords[speedWordIndex]);
-                utt.lang = 'en-US';
-                utt.rate = 2.5; // fast enough to not bleed into next word
-                speechSynthesis.speak(utt);
-            }
+            // TTS plays full verse in background at matching rate — no per-word firing
         }
 
         function startSpeedReading() {
@@ -1759,6 +1761,16 @@
 
             renderSpeedDisplay(0);
             speedReadTimer = setInterval(speedTick, speedMsPerWord);
+
+            // Start TTS for full verse at matched rate if enabled
+            if (speedTtsEnabled && speechSynthesis) {
+                speechSynthesis.cancel();
+                const utt = new SpeechSynthesisUtterance(activeVerseText);
+                utt.lang = 'en-US';
+                // SpeechSynthesis rate: 1 = ~150wpm, scale accordingly
+                utt.rate = Math.min(10, Math.max(0.5, wpm / 150));
+                speechSynthesis.speak(utt);
+            }
         }
 
         function stopSpeedReading() {
