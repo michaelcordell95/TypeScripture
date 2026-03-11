@@ -480,6 +480,7 @@
                 oninput="document.getElementById('wpm-display').textContent=this.value; updateReadStats();"
                 onchange="updateReadStats();">
             <button id="speed-toggle-btn" onclick="toggleSpeedReading()" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; transition:all 0.2s;">▶ Start</button>
+            <button id="speed-tts-btn" onclick="toggleSpeedTts()" title="Sync voice to speed reader" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:6px; padding:4px 8px; cursor:pointer; font-size:14px; transition:all 0.2s;">🔇</button>
         </div>
         <!-- Nav buttons -->
         <div style="display:flex; align-items:center; gap:16px;">
@@ -1693,6 +1694,15 @@
         let speedWordIndex = 0;
         let speedWords = [];
         let speedControlsVisible = false;
+        let speedTtsEnabled = false; // TTS sync toggle
+
+        function toggleSpeedTts() {
+            speedTtsEnabled = !speedTtsEnabled;
+            const btn = document.getElementById('speed-tts-btn');
+            btn.textContent = speedTtsEnabled ? '🔊' : '🔇';
+            btn.style.borderColor = speedTtsEnabled ? 'var(--accent)' : '#30363d';
+            btn.style.color = speedTtsEnabled ? 'var(--accent)' : 'var(--text-muted)';
+        }
 
         function toggleSpeedControls() {
             // Speed controls now always visible as slider — just stop if running
@@ -1723,6 +1733,14 @@
                 return;
             }
             renderSpeedDisplay(speedWordIndex);
+            // Speak current word if TTS sync is on
+            if (speedTtsEnabled && speechSynthesis) {
+                speechSynthesis.cancel();
+                const utt = new SpeechSynthesisUtterance(speedWords[speedWordIndex]);
+                utt.lang = 'en-US';
+                utt.rate = 2.5; // fast enough to not bleed into next word
+                speechSynthesis.speak(utt);
+            }
         }
 
         function startSpeedReading() {
@@ -1747,6 +1765,7 @@
             clearInterval(speedReadTimer);
             speedReadActive = false;
             speedWordIndex = 0;
+            if (speechSynthesis) speechSynthesis.cancel();
             const btn = document.getElementById('speed-toggle-btn');
             btn.innerText = '▶ Start';
             btn.classList.remove('active');
