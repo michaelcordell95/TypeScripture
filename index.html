@@ -279,8 +279,10 @@
                 background: var(--bg-dark);
                 padding: 4px 0;
             }
-            .stat-box { min-width: 0; flex: 1; padding: 8px 6px; }
+            #type-stats, #read-stats { width: 100%; }
+            .stat-box { min-width: 0; flex: 1; padding: 8px 4px; max-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
             .stat-value { font-size: 18px; }
+            .stat-label { font-size: 9px; }
 
             /* Last verse box also sticky */
             #last-verse-box {
