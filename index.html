@@ -1207,28 +1207,49 @@
             const lastActive = localStorage.getItem('tsLastActive');
             let streak = parseInt(localStorage.getItem('tsDailyStreak') || '0');
 
-            if (lastActive === today) {
-                // Already visited today — streak unchanged
-            } else if (lastActive === new Date(Date.now() - 86400000).toDateString()) {
-                // Visited yesterday — extend streak
-                streak++;
-                localStorage.setItem('tsDailyStreak', streak);
-                localStorage.setItem('tsLastActive', today);
-            } else {
-                // Missed a day — reset
-                streak = 1;
-                localStorage.setItem('tsDailyStreak', streak);
-                localStorage.setItem('tsLastActive', today);
+            // If streak was already earned today, nothing changes
+            // If last active was yesterday and streak > 0, it's still valid (will extend on completion)
+            // If gap > 1 day, reset streak to 0 (will become 1 on first completion today)
+            if (lastActive !== today && lastActive !== new Date(Date.now() - 86400000).toDateString()) {
+                if (lastActive) { // only reset if they had a streak before
+                    streak = 0;
+                    localStorage.setItem('tsDailyStreak', 0);
+                }
             }
 
+            updateStreakBanner(streak, lastActive === today);
+        }
+
+        function markStreakActivity() {
+            const today = new Date().toDateString();
+            const lastActive = localStorage.getItem('tsLastActive');
+            if (lastActive === today) return; // already earned today, nothing to do
+
+            let streak = parseInt(localStorage.getItem('tsDailyStreak') || '0');
+            const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+            if (lastActive === yesterday) {
+                streak++; // extend streak
+            } else {
+                streak = 1; // start fresh
+            }
+
+            localStorage.setItem('tsDailyStreak', streak);
+            localStorage.setItem('tsLastActive', today);
+            updateStreakBanner(streak, true);
+        }
+
+        function updateStreakBanner(streak, earnedToday) {
             const el = document.getElementById('streak-banner');
+            if (!el) return;
             if (streak >= 2) {
                 el.innerHTML = `🔥 <strong style="color:var(--accent);">${streak}-day streak</strong> — keep it up!`;
-                el.style.display = 'block';
+            } else if (streak === 1 && earnedToday) {
+                el.innerHTML = `🔥 <strong style="color:var(--accent);">Streak started!</strong> Come back tomorrow to keep it going.`;
             } else {
                 el.innerHTML = `Start your streak — type or read a verse today!`;
-                el.style.display = 'block';
             }
+            el.style.display = 'block';
         }
 
         // ===== KEYBOARD SHORTCUTS =====
@@ -1349,6 +1370,7 @@
             updateReadProgress();
             updateVerses();
             updateBooks();
+            markStreakActivity();
 
             if (!currentUserId || !supabaseClient) return;
 
@@ -1610,7 +1632,7 @@
             const totalChaps = chapCounts[books.indexOf(bookName)] || 1;
             const hasNext = chapNum < totalChaps;
             const versesTyped = verseWpms.length;
-            localStorage.setItem('tsLastActive', new Date().toDateString());
+            markStreakActivity();
 
             displayEl.innerHTML = `
                 <div class="complete-screen">
@@ -2253,6 +2275,7 @@
             if (typed.length >= activeVerseText.length && activeVerseText.length > 0) {
                 warningEl.innerText = "";
                 verseWpms.push(wpm);
+                markStreakActivity();
                 const bookName = bookSel.value.replace(" ✅", "");
                 const chapNum = parseInt(chapSel.value);
                 const verseNum = currentIndex + 1;
