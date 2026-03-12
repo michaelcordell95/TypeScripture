@@ -94,6 +94,8 @@
         .nav-group { display: flex; align-items: center; gap: 8px; }
         .settings-group { display: none; }
         /* Focus mode */
+        body.focus-mode #votd-banner,
+        body.focus-mode #streak-banner,
         body.focus-mode .brand-container,
         body.focus-mode #stats-bar,
         body.focus-mode #bible-progress-container,
@@ -385,6 +387,16 @@
         <button id="ios-install-close" onclick="this.parentElement.style.display='none'">✕</button>
         📲 Use as app: tap <span>three dots ⋯</span> at bottom · tap <span>Share ↑</span> · tap <span>Add to Home Screen</span>
     </div>
+    <!-- Verse of the Day -->
+    <div id="votd-banner" style="width:90%; max-width:900px; background:var(--panel-bg); border:1px solid var(--border); border-radius:10px; padding:12px 18px; margin-bottom:10px; display:none; cursor:pointer;" onclick="goToVotd()" title="Click to type this verse">
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:5px;">✨ Verse of the Day</div>
+        <div id="votd-text" style="font-size:14px; color:var(--text-main); line-height:1.6; font-style:italic;"></div>
+        <div id="votd-ref" style="font-size:12px; color:var(--accent); margin-top:5px; font-weight:700;"></div>
+    </div>
+
+    <!-- Daily Streak -->
+    <div id="streak-banner" style="display:none; font-size:12px; color:var(--text-muted); margin-bottom:6px;"></div>
+
     <div id="bible-progress-container"><div id="bible-progress-fill"></div></div>
     <div id="progress-text">Bible Typed: 0%</div>
     <div id="read-progress-container" style="display:none; width:90%; max-width:900px; background:var(--progress-bg); height:8px; border-radius:10px; margin-bottom:5px; border:1px solid #30363d;"><div id="read-progress-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#2ea043,var(--accent)); transition:width 0.5s ease-out;"></div></div>
@@ -1132,6 +1144,118 @@
 
         let readModeActive = false;
 
+        // ===== VERSE OF THE DAY =====
+        const VOTD_VERSES = [
+            { ref: 'John 3:16', book: 'John', ch: 3, v: 16 },
+            { ref: 'Romans 8:28', book: 'Romans', ch: 8, v: 28 },
+            { ref: 'Philippians 4:13', book: 'Philippians', ch: 4, v: 13 },
+            { ref: 'Psalm 23:1', book: 'Psalms', ch: 23, v: 1 },
+            { ref: 'Proverbs 3:5', book: 'Proverbs', ch: 3, v: 5 },
+            { ref: 'Isaiah 40:31', book: 'Isaiah', ch: 40, v: 31 },
+            { ref: 'Jeremiah 29:11', book: 'Jeremiah', ch: 29, v: 11 },
+            { ref: 'Matthew 6:33', book: 'Matthew', ch: 6, v: 33 },
+            { ref: 'Romans 12:2', book: 'Romans', ch: 12, v: 2 },
+            { ref: 'Galatians 5:22', book: 'Galatians', ch: 5, v: 22 },
+            { ref: '2 Timothy 3:16', book: '2 Timothy', ch: 3, v: 16 },
+            { ref: 'Hebrews 11:1', book: 'Hebrews', ch: 11, v: 1 },
+            { ref: 'James 1:2', book: 'James', ch: 1, v: 2 },
+            { ref: '1 John 4:19', book: '1 John', ch: 4, v: 19 },
+            { ref: 'Psalm 119:105', book: 'Psalms', ch: 119, v: 105 },
+            { ref: 'Matthew 5:16', book: 'Matthew', ch: 5, v: 16 },
+            { ref: 'Romans 5:8', book: 'Romans', ch: 5, v: 8 },
+            { ref: 'Ephesians 2:8', book: 'Ephesians', ch: 2, v: 8 },
+            { ref: 'Psalm 46:1', book: 'Psalms', ch: 46, v: 1 },
+            { ref: '1 Corinthians 13:4', book: '1 Corinthians', ch: 13, v: 4 },
+            { ref: 'Joshua 1:9', book: 'Joshua', ch: 1, v: 9 },
+            { ref: 'Proverbs 22:6', book: 'Proverbs', ch: 22, v: 6 },
+            { ref: 'Matthew 28:19', book: 'Matthew', ch: 28, v: 19 },
+            { ref: 'John 14:6', book: 'John', ch: 14, v: 6 },
+            { ref: 'Romans 3:23', book: 'Romans', ch: 3, v: 23 },
+            { ref: 'Psalm 37:4', book: 'Psalms', ch: 37, v: 4 },
+            { ref: 'Isaiah 41:10', book: 'Isaiah', ch: 41, v: 10 },
+            { ref: 'John 15:13', book: 'John', ch: 15, v: 13 },
+            { ref: 'Colossians 3:23', book: 'Colossians', ch: 3, v: 23 },
+            { ref: '2 Corinthians 5:17', book: '2 Corinthians', ch: 5, v: 17 },
+            { ref: 'Micah 6:8', book: 'Micah', ch: 6, v: 8 },
+            { ref: 'Psalm 1:1', book: 'Psalms', ch: 1, v: 1 },
+            { ref: 'Acts 1:8', book: 'Acts', ch: 1, v: 8 },
+            { ref: 'Revelation 21:4', book: 'Revelation', ch: 21, v: 4 },
+            { ref: '1 Peter 5:7', book: '1 Peter', ch: 5, v: 7 },
+            { ref: 'Psalm 27:1', book: 'Psalms', ch: 27, v: 1 },
+            { ref: 'John 11:25', book: 'John', ch: 11, v: 25 },
+        ];
+        let votdVerse = null;
+
+        function initVotd() {
+            if (typeof KJV_EMBEDDED === 'undefined') return;
+            const today = new Date();
+            const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
+            votdVerse = VOTD_VERSES[dayOfYear % VOTD_VERSES.length];
+            try {
+                const bookEntry = KJV_EMBEDDED.books.find(b => b.name === votdVerse.book);
+                const chapEntry = bookEntry.chapters.find(c => c.chapter === votdVerse.ch);
+                const verseEntry = chapEntry.verses.find(v => v.verse === votdVerse.v);
+                const text = verseEntry.text.replace(/<[^>]*>/g, '').trim();
+                document.getElementById('votd-text').textContent = '\u201c' + text + '\u201d';
+                document.getElementById('votd-ref').textContent = '— ' + votdVerse.ref;
+                document.getElementById('votd-banner').style.display = 'block';
+            } catch(e) {}
+        }
+
+        function goToVotd() {
+            if (!votdVerse) return;
+            const bookIdx = books.indexOf(votdVerse.book);
+            if (bookIdx === -1) return;
+            bookSel.value = votdVerse.book;
+            updateChapters();
+            chapSel.value = votdVerse.ch;
+            updateVerses();
+            verseSel.value = votdVerse.v - 1;
+            fetchVerses();
+        }
+
+        // ===== DAILY STREAK =====
+        function initStreak() {
+            const today = new Date().toDateString();
+            const lastActive = localStorage.getItem('tsLastActive');
+            let streak = parseInt(localStorage.getItem('tsDailyStreak') || '0');
+
+            if (lastActive === today) {
+                // Already visited today — streak unchanged
+            } else if (lastActive === new Date(Date.now() - 86400000).toDateString()) {
+                // Visited yesterday — extend streak
+                streak++;
+                localStorage.setItem('tsDailyStreak', streak);
+                localStorage.setItem('tsLastActive', today);
+            } else {
+                // Missed a day — reset
+                streak = 1;
+                localStorage.setItem('tsDailyStreak', streak);
+                localStorage.setItem('tsLastActive', today);
+            }
+
+            const el = document.getElementById('streak-banner');
+            if (streak >= 2) {
+                el.innerHTML = `🔥 <strong style="color:var(--accent);">${streak}-day streak</strong> — keep it up!`;
+                el.style.display = 'block';
+            } else {
+                el.innerHTML = `Start your streak — type or read a verse today!`;
+                el.style.display = 'block';
+            }
+        }
+
+        // ===== KEYBOARD SHORTCUTS =====
+        document.addEventListener('keydown', function(e) {
+            // Only fire when not typing in an input
+            const tag = document.activeElement.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); goToNextVerse(); }
+                if (e.key === 'ArrowLeft') { e.preventDefault(); goToPrevVerse(); }
+                if (e.key === 'r') { e.preventDefault(); toggleReadMode(); }
+            }
+        });
+
         function toggleTheme() {
             const isLight = document.body.classList.toggle('light-mode');
             localStorage.setItem('tsTheme', isLight ? 'light' : 'dark');
@@ -1493,19 +1617,35 @@
 
         function showChapterComplete() {
             const avg = verseWpms.length > 0 ? Math.round(verseWpms.reduce((a, b) => a + b, 0) / verseWpms.length) : 0;
+            const best = verseWpms.length > 0 ? Math.max(...verseWpms) : 0;
             const bookName = bookSel.value.replace(" ✅", "");
             const chapNum = parseInt(chapSel.value);
             const totalChaps = chapCounts[books.indexOf(bookName)] || 1;
             const hasNext = chapNum < totalChaps;
+            const versesTyped = verseWpms.length;
+            localStorage.setItem('tsLastActive', new Date().toDateString());
 
             displayEl.innerHTML = `
                 <div class="complete-screen">
                     <div class="emoji">🎉</div>
-                    <h2>Chapter ${chapNum} Complete!</h2>
-                    <div class="avg">Average WPM this chapter: <strong>${avg}</strong></div>
+                    <h2>${bookName} ${chapNum} Complete!</h2>
+                    <div style="display:flex; gap:12px; justify-content:center; margin:14px 0; flex-wrap:wrap;">
+                        <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:8px; padding:10px 18px; text-align:center;">
+                            <div style="font-size:22px; font-weight:800; color:var(--accent);">${avg}</div>
+                            <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Avg WPM</div>
+                        </div>
+                        <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:8px; padding:10px 18px; text-align:center;">
+                            <div style="font-size:22px; font-weight:800; color:var(--accent);">${best}</div>
+                            <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Best WPM</div>
+                        </div>
+                        <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:8px; padding:10px 18px; text-align:center;">
+                            <div style="font-size:22px; font-weight:800; color:var(--accent);">${versesTyped}</div>
+                            <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Verses</div>
+                        </div>
+                    </div>
                     ${hasNext
                         ? `<button class="next-btn" onclick="goToNextChapter()">Next Chapter →</button>`
-                        : `<div style="color:var(--text-muted);font-size:0.9em;">You've reached the end of ${bookName}!</div>`
+                        : `<div style="color:var(--text-muted);font-size:0.9em;margin-top:8px;">🏁 You've finished ${bookName}!</div>`
                     }
                 </div>`;
         }
@@ -2343,6 +2483,8 @@
         if (isMobile) toggleReadMode();
 
         fetchVerses();
+        initStreak();
+        setTimeout(initVotd, 300); // slight delay so bible.js is ready
 
         // Auth init — runs after all variables and functions are declared
         checkAuth();
