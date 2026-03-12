@@ -366,7 +366,7 @@
                     }).join('');
                     var yourRankRow = '';
                     if (currentUserId && myRankIdx === -1) {
-                        yourRankRow = '<tr><td colspan="3" style="text-align:center;padding:10px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);">You're not in the top ' + data.length + ' for this verse yet</td></tr>';
+                        yourRankRow = '<tr><td colspan="3" style="text-align:center;padding:10px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);">You&#39;re not in the top ' + data.length + ' for this verse yet</td></tr>';
                     }
                     document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Best WPM</th></tr></thead><tbody>' + rows + yourRankRow + '</tbody></table>';
 
