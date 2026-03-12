@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="light">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192-maskable.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512-maskable.png">
@@ -29,6 +29,38 @@
             --correct: #f0f6fc;
             --progress-bg: #21262d;
         }
+        body.light-mode {
+            --bg-dark: #f2e8d5;
+            --panel-bg: #faf3e0;
+            --accent: #b8860b;
+            --text-main: #1a1208;
+            --text-muted: #8a7560;
+            --text-bright: #0a0600;
+            --error: #8b1a1a;
+            --correct: #0a0600;
+            --progress-bg: #d9c9a8;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+        }
+        body.light-mode #display {
+            font-family: 'Georgia', 'Times New Roman', serif !important;
+            border-color: #c8a96e !important;
+            box-shadow: 0 2px 16px rgba(139,107,40,0.13), inset 0 0 40px rgba(210,185,140,0.10) !important;
+        }
+        body.light-mode #nav-header {
+            border-color: #c8a96e !important;
+            box-shadow: 0 2px 8px rgba(139,107,40,0.10) !important;
+        }
+        body.light-mode .stat-box {
+            border-color: #c8a96e !important;
+        }
+        body.light-mode select, body.light-mode input[type="text"] {
+            background: #faf3e0 !important;
+            color: #1a1208 !important;
+            border-color: #c8a96e !important;
+        }
+        body.light-mode .logo-text { color: #1a1208; }
+        body.light-mode .logo-text span { color: #b8860b; }
+        *, *::before, *::after { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
         body {
             background-color: var(--bg-dark);
             color: var(--text-main);
@@ -74,21 +106,22 @@
         body.focus-mode #display { border-color: transparent; box-shadow: none; background: var(--bg-dark); transition: all 0.4s ease; }
         body.focus-mode #nav-header { opacity: 0.15; transition: opacity 0.3s ease; }
         body.focus-mode #nav-header:hover { opacity: 1; }
-        #read-mode-btn { background: rgba(88,166,255,0.08); border: 1.5px solid rgba(88,166,255,0.35); color: rgba(88,166,255,0.5); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 700; transition: all 0.2s; }
-        #read-mode-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.15); }
+        #read-mode-btn { background: rgba(88,166,255,0.08); border: 1.5px solid var(--accent); color: var(--accent); opacity: 0.6; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 700; transition: all 0.2s; }
+        #read-mode-btn:hover { opacity: 1; background: rgba(88,166,255,0.15); }
         .toggle-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-muted); user-select: none; }
         .toggle-label input[type=checkbox] { display: none; }
-        .toggle-track { width: 32px; height: 18px; background: #30363d; border-radius: 9px; position: relative; transition: background 0.2s; flex-shrink: 0; }
-        .toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: #666; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
-        .toggle-label input:checked + .toggle-track { background: rgba(88,166,255,0.3); }
+        .toggle-track { width: 32px; height: 18px; background: var(--progress-bg); border-radius: 9px; position: relative; transition: background 0.2s; flex-shrink: 0; }
+        .toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: var(--text-muted); border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+        .toggle-label input:checked + .toggle-track { background: rgba(88,166,255,0.25); }
+        body.light-mode .toggle-label input:checked + .toggle-track { background: rgba(184,134,11,0.25); }
         .toggle-label input:checked + .toggle-track::after { transform: translateX(14px); background: var(--accent); }
         /* Search box in nav */
-        .nav-search-wrap { display: flex; align-items: center; gap: 0; background: #21262d; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; transition: border-color 0.2s; }
+        .nav-search-wrap { display: flex; align-items: center; gap: 0; background: var(--panel-bg); border: 1px solid var(--progress-bg); border-radius: 6px; overflow: hidden; transition: border-color 0.2s; }
         .nav-search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
         .nav-search-wrap input { background: transparent; border: none; color: var(--text-main); padding: 5px 8px; font-size: 12px; font-family: inherit; outline: none; width: 110px; min-width: 0; }
         .nav-search-wrap input::placeholder { color: var(--text-muted); font-style: italic; }
         @media (max-width: 600px) { .nav-search-wrap input { width: 70px; } .nav-search-wrap input::placeholder { font-size: 11px; } }
-        .nav-search-wrap button { background: transparent; border: none; border-left: 1px solid #30363d; color: var(--text-muted); padding: 5px 8px; cursor: pointer; font-size: 13px; transition: color 0.2s; }
+        .nav-search-wrap button { background: transparent; border: none; border-left: 1px solid var(--progress-bg); color: var(--text-muted); padding: 5px 8px; cursor: pointer; font-size: 13px; transition: color 0.2s; }
         .nav-search-wrap button:hover { color: var(--accent); }
         .hidden { display: none !important; }
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
@@ -324,6 +357,7 @@
             <a href="/leaderboard.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text-main)'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">🏆 Leaderboard</a>
             <a href="/bookmarks.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='#f0b429';this.style.color='#f0b429'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">⭐ Bookmarks</a>
             <a href="/search.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='#58a6ff';this.style.color='#58a6ff'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">🔍 Search</a>
+            <button id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light/dark mode" style="color:var(--text-muted); font-size:12px; border:1px solid #30363d; padding:5px 10px; border-radius:6px; background:transparent; cursor:pointer;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text-main)'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">☀️ Theme</button>
             <button id="install-btn" onclick="installApp()" style="display:none; color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px; background:transparent; cursor:pointer;" onmouseover="this.style.borderColor='#2ea043';this.style.color='#2ea043'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">📲 Install App</button>
             <div id="auth-container" style="margin:0; display:flex; gap:8px; align-items:center;">
                 <button id="google-login-btn" onclick="handleGoogleLogin()">
@@ -384,7 +418,7 @@
             <!-- TYPE MODE group (hidden in read mode) -->
             <div id="type-mode-group" style="display:flex; align-items:center; gap:8px;">
                 <label class="toggle-label">
-                    <input type="checkbox" id="easy-mode" checked onchange="fetchVerses()">
+                    <input type="checkbox" id="easy-mode" onchange="localStorage.setItem('tsEasyMode', this.checked); fetchVerses()">
                     <span class="toggle-track"></span>
                     EASY
                 </label>
@@ -443,7 +477,7 @@
 
             <!-- Read/Type Mode button — always visible -->
             <div class="nav-btn-wrap">
-                <button id="read-mode-btn" onclick="toggleReadMode()" title="Toggle Read Mode" aria-label="Toggle Read Mode">📖 Read</button>
+                <button id="read-mode-btn" onclick="toggleReadMode()" title="Toggle Read Mode" aria-label="Toggle Read Mode">⌨️ Type</button>
                 <span class="nav-btn-label">Mode</span>
             </div>
         </div>
@@ -1098,6 +1132,23 @@
 
         let readModeActive = false;
 
+        function toggleTheme() {
+            const isLight = document.body.classList.toggle('light-mode');
+            localStorage.setItem('tsTheme', isLight ? 'light' : 'dark');
+            document.getElementById('theme-toggle-btn').textContent = isLight ? '☀️ Theme' : '🌙 Theme';
+            document.querySelector('meta[name="color-scheme"]').content = isLight ? 'light' : 'dark';
+        }
+
+        // Apply saved theme — default is light
+        if (localStorage.getItem('tsTheme') !== 'dark') {
+            document.body.classList.add('light-mode');
+            document.addEventListener('DOMContentLoaded', () => {
+                const btn = document.getElementById('theme-toggle-btn');
+                if (btn) btn.textContent = '☀️ Theme';
+                document.querySelector('meta[name="color-scheme"]').content = 'light';
+            });
+        }
+
         function toggleReadMode() {
             readModeActive = !readModeActive;
             const isRead = readModeActive;
@@ -1426,7 +1477,7 @@
         async function fetchVerses() {
             const bookName = bookSel.value.replace(" ✅", "");
             const chapNum = parseInt(chapSel.value);
-            const isEasy = document.getElementById('easy-mode').checked;
+            const isEasy = !readModeActive && document.getElementById('easy-mode').checked;
             try {
                 const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
                 const chapterObj = bookEntry.chapters.find(c => c.chapter === chapNum);
@@ -2283,13 +2334,15 @@
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        fetchVerses();
+        // Restore easy mode preference
+        const savedEasy = localStorage.getItem('tsEasyMode');
+        if (savedEasy === 'true') document.getElementById('easy-mode').checked = true;
 
-        // Auto-enable Read Mode on mobile (after fetchVerses so it's last)
+        // Auto-enable Read Mode on mobile before fetching verses
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 600;
-        if (isMobile) {
-            toggleReadMode();
-        }
+        if (isMobile) toggleReadMode();
+
+        fetchVerses();
 
         // Auth init — runs after all variables and functions are declared
         checkAuth();
