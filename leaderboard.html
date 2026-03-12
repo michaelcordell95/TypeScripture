@@ -754,18 +754,15 @@
 
             function px(i) { return padL + (n > 1 ? i * xStep : gw / 2); }
             function py(v) { return padT + gh * (1 - (v - minWpm) / wpmRange); }
-
-            // Gradient fill
-            var grad = ctx.createLinearGradient(0, padT, 0, padT + gh);
-            grad.addColorStop(0, accentColor.replace(')', ', 0.3)').replace('rgb', 'rgba').replace('#', 'rgba(').replace('rgba(', 'rgba('));
-            // Simpler: just use a semi-transparent fill
+            var isLight = document.body.classList.contains('light-mode');
+            var fillColor = isLight ? 'rgba(184,134,11,0.10)' : 'rgba(88,166,255,0.10)';
             ctx.beginPath();
             ctx.moveTo(px(0), py(points[0]));
             for (var i = 1; i < n; i++) ctx.lineTo(px(i), py(points[i]));
             ctx.lineTo(px(n-1), padT + gh);
             ctx.lineTo(px(0), padT + gh);
             ctx.closePath();
-            ctx.fillStyle = 'rgba(88,166,255,0.08)';
+            ctx.fillStyle = fillColor;
             ctx.fill();
 
             // Line
