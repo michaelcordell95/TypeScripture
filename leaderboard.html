@@ -98,6 +98,7 @@
             <button class="tab" onclick="switchTab('scores')">&#127963; Scores</button>
             <button class="tab" onclick="switchTab('personal')">&#128100; My Stats</button>
             <button class="tab" onclick="switchTab('read')">&#128214; Most Read</button>
+            <button class="tab" onclick="switchTab('streaks')">&#128293; Streaks</button>
             <button class="tab" onclick="switchTab('search')">&#128269; Player Search</button>
         </div>
 
@@ -150,6 +151,24 @@
                 <button onclick="searchPlayer()" style="background:var(--accent);color:#0d1117;border:none;padding:8px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;">Search</button>
             </div>
             <div id="search-result"></div>
+        </div>
+
+        <!-- STREAKS TAB -->
+        <div id="tab-streaks" style="display:none;">
+            <div class="lb-panel" style="margin-bottom:16px;">
+                <div class="lb-header">
+                    <h3>🔥 Current Streaks</h3>
+                    <span id="streak-current-count"></span>
+                </div>
+                <div id="streak-current-body"><div class="loading">Loading...</div></div>
+            </div>
+            <div class="lb-panel">
+                <div class="lb-header">
+                    <h3>🏆 Longest Streaks Ever</h3>
+                    <span id="streak-longest-count"></span>
+                </div>
+                <div id="streak-longest-body"><div class="loading">Loading...</div></div>
+            </div>
         </div>
 
         <!-- BIBLE COMPLETION TAB -->
@@ -247,17 +266,19 @@
 
         function switchTab(tab) {
             var tabs = document.querySelectorAll('.tab');
-            var tabNames = ['bible', 'scores', 'personal', 'read', 'search'];
+            var tabNames = ['bible', 'scores', 'personal', 'read', 'streaks', 'search'];
             tabs.forEach(function(t, i) { t.classList.toggle('active', tabNames[i] === tab); });
             document.getElementById('tab-bible').style.display = tab === 'bible' ? 'block' : 'none';
             document.getElementById('tab-scores').style.display = tab === 'scores' ? 'block' : 'none';
             document.getElementById('tab-personal').style.display = tab === 'personal' ? 'block' : 'none';
             document.getElementById('tab-search').style.display = tab === 'search' ? 'block' : 'none';
             document.getElementById('tab-read').style.display = tab === 'read' ? 'block' : 'none';
+            document.getElementById('tab-streaks').style.display = tab === 'streaks' ? 'block' : 'none';
             if (tab === 'read') loadReadLeaderboard();
             if (tab === 'bible') loadBibleCompletionLeaderboard();
             if (tab === 'scores') populateScoresBookSelect();
             if (tab === 'personal') loadPersonalStats();
+            if (tab === 'streaks') loadStreaksLeaderboard();
         }
 
         // ===== VERSE SCORES TAB =====
@@ -945,6 +966,59 @@
             } catch(err) {
                 console.error('Read scores error:', err);
                 document.getElementById('scores-body').innerHTML = '<div class="empty">Error loading data.</div>';
+            }
+        }
+
+        // ===== STREAKS LEADERBOARD =====
+        async function loadStreaksLeaderboard() {
+            document.getElementById('streak-current-body').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('streak-longest-body').innerHTML = '<div class="loading">Loading...</div>';
+            try {
+                var result = await supabaseClient
+                    .from('profiles')
+                    .select('id, username, current_streak, longest_streak')
+                    .or('current_streak.gt.0,longest_streak.gt.0')
+                    .order('longest_streak', { ascending: false })
+                    .limit(50);
+
+                if (result.error) throw result.error;
+                var data = result.data || [];
+
+                function renderStreakTable(sorted, field, countEl, bodyEl) {
+                    sorted = sorted.filter(function(r) { return (r[field] || 0) > 0; });
+                    if (sorted.length === 0) {
+                        document.getElementById(countEl).innerText = '';
+                        document.getElementById(bodyEl).innerHTML = '<div class="empty">No streaks yet — be the first!</div>';
+                        return;
+                    }
+                    document.getElementById(countEl).innerText = sorted.length + ' player' + (sorted.length !== 1 ? 's' : '');
+                    var rows = sorted.map(function(r, i) {
+                        var rank = i + 1;
+                        var isYou = r.id === currentUserId;
+                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                        var days = r[field] || 0;
+                        var flame = days >= 30 ? '&#128293;&#128293;&#128293;' : days >= 7 ? '&#128293;&#128293;' : '&#128293;';
+                        return '<tr' + (isYou ? ' class="you-row"' : '') + '>' +
+                            '<td class="rank-cell ' + (rank <= 3 ? 'rank-' + rank : '') + '">' + medal + '</td>' +
+                            '<td>' + (r.username || 'Anonymous') + (isYou ? ' <span style="color:var(--accent);font-size:11px;">(you)</span>' : '') + '</td>' +
+                            '<td style="text-align:right;">' + flame + ' <span class="wpm-val">' + days + '</span> <span class="wpm-label">day' + (days !== 1 ? 's' : '') + '</span></td>' +
+                        '</tr>';
+                    }).join('');
+                    document.getElementById(bodyEl).innerHTML =
+                        '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Days</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                }
+
+                // Current streaks — sort by current_streak desc
+                var byCurrent = data.slice().sort(function(a, b) { return (b.current_streak || 0) - (a.current_streak || 0); });
+                renderStreakTable(byCurrent, 'current_streak', 'streak-current-count', 'streak-current-body');
+
+                // Longest streaks — already sorted by longest_streak desc from query
+                renderStreakTable(data, 'longest_streak', 'streak-longest-count', 'streak-longest-body');
+
+            } catch(err) {
+                console.error('Streaks error:', err);
+                document.getElementById('streak-current-body').innerHTML = '<div class="empty">Error loading streaks.</div>';
+                document.getElementById('streak-longest-body').innerHTML = '<div class="empty">Error loading streaks.</div>';
             }
         }
 
