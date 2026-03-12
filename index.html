@@ -2511,6 +2511,8 @@
             }
             // Clean URL without reloading
             window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+            initVotd();
         }
 
         // Restore easy mode preference
@@ -2521,7 +2523,6 @@
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 600;
         if (isMobile) toggleReadMode();
 
-        initVotd();
         fetchVerses();
         initStreak();
 
