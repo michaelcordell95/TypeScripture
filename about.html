@@ -5,18 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title>TypeScripture — About</title>
     <style>
+        /* === THEME === */
         :root {
             --bg-dark: #0d1117; --panel-bg: #161b22; --accent: #58a6ff;
-            --text-main: #c9d1d9; --text-muted: #8b949e; --text-bright: #ffffff;
-            --border: #30363d;
+            --accent-dim: rgba(88,166,255,0.12); --text-main: #c9d1d9;
+            --text-muted: #484f58; --text-bright: #ffffff; --error: #f85149;
+            --border: #30363d; --border-inner: #21262d; --progress-bg: #21262d;
         }
+        body.light-mode {
+            --bg-dark: #f2e8d5; --panel-bg: #faf3e0; --accent: #b8860b;
+            --accent-dim: rgba(184,134,11,0.12); --text-main: #1a1208;
+            --text-muted: #8a7560; --text-bright: #0a0600; --error: #8b1a1a;
+            --border: #c8a96e; --border-inner: #e8d9b8; --progress-bg: #d9c9a8;
+        }
+        *, *::before, *::after { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+        #theme-toggle-btn { color: var(--text-muted); font-size: 12px; border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; background: transparent; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+        #theme-toggle-btn:hover { border-color: var(--accent); color: var(--text-main); }
+        body.light-mode .logo-text { color: #1a1208 !important; }
+        body.light-mode .logo-text span { color: var(--accent) !important; }
+        body.light-mode .moment-card, body.light-mode .support-card, body.light-mode .social-card,
+        body.light-mode .stat-row, body.light-mode .podium-card, body.light-mode .rank-row,
+        body.light-mode .verse-card, body.light-mode .bookmark-card { background: #efe5cc !important; }
+        body.light-mode .note-area { background: #f2e8d5 !important; }
+        /* === END THEME === */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background-color: var(--bg-dark); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 20px; }
 
         .header { display: flex; align-items: center; justify-content: space-between; max-width: 700px; margin: 0 auto 24px; flex-wrap: wrap; gap: 10px; }
         .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-        .logo-text { font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
-        .logo-text span { color: var(--text-bright); }
+        .logo-text { font-size: 22px; font-weight: 800; color: var(--text-bright); letter-spacing: -1px; }
+        .logo-text span { color: var(--accent); }
         .back-link { color: var(--text-muted); font-size: 13px; text-decoration: none; border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; transition: all 0.2s; }
         .back-link:hover { color: var(--text-main); border-color: var(--accent); }
 
@@ -39,7 +57,7 @@
         }
         .verse-quote cite { display: block; margin-top: 6px; font-style: normal; font-size: 12px; color: var(--accent); }
 
-        .moment-card { display: flex; gap: 14px; align-items: flex-start; padding: 16px; background: #21262d; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; }
+        .moment-card { display: flex; gap: 14px; align-items: flex-start; padding: 16px; background: var(--border-inner); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; }
         .moment-card:last-child { margin-bottom: 0; }
         .moment-card .icon { font-size: 24px; flex-shrink: 0; line-height: 1; margin-top: 2px; }
         .moment-card .text { font-size: 14px; line-height: 1.7; color: var(--text-main); }
@@ -48,14 +66,14 @@
         .support-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         @media (max-width: 480px) { .support-grid { grid-template-columns: 1fr; } }
 
-        .support-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: #21262d; border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--text-main); transition: border-color 0.2s, background 0.2s; }
+        .support-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: var(--border-inner); border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--text-main); transition: border-color 0.2s, background 0.2s; }
         .support-card:hover { border-color: var(--accent); background: rgba(88,166,255,0.06); }
         .support-card .emoji { font-size: 28px; line-height: 1; flex-shrink: 0; }
         .support-card .info .name { font-size: 14px; font-weight: 700; color: var(--text-bright); }
         .support-card .info .handle { font-size: 12px; color: var(--accent); margin-top: 2px; }
         .support-card .info .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-        .social-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: #21262d; border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--text-main); transition: border-color 0.2s, background 0.2s; }
+        .social-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: var(--border-inner); border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--text-main); transition: border-color 0.2s, background 0.2s; }
         .social-card:hover { border-color: var(--accent); background: rgba(88,166,255,0.06); }
         .social-card .emoji { font-size: 28px; flex-shrink: 0; }
         .social-card .info .name { font-size: 14px; font-weight: 700; color: var(--text-bright); }
@@ -65,6 +83,7 @@
         .cta-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #0d1117; font-weight: 700; font-size: 14px; padding: 10px 24px; border-radius: 8px; text-decoration: none; transition: background 0.2s; }
         .cta-btn:hover { background: #79b8ff; }
     </style>
+    <meta name="color-scheme" content="light">
 </head>
 <body>
 
@@ -135,5 +154,18 @@
     </div>
 
 </div>
+    <script>
+        (function(){if(localStorage.getItem('tsTheme')!=='dark'){document.documentElement.classList.add('light-mode');}})();
+        document.addEventListener('DOMContentLoaded',function(){
+            if(localStorage.getItem('tsTheme')!=='dark'){document.body.classList.add('light-mode');}
+            var nav=document.querySelector('.nav-links');
+            if(nav){var b=document.createElement('button');b.id='theme-toggle-btn';b.title='Toggle theme';
+            b.textContent=document.body.classList.contains('light-mode')?'☀️ Theme':'🌙 Theme';
+            b.onclick=function(){var l=document.body.classList.toggle('light-mode');
+            localStorage.setItem('tsTheme',l?'light':'dark');b.textContent=l?'☀️ Theme':'🌙 Theme';
+            var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=l?'light':'dark';};
+            nav.appendChild(b);}
+        });
+    </script>
 </body>
 </html>

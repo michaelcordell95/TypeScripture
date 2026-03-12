@@ -6,39 +6,57 @@
     <title>TypeScripture — Leaderboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* === THEME === */
         :root {
             --bg-dark: #0d1117; --panel-bg: #161b22; --accent: #58a6ff;
-            --text-main: #c9d1d9; --text-muted: #484f58; --text-bright: #ffffff;
-            --error: #f85149; --progress-bg: #21262d;
+            --accent-dim: rgba(88,166,255,0.12); --text-main: #c9d1d9;
+            --text-muted: #484f58; --text-bright: #ffffff; --error: #f85149;
+            --border: #30363d; --border-inner: #21262d; --progress-bg: #21262d;
         }
+        body.light-mode {
+            --bg-dark: #f2e8d5; --panel-bg: #faf3e0; --accent: #b8860b;
+            --accent-dim: rgba(184,134,11,0.12); --text-main: #1a1208;
+            --text-muted: #8a7560; --text-bright: #0a0600; --error: #8b1a1a;
+            --border: #c8a96e; --border-inner: #e8d9b8; --progress-bg: #d9c9a8;
+        }
+        *, *::before, *::after { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+        #theme-toggle-btn { color: var(--text-muted); font-size: 12px; border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; background: transparent; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+        #theme-toggle-btn:hover { border-color: var(--accent); color: var(--text-main); }
+        body.light-mode .logo-text { color: #1a1208 !important; }
+        body.light-mode .logo-text span { color: var(--accent) !important; }
+        body.light-mode .moment-card, body.light-mode .support-card, body.light-mode .social-card,
+        body.light-mode .stat-row, body.light-mode .podium-card, body.light-mode .rank-row,
+        body.light-mode .verse-card, body.light-mode .bookmark-card { background: #efe5cc !important; }
+        body.light-mode .note-area { background: #f2e8d5 !important; }
+        /* === END THEME === */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background-color: var(--bg-dark); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 20px; }
         .header { display: flex; align-items: center; justify-content: space-between; max-width: 1000px; margin: 0 auto 24px; }
         .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-        .logo-text { font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
-        .logo-text span { color: var(--text-bright); }
-        .back-link { color: var(--text-muted); font-size: 13px; text-decoration: none; border: 1px solid #30363d; padding: 5px 12px; border-radius: 6px; }
+        .logo-text { font-size: 22px; font-weight: 800; color: var(--text-bright); letter-spacing: -1px; }
+        .logo-text span { color: var(--accent); }
+        .back-link { color: var(--text-muted); font-size: 13px; text-decoration: none; border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; }
         .back-link:hover { color: var(--text-main); border-color: var(--accent); }
         #user-display { color: var(--text-muted); font-size: 12px; }
-        .tabs { display: flex; gap: 4px; max-width: 1000px; margin: 0 auto 20px; border-bottom: 1px solid #30363d; }
+        .tabs { display: flex; gap: 4px; max-width: 1000px; margin: 0 auto 20px; border-bottom: 1px solid var(--border); }
         .tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
         .tab:hover { color: var(--text-main); }
         .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
         .content { max-width: 1000px; margin: 0 auto; }
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
-        .stat-card { background: var(--panel-bg); border: 1px solid #30363d; border-radius: 10px; padding: 16px; text-align: center; }
+        .stat-card { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
         .stat-card .value { font-size: 26px; font-weight: 800; color: var(--accent); }
         .stat-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; letter-spacing: 0.5px; }
         .browse-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-        select { background: #21262d; border: 1px solid #30363d; color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; min-width: 140px; }
+        select { background: var(--border-inner); border: 1px solid var(--border); color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; min-width: 140px; }
         select:focus { outline: none; border-color: var(--accent); }
-        .lb-panel { background: var(--panel-bg); border: 1px solid #30363d; border-radius: 12px; overflow: hidden; }
-        .lb-header { padding: 14px 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+        .lb-panel { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .lb-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .lb-header h3 { font-size: 14px; color: var(--text-main); font-weight: 600; }
         .lb-header span { font-size: 12px; color: var(--text-muted); }
         .lb-table { width: 100%; border-collapse: collapse; }
-        .lb-table th { padding: 10px 20px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #30363d; }
-        .lb-table td { padding: 12px 20px; font-size: 14px; border-bottom: 1px solid #21262d; }
+        .lb-table th { padding: 10px 20px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+        .lb-table td { padding: 12px 20px; font-size: 14px; border-bottom: 1px solid var(--border-inner); }
         .lb-table tr:last-child td { border-bottom: none; }
         .lb-table tr:hover td { background: rgba(88,166,255,0.04); }
         .rank { font-weight: 800; color: var(--text-muted); width: 40px; }
@@ -50,7 +68,7 @@
         .wpm-cell { text-align: right; white-space: nowrap; }
         .wpm-val { font-weight: 700; color: var(--text-main); }
         .wpm-label { font-size: 11px; color: var(--text-muted); font-weight: 400; }
-        .progress-bar-wrap { width: 120px; background: #21262d; border-radius: 4px; height: 6px; display: inline-block; vertical-align: middle; margin-left: 8px; }
+        .progress-bar-wrap { width: 120px; background: var(--border-inner); border-radius: 4px; height: 6px; display: inline-block; vertical-align: middle; margin-left: 8px; }
         .progress-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #2ea043, var(--accent)); }
         .empty, .loading { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
         @media (max-width: 700px) {
@@ -60,6 +78,7 @@
             .lb-table .hide-mobile { display: none; }
         }
     </style>
+    <meta name="color-scheme" content="light">
 </head>
 <body>
     <div class="header">
@@ -83,7 +102,7 @@
         <div id="tab-scores" style="display:none;">
             <div style="display:flex; gap:8px; justify-content:center; margin-bottom:12px;">
                 <button id="scores-mode-typed" onclick="setScoresMode('typed')" style="background:rgba(88,166,255,0.12); border:1px solid var(--accent); color:var(--accent); padding:6px 18px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit;">⌨️ Typed</button>
-                <button id="scores-mode-read" onclick="setScoresMode('read')" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:6px 18px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit;">📖 Read</button>
+                <button id="scores-mode-read" onclick="setScoresMode('read')" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:6px 18px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit;">📖 Read</button>
             </div>
             <div class="browse-row">
                 <select id="scores-book" onchange="onScoresBookChange()">
@@ -101,9 +120,9 @@
                     <h3 id="scores-title">Select a book to see scores</h3>
                     <span id="scores-count"></span>
                 </div>
-                <div id="scores-personal" style="display:none; padding:10px 20px; font-size:13px; color:var(--text-muted); border-bottom:1px solid #30363d;">
+                <div id="scores-personal" style="display:none; padding:10px 20px; font-size:13px; color:var(--text-muted); border-bottom:1px solid var(--border);">
                     <span id="scores-personal-text"></span>
-                    <div style="margin-top:6px; background:#21262d; border-radius:4px; height:6px; width:100%;">
+                    <div style="margin-top:6px; background:var(--border-inner); border-radius:4px; height:6px; width:100%;">
                         <div id="scores-personal-bar" style="height:100%; border-radius:4px; background:linear-gradient(90deg,#2ea043,var(--accent)); width:0%; transition:width 0.5s;"></div>
                     </div>
                 </div>
@@ -124,7 +143,7 @@
 
         <div id="tab-search" style="display:none;">
             <div class="browse-row" style="gap:10px;">
-                <input id="search-input" type="text" placeholder="Enter username..." style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:8px 14px;border-radius:6px;font-size:14px;min-width:220px;" />
+                <input id="search-input" type="text" placeholder="Enter username..." style="background:var(--border-inner);border:1px solid var(--border);color:#c9d1d9;padding:8px 14px;border-radius:6px;font-size:14px;min-width:220px;" />
                 <button onclick="searchPlayer()" style="background:var(--accent);color:#0d1117;border:none;padding:8px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;">Search</button>
             </div>
             <div id="search-result"></div>
@@ -196,10 +215,10 @@
             var typedBtn = document.getElementById('scores-mode-typed');
             var readBtn = document.getElementById('scores-mode-read');
             typedBtn.style.background = mode === 'typed' ? 'rgba(88,166,255,0.12)' : 'transparent';
-            typedBtn.style.borderColor = mode === 'typed' ? 'var(--accent)' : '#30363d';
+            typedBtn.style.borderColor = mode === 'typed' ? 'var(--accent)' : 'var(--border)';
             typedBtn.style.color = mode === 'typed' ? 'var(--accent)' : 'var(--text-muted)';
             readBtn.style.background = mode === 'read' ? 'rgba(88,166,255,0.12)' : 'transparent';
-            readBtn.style.borderColor = mode === 'read' ? 'var(--accent)' : '#30363d';
+            readBtn.style.borderColor = mode === 'read' ? 'var(--accent)' : 'var(--border)';
             readBtn.style.color = mode === 'read' ? 'var(--accent)' : 'var(--text-muted)';
             // Hide verse select in read mode (reading tracked at verse level but no WPM)
             document.getElementById('scores-verse').style.display = mode === 'read' ? 'none' : '';
@@ -822,11 +841,11 @@
 
             var isYou = uid === currentUserId;
             resultEl.innerHTML =
-                '<div style="padding:16px 20px;border-bottom:1px solid #30363d;">' +
+                '<div style="padding:16px 20px;border-bottom:1px solid var(--border);">' +
                     '<span style="font-size:16px;font-weight:800;color:var(--accent);">' + profile.username + '</span>' +
                     (isYou ? ' <span style="font-size:11px;color:var(--text-muted);">(you)</span>' : '') +
                 '</div>' +
-                '<div class="stats-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#30363d;">' +
+                '<div class="stats-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);">' +
                     '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + displayPct + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Bible Completion</div></div>' +
                     '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + rows.length.toLocaleString() + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Verses Typed</div></div>' +
                     '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + booksCompleted + ' / 66</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Books Complete</div></div>' +
@@ -839,6 +858,19 @@
         document.getElementById('search-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchPlayer(); });
 
         init().then(function() { loadBibleCompletionLeaderboard(); });
+    </script>
+    <script>
+        (function(){if(localStorage.getItem('tsTheme')!=='dark'){document.documentElement.classList.add('light-mode');}})();
+        document.addEventListener('DOMContentLoaded',function(){
+            if(localStorage.getItem('tsTheme')!=='dark'){document.body.classList.add('light-mode');}
+            var nav=document.querySelector('.nav-links');
+            if(nav){var b=document.createElement('button');b.id='theme-toggle-btn';b.title='Toggle theme';
+            b.textContent=document.body.classList.contains('light-mode')?'☀️ Theme':'🌙 Theme';
+            b.onclick=function(){var l=document.body.classList.toggle('light-mode');
+            localStorage.setItem('tsTheme',l?'light':'dark');b.textContent=l?'☀️ Theme':'🌙 Theme';
+            var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=l?'light':'dark';};
+            nav.appendChild(b);}
+        });
     </script>
 </body>
 </html>

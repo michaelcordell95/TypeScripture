@@ -7,16 +7,29 @@
     <title>TypeScripture — Bookmarks</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* === THEME === */
         :root {
-            --bg-dark: #0d1117;
-            --panel-bg: #161b22;
-            --accent: #58a6ff;
-            --text-main: #c9d1d9;
-            --text-muted: #484f58;
-            --text-bright: #ffffff;
-            --error: #f85149;
-            --gold: #f0b429;
+            --bg-dark: #0d1117; --panel-bg: #161b22; --accent: #58a6ff;
+            --accent-dim: rgba(88,166,255,0.12); --text-main: #c9d1d9;
+            --text-muted: #484f58; --text-bright: #ffffff; --error: #f85149;
+            --border: #30363d; --border-inner: #21262d; --progress-bg: #21262d;
         }
+        body.light-mode {
+            --bg-dark: #f2e8d5; --panel-bg: #faf3e0; --accent: #b8860b;
+            --accent-dim: rgba(184,134,11,0.12); --text-main: #1a1208;
+            --text-muted: #8a7560; --text-bright: #0a0600; --error: #8b1a1a;
+            --border: #c8a96e; --border-inner: #e8d9b8; --progress-bg: #d9c9a8;
+        }
+        *, *::before, *::after { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+        #theme-toggle-btn { color: var(--text-muted); font-size: 12px; border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; background: transparent; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+        #theme-toggle-btn:hover { border-color: var(--accent); color: var(--text-main); }
+        body.light-mode .logo-text { color: #1a1208 !important; }
+        body.light-mode .logo-text span { color: var(--accent) !important; }
+        body.light-mode .moment-card, body.light-mode .support-card, body.light-mode .social-card,
+        body.light-mode .stat-row, body.light-mode .podium-card, body.light-mode .rank-row,
+        body.light-mode .verse-card, body.light-mode .bookmark-card { background: #efe5cc !important; }
+        body.light-mode .note-area { background: #f2e8d5 !important; }
+        /* === END THEME === */
         * { box-sizing: border-box; }
         body {
             background: var(--bg-dark);
@@ -30,12 +43,12 @@
             min-height: 100vh;
         }
         .header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-        .logo-text { font-size: 32px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
-        .logo-text span { color: var(--text-bright); }
+        .logo-text { font-size: 32px; font-weight: 800; color: var(--text-bright); letter-spacing: -1px; }
+        .logo-text span { color: var(--accent); }
         .nav-links { display: flex; gap: 10px; margin-bottom: 24px; }
         .nav-links a {
             color: var(--text-muted); font-size: 12px; text-decoration: none;
-            border: 1px solid #30363d; padding: 5px 10px; border-radius: 6px;
+            border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px;
         }
         .nav-links a:hover { border-color: var(--accent); color: var(--text-main); }
         .nav-links a.active { border-color: var(--gold); color: var(--gold); }
@@ -45,7 +58,7 @@
         .bookmark-list { display: flex; flex-direction: column; gap: 10px; }
         .bookmark-card {
             background: var(--panel-bg);
-            border: 1px solid #30363d;
+            border: 1px solid var(--border);
             border-radius: 10px;
             padding: 16px 20px;
             display: flex;
@@ -58,13 +71,13 @@
         .bookmark-text { font-size: 13px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
         .bookmark-date { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
         .remove-btn {
-            background: transparent; border: 1px solid #30363d;
+            background: transparent; border: 1px solid var(--border);
             color: var(--text-muted); padding: 5px 10px; border-radius: 6px;
             cursor: pointer; font-size: 12px; white-space: nowrap;
         }
         .remove-btn:hover { border-color: var(--error); color: var(--error); }
         .note-btn {
-            background: transparent; border: 1px solid #30363d;
+            background: transparent; border: 1px solid var(--border);
             color: var(--text-muted); padding: 5px 10px; border-radius: 6px;
             cursor: pointer; font-size: 12px; white-space: nowrap;
         }
@@ -72,7 +85,7 @@
         .note-btn.has-note { border-color: #f0b429; color: #f0b429; }
         .note-area {
             display: none; width: 100%; margin-top: 10px;
-            background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+            background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px;
             color: var(--text-main); font-size: 13px; padding: 10px;
             resize: vertical; min-height: 72px; font-family: inherit; line-height: 1.5;
         }
@@ -86,7 +99,7 @@
         .count { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
         #auth-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); }
         #auth-bar button {
-            background: transparent; border: 1px solid #30363d; color: var(--text-muted);
+            background: transparent; border: 1px solid var(--border); color: var(--text-muted);
             padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
         }
         #auth-bar button:hover { border-color: var(--error); color: var(--error); }
@@ -95,6 +108,7 @@
             .bookmark-date { display: none; }
         }
     </style>
+    <meta name="color-scheme" content="light">
 </head>
 <body>
     <div class="header">
@@ -365,6 +379,19 @@
         }
 
         init();
+    </script>
+    <script>
+        (function(){if(localStorage.getItem('tsTheme')!=='dark'){document.documentElement.classList.add('light-mode');}})();
+        document.addEventListener('DOMContentLoaded',function(){
+            if(localStorage.getItem('tsTheme')!=='dark'){document.body.classList.add('light-mode');}
+            var nav=document.querySelector('.nav-links');
+            if(nav){var b=document.createElement('button');b.id='theme-toggle-btn';b.title='Toggle theme';
+            b.textContent=document.body.classList.contains('light-mode')?'☀️ Theme':'🌙 Theme';
+            b.onclick=function(){var l=document.body.classList.toggle('light-mode');
+            localStorage.setItem('tsTheme',l?'light':'dark');b.textContent=l?'☀️ Theme':'🌙 Theme';
+            var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=l?'light':'dark';};
+            nav.appendChild(b);}
+        });
     </script>
 </body>
 </html>
