@@ -47,6 +47,9 @@
         .stat-card { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
         .stat-card .value { font-size: 26px; font-weight: 800; color: var(--accent); }
         .stat-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; letter-spacing: 0.5px; }
+        .graph-range-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+        .graph-range-btn:hover { border-color: var(--accent); color: var(--text-main); }
+        .graph-range-btn.active-range { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
         .browse-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
         select { background: var(--border-inner); border: 1px solid var(--border); color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; min-width: 140px; }
         select:focus { outline: none; border-color: var(--accent); }
@@ -166,7 +169,18 @@
                 <div class="lb-panel"><div class="empty">Sign in to see your personal stats</div></div>
             </div>
             <div id="personal-content" style="display:none;">
-                <h4 style="color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px;font-weight:600;">&#9000;&#65039; Typing</h4>
+                <h4 style="color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px;font-weight:600;">📈 WPM Over Time</h4>
+                <div id="wpm-graph-wrap" style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:4px;">
+                    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                        <button onclick="setGraphRange('week')" id="graph-btn-week" class="graph-range-btn active-range">7 days</button>
+                        <button onclick="setGraphRange('month')" id="graph-btn-month" class="graph-range-btn">30 days</button>
+                        <button onclick="setGraphRange('year')" id="graph-btn-year" class="graph-range-btn">1 year</button>
+                        <button onclick="setGraphRange('all')" id="graph-btn-all" class="graph-range-btn">All time</button>
+                    </div>
+                    <canvas id="wpm-graph" height="180" style="width:100%;display:block;"></canvas>
+                    <div id="wpm-graph-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted);font-size:13px;">No typing data yet — start typing verses to see your progress!</div>
+                </div>
+                <h4 style="color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px;font-weight:600;">⌨️ Typing</h4>
                 <div class="stats-grid">
                     <div class="stat-card"><div class="value" id="stat-completion">0%</div><div class="label">Bible Typed</div></div>
                     <div class="stat-card"><div class="value" id="stat-verses">0</div><div class="label">Verses Typed</div></div>
@@ -341,6 +355,7 @@
                     var usernameMap = {};
                     (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
                     document.getElementById('scores-count').innerText = data.length + ' score' + (data.length !== 1 ? 's' : '');
+                    var myRankIdx = currentUserId ? data.findIndex(function(r){ return r.user_id === currentUserId; }) : -1;
                     var rows = data.map(function(row, i) {
                         var rank = i + 1;
                         var rankClass = rank <= 3 ? 'rank-' + rank : '';
@@ -349,7 +364,11 @@
                         var isYou = row.user_id === currentUserId;
                         return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span></td></tr>';
                     }).join('');
-                    document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Best WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                    var yourRankRow = '';
+                    if (currentUserId && myRankIdx === -1) {
+                        yourRankRow = '<tr><td colspan="3" style="text-align:center;padding:10px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);">You're not in the top ' + data.length + ' for this verse yet</td></tr>';
+                    }
+                    document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Best WPM</th></tr></thead><tbody>' + rows + yourRankRow + '</tbody></table>';
 
                 } else if (chap) {
                     document.getElementById('scores-title').innerText = book + ' — Chapter ' + chap;
@@ -554,7 +573,7 @@
             try {
                 var result = await supabaseClient
                     .from('verse_progress')
-                    .select('book_name, chapter_num, verse_num, best_wpm')
+                    .select('book_name, chapter_num, verse_num, best_wpm, completed_at')
                     .eq('user_id', currentUserId);
 
                 if (result.error) throw result.error;
@@ -636,12 +655,147 @@
                 document.getElementById('stat-read-pct').innerText = readDisplayPct;
                 document.getElementById('stat-read-books').innerText = booksFullyRead + ' / 66';
 
+                // Render WPM graph
+                allVerseData = completed.filter(function(r) { return r.best_wpm > 0 && r.completed_at; });
+                setGraphRange(currentGraphRange);
+
             } catch(err) {
                 console.error('Personal stats error:', err);
             }
         }
 
-        // ===== MOST READ LEADERBOARD =====
+        var allVerseData = [];
+        var currentGraphRange = 'week';
+
+        function setGraphRange(range) {
+            currentGraphRange = range;
+            ['week','month','year','all'].forEach(function(r) {
+                var btn = document.getElementById('graph-btn-' + r);
+                if (btn) btn.className = 'graph-range-btn' + (r === range ? ' active-range' : '');
+            });
+            renderWpmGraph(allVerseData, range);
+        }
+
+        function renderWpmGraph(data, range) {
+            var canvas = document.getElementById('wpm-graph');
+            var emptyEl = document.getElementById('wpm-graph-empty');
+            if (!canvas) return;
+
+            var now = new Date();
+            var cutoff = new Date();
+            if (range === 'week')  cutoff.setDate(now.getDate() - 7);
+            if (range === 'month') cutoff.setDate(now.getDate() - 30);
+            if (range === 'year')  cutoff.setFullYear(now.getFullYear() - 1);
+            if (range === 'all')   cutoff = new Date(0);
+
+            var filtered = data.filter(function(r) { return new Date(r.completed_at) >= cutoff; });
+
+            if (filtered.length === 0) {
+                canvas.style.display = 'none';
+                emptyEl.style.display = 'block';
+                return;
+            }
+            canvas.style.display = 'block';
+            emptyEl.style.display = 'none';
+
+            // Group by day — avg wpm per day
+            var dayMap = {};
+            filtered.forEach(function(r) {
+                var d = new Date(r.completed_at);
+                var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+                if (!dayMap[key]) dayMap[key] = { sum: 0, count: 0 };
+                dayMap[key].sum += r.best_wpm;
+                dayMap[key].count++;
+            });
+            var days = Object.keys(dayMap).sort();
+            var points = days.map(function(d) { return Math.round(dayMap[d].sum / dayMap[d].count); });
+
+            // Canvas setup
+            var dpr = window.devicePixelRatio || 1;
+            var w = canvas.parentElement.clientWidth - 32;
+            var h = 180;
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+            var ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            var padL = 42, padR = 12, padT = 16, padB = 36;
+            var gw = w - padL - padR;
+            var gh = h - padT - padB;
+
+            var maxWpm = Math.max.apply(null, points);
+            var minWpm = Math.min.apply(null, points);
+            var wpmRange = maxWpm - minWpm || 1;
+
+            // Get CSS vars
+            var style = getComputedStyle(document.body);
+            var accentColor = style.getPropertyValue('--accent').trim();
+            var mutedColor = style.getPropertyValue('--text-muted').trim();
+            var borderColor = style.getPropertyValue('--border').trim();
+
+            // Grid lines
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 0.5;
+            [0, 0.25, 0.5, 0.75, 1].forEach(function(t) {
+                var y = padT + gh * (1 - t);
+                ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + gw, y); ctx.stroke();
+                var label = Math.round(minWpm + wpmRange * t);
+                ctx.fillStyle = mutedColor;
+                ctx.font = '10px system-ui';
+                ctx.textAlign = 'right';
+                ctx.fillText(label, padL - 6, y + 4);
+            });
+
+            // Line + fill
+            var n = points.length;
+            var xStep = n > 1 ? gw / (n - 1) : gw;
+
+            function px(i) { return padL + (n > 1 ? i * xStep : gw / 2); }
+            function py(v) { return padT + gh * (1 - (v - minWpm) / wpmRange); }
+
+            // Gradient fill
+            var grad = ctx.createLinearGradient(0, padT, 0, padT + gh);
+            grad.addColorStop(0, accentColor.replace(')', ', 0.3)').replace('rgb', 'rgba').replace('#', 'rgba(').replace('rgba(', 'rgba('));
+            // Simpler: just use a semi-transparent fill
+            ctx.beginPath();
+            ctx.moveTo(px(0), py(points[0]));
+            for (var i = 1; i < n; i++) ctx.lineTo(px(i), py(points[i]));
+            ctx.lineTo(px(n-1), padT + gh);
+            ctx.lineTo(px(0), padT + gh);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(88,166,255,0.08)';
+            ctx.fill();
+
+            // Line
+            ctx.beginPath();
+            ctx.moveTo(px(0), py(points[0]));
+            for (var i = 1; i < n; i++) ctx.lineTo(px(i), py(points[i]));
+            ctx.strokeStyle = accentColor;
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            // Dots
+            for (var i = 0; i < n; i++) {
+                ctx.beginPath();
+                ctx.arc(px(i), py(points[i]), n > 30 ? 0 : 3, 0, Math.PI * 2);
+                ctx.fillStyle = accentColor;
+                ctx.fill();
+            }
+
+            // X axis labels (show up to 7 evenly spaced)
+            ctx.fillStyle = mutedColor;
+            ctx.font = '10px system-ui';
+            ctx.textAlign = 'center';
+            var labelStep = Math.ceil(n / 7);
+            for (var i = 0; i < n; i += labelStep) {
+                var parts = days[i].split('-');
+                var label = parts[1] + '/' + parts[2];
+                ctx.fillText(label, px(i), padT + gh + 18);
+            }
+        }
         async function loadReadLeaderboard() {
             document.getElementById('read-lb-body').innerHTML = '<div class="loading">Loading...</div>';
             try {
@@ -856,6 +1010,10 @@
         }
 
         document.getElementById('search-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchPlayer(); });
+
+        window.addEventListener('resize', function() {
+            if (allVerseData.length > 0) renderWpmGraph(allVerseData, currentGraphRange);
+        });
 
         init().then(function() { loadBibleCompletionLeaderboard(); });
     </script>
