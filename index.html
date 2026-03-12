@@ -1226,14 +1226,13 @@
             const streak = parseInt(localStorage.getItem('tsDailyStreak') || '0');
             const longest = parseInt(localStorage.getItem('tsLongestStreak') || '0');
             if (streak === 0 && longest === 0) return;
-            supabaseClient.from('profiles').upsert({
-                id: currentUserId,
-                current_streak: streak,
-                longest_streak: longest
-            }, { onConflict: 'id' }).then(({ error }) => {
-                if (error) console.warn('Streak sync error:', error.message);
-                else console.log('Streak synced:', streak, '/', longest);
-            });
+            supabaseClient.from('profiles')
+                .update({ current_streak: streak, longest_streak: longest })
+                .eq('id', currentUserId)
+                .then(({ error }) => {
+                    if (error) console.warn('Streak sync error:', error.message);
+                    else console.log('Streak synced:', streak, '/', longest);
+                });
         }
 
         function markStreakActivity() {
@@ -1260,13 +1259,12 @@
 
             // Sync to Supabase if logged in
             if (currentUserId && supabaseClient) {
-                supabaseClient.from('profiles').upsert({
-                    id: currentUserId,
-                    current_streak: streak,
-                    longest_streak: longest
-                }, { onConflict: 'id' }).then(({ error }) => {
-                    if (error) console.warn('Streak sync error:', error.message);
-                });
+                supabaseClient.from('profiles')
+                    .update({ current_streak: streak, longest_streak: longest })
+                    .eq('id', currentUserId)
+                    .then(({ error }) => {
+                        if (error) console.warn('Streak sync error:', error.message);
+                    });
             }
         }
 
