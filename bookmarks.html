@@ -126,11 +126,16 @@
             <span id="auth-username"></span>
             <button onclick="handleLogout()">Logout</button>
         </div>
-        <div class="page-title">⭐ My Bookmarks</div>
-        <div class="page-subtitle">Verses you've saved for easy reference</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
+            <div id="bookmark-page-title" class="page-title" style="margin-bottom:0;flex:1;min-width:0;">⭐ My Bookmarks</div>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+                <input id="player-search-input" type="text" placeholder="Search player..." style="background:var(--border-inner);border:1px solid var(--border);color:var(--text-main);padding:6px 12px;border-radius:6px;font-size:13px;font-family:inherit;outline:none;width:150px;" />
+                <button onclick="searchPlayerBookmarks()" style="background:var(--accent);color:#0d1117;border:none;padding:6px 14px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">Go</button>
+            </div>
+        </div>
+        <div id="bookmark-page-subtitle" class="page-subtitle">Verses you've saved for easy reference</div>
         <div id="bookmark-count" class="count"></div>
         <div id="bookmark-list"><div class="loading">Loading...</div></div>
-    </div>
 
     <script src="/bible.js"></script>
     <script>
@@ -376,6 +381,85 @@
                     console.warn('Could not save note to DB:', e);
                 }
             }
+        }
+
+        // Enter key triggers search
+        document.addEventListener('DOMContentLoaded', function() {
+            var inp = document.getElementById('player-search-input');
+            if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') searchPlayerBookmarks(); });
+        });
+
+        async function searchPlayerBookmarks() {
+            const username = document.getElementById('player-search-input').value.trim();
+            if (!username) return;
+
+            const listEl = document.getElementById('bookmark-list');
+            const countEl = document.getElementById('bookmark-count');
+            const titleEl = document.getElementById('bookmark-page-title');
+            const subtitleEl = document.getElementById('bookmark-page-subtitle');
+
+            listEl.innerHTML = '<div class="loading">Searching...</div>';
+            countEl.innerText = '';
+
+            try {
+                const { data: profile } = await sb.from('profiles')
+                    .select('id, username')
+                    .ilike('username', username)
+                    .maybeSingle();
+
+                if (!profile) {
+                    listEl.innerHTML = '<div class="empty">No player found with that username.</div>';
+                    return;
+                }
+
+                const { data: bms } = await sb.from('bookmarks')
+                    .select('book_name, chapter_num, verse_num, notes, created_at')
+                    .eq('user_id', profile.id)
+                    .order('created_at', { ascending: false });
+
+                // Update header
+                titleEl.innerHTML = '⭐ ' + profile.username + '\'s Bookmarks '
+                    + '<button onclick="resetToMyBookmarks()" style="font-size:12px;font-weight:600;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:3px 10px;border-radius:6px;cursor:pointer;font-family:inherit;vertical-align:middle;">← Mine</button>';
+                subtitleEl.style.display = 'none';
+
+                if (!bms || bms.length === 0) {
+                    countEl.innerText = '';
+                    listEl.innerHTML = '<div class="empty">' + profile.username + ' has no bookmarks yet.</div>';
+                    return;
+                }
+
+                countEl.innerText = bms.length + ' bookmark' + (bms.length !== 1 ? 's' : '');
+
+                const cards = bms.map(function(b) {
+                    const ref = b.book_name + ' ' + b.chapter_num + ':' + b.verse_num;
+                    const verseText = getVerseText(b.book_name, b.chapter_num, b.verse_num);
+                    const verseUrl = '/?book=' + encodeURIComponent(b.book_name) + '&chapter=' + b.chapter_num + '&verse=' + b.verse_num;
+                    const date = b.created_at
+                        ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '';
+                    return '<div class="bookmark-card">' +
+                        '<div style="flex:1;min-width:0;">' +
+                            '<a href="' + verseUrl + '" style="text-decoration:none;"><div class="bookmark-ref" style="cursor:pointer;">↗ ' + ref + '</div></a>' +
+                            (verseText ? '<div class="bookmark-text">' + verseText + '</div>' : '') +
+                            (b.notes ? '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;font-style:italic;">📝 ' + b.notes + '</div>' : '') +
+                        '</div>' +
+                        '<span class="bookmark-date">Saved ' + date + '</span>' +
+                    '</div>';
+                }).join('');
+
+                listEl.innerHTML = '<div class="bookmark-list">' + cards + '</div>';
+
+            } catch(err) {
+                console.error('Player bookmark search error:', err);
+                listEl.innerHTML = '<div class="empty">Error loading bookmarks.</div>';
+            }
+        }
+
+        function resetToMyBookmarks() {
+            document.getElementById('bookmark-page-title').innerText = '⭐ My Bookmarks';
+            document.getElementById('bookmark-page-subtitle').style.display = '';
+            document.getElementById('player-search-input').value = '';
+            loadBookmarks();
         }
 
         init();
