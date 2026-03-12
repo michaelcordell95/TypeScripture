@@ -1226,6 +1226,7 @@
             if (lastActive === today) return; // already earned today, nothing to do
 
             let streak = parseInt(localStorage.getItem('tsDailyStreak') || '0');
+            let longest = parseInt(localStorage.getItem('tsLongestStreak') || '0');
             const yesterday = new Date(Date.now() - 86400000).toDateString();
 
             if (lastActive === yesterday) {
@@ -1234,9 +1235,23 @@
                 streak = 1; // start fresh
             }
 
+            if (streak > longest) longest = streak;
+
             localStorage.setItem('tsDailyStreak', streak);
+            localStorage.setItem('tsLongestStreak', longest);
             localStorage.setItem('tsLastActive', today);
             updateStreakBanner(streak, true);
+
+            // Sync to Supabase if logged in
+            if (currentUserId && supabaseClient) {
+                supabaseClient.from('profiles').upsert({
+                    id: currentUserId,
+                    current_streak: streak,
+                    longest_streak: longest
+                }, { onConflict: 'id' }).then(({ error }) => {
+                    if (error) console.warn('Streak sync error:', error.message);
+                });
+            }
         }
 
         function updateStreakBanner(streak, earnedToday) {
