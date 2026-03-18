@@ -1428,12 +1428,14 @@
             verseReadStartTime = Date.now();
         }
 
-        async function markVerseRead() {
-            // Integrity threshold: must have been on verse for at least 400ms
-            const elapsed = verseReadStartTime ? Date.now() - verseReadStartTime : 0;
-            if (elapsed < 400) {
-                console.log('Skipping read mark - too fast (' + elapsed + 'ms)');
-                return;
+        async function markVerseRead(skipTimeCheck = false) {
+            // Integrity threshold: must have been on verse for at least 400ms (skipped when called from typing)
+            if (!skipTimeCheck) {
+                const elapsed = verseReadStartTime ? Date.now() - verseReadStartTime : 0;
+                if (elapsed < 400) {
+                    console.log('Skipping read mark - too fast (' + elapsed + 'ms)');
+                    return;
+                }
             }
             const bookName = bookSel.value.replace(' ✅', '');
             const chapNum = parseInt(chapSel.value);
@@ -2359,6 +2361,7 @@
                 warningEl.innerText = "";
                 verseWpms.push(wpm);
                 markStreakActivity();
+                markVerseRead(true); // typing a verse counts as reading it
                 const bookName = bookSel.value.replace(" ✅", "");
                 const chapNum = parseInt(chapSel.value);
                 const verseNum = currentIndex + 1;
