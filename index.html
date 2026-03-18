@@ -152,7 +152,8 @@
         .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(24px, 3.5vh, 42px); line-height: 1.5; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
-        .current-char { border-left: 3px solid var(--accent); animation: blink 1s infinite; background: rgba(88, 166, 255, 0.1); }
+        .current-char { border-left: 3px solid var(--accent); background: rgba(88, 166, 255, 0.1); }
+        body.typing-focused .current-char { animation: blink 1s infinite; }
         @keyframes blink { 50% { border-color: transparent; } }
         .correct { color: var(--correct) !important; }
         .incorrect { color: var(--error) !important; background: rgba(248, 81, 73, 0.1); text-decoration: underline; }
@@ -180,10 +181,11 @@
         .complete-screen .avg strong { color: var(--accent); font-size: 1.2em; }
         #reset-btn, #next-verse-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 16px; line-height: 1; }
         #reset-btn:hover, #next-verse-btn:hover { border-color: var(--accent); color: var(--accent); }
-        #bookmark-btn, #bookmark-btn-read, #listen-btn, #blb-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
-        #bookmark-btn:hover, #bookmark-btn-read:hover { border-color: #f0b429; color: #f0b429; }
+        #bookmark-btn, #bookmark-btn-read, #bookmark-btn-read-top, #listen-btn, #blb-btn, #place-btn, #place-btn-read { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+        #bookmark-btn:hover, #bookmark-btn-read:hover, #bookmark-btn-read-top:hover { border-color: #f0b429; color: #f0b429; }
         #listen-btn:hover, #blb-btn:hover { border-color: var(--accent); color: var(--accent); }
-        #bookmark-btn.bookmarked, #bookmark-btn-read.bookmarked { border-color: #f0b429; color: #f0b429; }
+        #bookmark-btn.bookmarked, #bookmark-btn-read.bookmarked, #bookmark-btn-read-top.bookmarked { border-color: #f0b429 !important; color: #f0b429 !important; background: rgba(240,180,41,0.18) !important; box-shadow: 0 0 8px rgba(240,180,41,0.4) !important; }
+        #place-btn.placed { border-color: #e05a2b !important; color: #e05a2b !important; background: rgba(224,90,43,0.18) !important; box-shadow: 0 0 6px rgba(224,90,43,0.3) !important; }
         #voice-btn.listening { border-color: var(--error) !important; color: var(--error) !important; animation: pulse-mic 1s infinite; }
         @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
@@ -308,7 +310,9 @@
             #select-group select { flex: 1; max-width: none; min-width: 0; }
             #btn-group { justify-content: center; flex-wrap: nowrap; }
             /* Keep type/read mode groups on one line */
-            #type-mode-group, #read-mode-group { flex-wrap: nowrap; gap: 6px; justify-content: center; width: 100%; }
+            #type-mode-group, #read-mode-group { flex-wrap: nowrap; gap: 6px; justify-content: center; }
+            .nav-row { flex-wrap: wrap; }
+            #read-mode-btn { flex-shrink: 0; }
             /* Shrink buttons and toggles a bit on mobile */
             #type-mode-group button, #read-mode-group button { padding: 6px 11px; font-size: 13px; }
             .toggle-label { font-size: 11px; gap: 4px; }
@@ -478,18 +482,18 @@
                         <span class="nav-btn-label">BLB</span>
                     </div>
                     <div class="nav-btn-wrap">
-                        <button id="bookmark-btn-read" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
+                        <button id="bookmark-btn-read-top" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
                         <span class="nav-btn-label">Bookmark</span>
                     </div>
                 </div>
+                </div>
+                </div>
             </div>
 
-            <div class="nav-divider"></div>
-
             <!-- Read/Type Mode button — always visible -->
-            <div class="nav-btn-wrap">
+            <div class="nav-btn-wrap" style="flex-shrink:0;">
                 <button id="read-mode-btn" onclick="toggleReadMode()" title="Toggle Read Mode" aria-label="Toggle Read Mode">⌨️ Type</button>
-                <span class="nav-btn-label">Mode</span>
+                <span class="nav-btn-label">Current Mode</span>
             </div>
         </div>
 
@@ -518,6 +522,13 @@
     <div id="read-ref-box" style="display:none;"></div>
     <div id="blb-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Hold verse to open in Blue Letter Bible</div>
     <div id="accuracy-warning"></div>
+    <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
+        <span id="verse-ref-text" style="color:var(--accent);"></span>
+        <span style="display:flex;align-items:center;gap:8px;">
+            <button id="place-btn" onclick="toggleSavePlace()" title="Save your place" aria-label="Save your place" style="background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">📍</button>
+            <span style="color:var(--text-muted);font-size:11px;">KJV</span>
+        </span>
+    </div>
     <div id="display"><div id="skeleton-screen">
         <div class="skeleton-line" style="height:28px; width:95%;"></div>
         <div class="skeleton-line" style="height:28px; width:88%;"></div>
@@ -539,6 +550,10 @@
         </div>
         <!-- Nav buttons -->
         <div style="display:flex; align-items:center; gap:16px;">
+            <div class="read-nav-btn-wrap">
+                <button id="bookmark-btn-read" onclick="toggleBookmark()" aria-label="Bookmark this verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:28px; width:62px; height:62px; cursor:pointer; transition:all 0.15s;">⭐</button>
+                <span class="read-nav-label">Bookmark</span>
+            </div>
             <div class="read-nav-btn-wrap">
                 <button id="read-share-btn" onclick="shareVerse()" aria-label="Copy verse to share" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:28px; width:62px; height:62px; cursor:pointer; transition:all 0.15s;">📋</button>
                 <span class="read-nav-label">Copy</span>
@@ -682,6 +697,50 @@
             } catch(e) { console.warn('Could not refresh bookmark cache:', e); }
         }
 
+        // ===== SAVE PLACE =====
+        function updatePlaceBtns() {
+            const saved = getSavedPlace();
+            const bookName = bookSel.value.replace(' ✅', '');
+            const chapNum = parseInt(chapSel.value);
+            const verseNum = currentIndex + 1;
+            const isHere = saved && saved.book === bookName && saved.ch === chapNum && saved.v === verseNum;
+            const btn = document.getElementById('place-btn');
+            if (btn) {
+                btn.classList.toggle('placed', isHere);
+                btn.title = isHere ? 'Clear saved place' : saved ? 'Go to saved place — ' + saved.book + ' ' + saved.ch + ':' + saved.v : 'Save your place here';
+            }
+        }
+
+        function getSavedPlace() {
+            try { return JSON.parse(localStorage.getItem('tsMyPlace')); } catch(e) { return null; }
+        }
+
+        function toggleSavePlace() {
+            const bookName = bookSel.value.replace(' ✅', '');
+            const chapNum = parseInt(chapSel.value);
+            const verseNum = currentIndex + 1;
+            const saved = getSavedPlace();
+            const isHere = saved && saved.book === bookName && saved.ch === chapNum && saved.v === verseNum;
+
+            if (isHere) {
+                // Already here — go back to where we were, or clear
+                localStorage.removeItem('tsMyPlace');
+                updatePlaceBtns();
+            } else if (saved) {
+                // Go to saved place
+                bookSel.value = saved.book;
+                updateChapters();
+                chapSel.value = saved.ch;
+                updateVerses();
+                verseSel.value = saved.v - 1;
+                fetchVerses();
+            } else {
+                // Save current place
+                localStorage.setItem('tsMyPlace', JSON.stringify({ book: bookName, ch: chapNum, v: verseNum }));
+                updatePlaceBtns();
+            }
+        }
+
         async function loadBookmarkState() {
             if (!currentUserId || !supabaseClient) {
                 document.getElementById('bookmark-btn').classList.remove('bookmarked');
@@ -720,6 +779,8 @@
             btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
             const btnRead = document.getElementById('bookmark-btn-read');
             if (btnRead) { btnRead.classList.toggle('bookmarked', currentBookmark); btnRead.title = btn.title; }
+            const btnReadTop = document.getElementById('bookmark-btn-read-top');
+            if (btnReadTop) { btnReadTop.classList.toggle('bookmarked', currentBookmark); btnReadTop.title = btn.title; }
             syncReadBookmark();
         }
 
@@ -742,6 +803,8 @@
             btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
             const btnRead = document.getElementById('bookmark-btn-read');
             if (btnRead) { btnRead.classList.toggle('bookmarked', currentBookmark); btnRead.title = btn.title; }
+            const btnReadTop = document.getElementById('bookmark-btn-read-top');
+            if (btnReadTop) { btnReadTop.classList.toggle('bookmarked', currentBookmark); btnReadTop.title = btn.title; }
             syncReadBookmark();
 
             // Try to sync to Supabase
@@ -1188,9 +1251,7 @@
 
         function initVotd() {
             if (typeof KJV_EMBEDDED === 'undefined') return;
-            const today = new Date();
-            const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
-            votdVerse = VOTD_VERSES[dayOfYear % VOTD_VERSES.length];
+            votdVerse = VOTD_VERSES[Math.floor(Math.random() * VOTD_VERSES.length)];
             try {
                 const bookIdx = books.indexOf(votdVerse.book);
                 if (bookIdx === -1) return;
@@ -1317,7 +1378,7 @@
             // Update button label
             const btn = document.getElementById('read-mode-btn');
             btn.textContent = isRead ? '📖 Read' : '⌨️ Type';
-            document.querySelector('#read-mode-btn + .nav-btn-label').textContent = 'Mode';
+            document.querySelector('#read-mode-btn + .nav-btn-label').textContent = 'Current Mode';
 
             // Swap progress bars
             document.getElementById('bible-progress-container').style.display = isRead ? 'none' : '';
@@ -1771,6 +1832,10 @@
             document.getElementById('verse-best-display').innerText = bestWpm;
             document.getElementById('progress').innerText = `${currentIndex + 1}/${currentVerses.length}`;
 
+            // Update reference label
+            const refEl = document.getElementById('verse-ref-text');
+            if (refEl) refEl.textContent = bookName + ' ' + chapNum + ':' + verseNum;
+
             warningEl.innerText = "";
             renderDisplay("");
             inputEl.value = "";
@@ -1779,6 +1844,7 @@
             document.getElementById('accuracy').innerText = '100';
                         if (readModeActive) onVerseLoaded();
             loadBookmarkState();
+            updatePlaceBtns();
         }
 
         // ===== SYNTAX HIGHLIGHTING =====
@@ -2288,6 +2354,8 @@
             }, 3000);
         }
 
+        inputEl.addEventListener('focus', () => document.body.classList.add('typing-focused'));
+        inputEl.addEventListener('blur', () => document.body.classList.remove('typing-focused'));
         inputEl.addEventListener('input', () => {
             if (!verseStartTime) verseStartTime = new Date();
             const typed = inputEl.value;
@@ -2470,11 +2538,13 @@
             }
         });
 
-        // Arrow keys: left = reset, right = next verse (only when not typing in a select)
+        // Arrow keys: navigate verses, Escape = restart current verse
         window.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'SELECT') return;
-            if (e.key === 'ArrowLeft') { e.preventDefault(); loadVerse(); }
+            if (e.ctrlKey || e.metaKey) return; // let Ctrl shortcuts handle these
+            if (e.key === 'ArrowLeft') { e.preventDefault(); goToPrevVerse(); }
             if (e.key === 'ArrowRight') { e.preventDefault(); goToNextVerse(); }
+            if (e.key === 'Escape') { e.preventDefault(); verseStreak = 0; loadVerse(); }
         });
 
         // Check for URL params (e.g. from bookmarks page)
