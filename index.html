@@ -107,7 +107,7 @@
         body.focus-mode #read-progress-container,
         body.focus-mode #read-progress-text,
         body.focus-mode #last-verse-box,
-        body.focus-mode #blb-hint,
+        body.focus-mode #streak-banner,
         body.focus-mode #accuracy-warning { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
         body.focus-mode #display { border-color: transparent; box-shadow: none; background: var(--bg-dark); transition: all 0.4s ease; }
         body.focus-mode #nav-header { opacity: 0.15; transition: opacity 0.3s ease; }
@@ -520,7 +520,7 @@
     </div>
     <div id="last-verse-box"></div>
     <div id="read-ref-box" style="display:none;"></div>
-    <div id="blb-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Hold verse to open in Blue Letter Bible</div>
+
     <div id="accuracy-warning"></div>
     <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
         <span id="verse-ref-text" style="color:var(--accent);"></span>
@@ -1410,7 +1410,7 @@
             // Read nav bar at bottom
             const readNav = document.getElementById('read-nav');
             readNav.style.display = isRead ? 'flex' : 'none';
-            document.getElementById('blb-hint').style.display = isRead ? 'block' : 'none';
+
             // Add bottom padding so display isn't hidden behind nav bar
             document.getElementById('display').style.marginBottom = isRead ? '140px' : '';
             document.body.style.paddingBottom = isRead ? '140px' : '';
