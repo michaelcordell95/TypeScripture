@@ -522,12 +522,10 @@
     <div id="read-ref-box" style="display:none;"></div>
     <div id="blb-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Hold verse to open in Blue Letter Bible</div>
     <div id="accuracy-warning"></div>
-    <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
+    <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
         <span id="verse-ref-text" style="color:var(--accent);"></span>
-        <span style="display:flex;align-items:center;gap:8px;">
-            <button id="place-btn" onclick="toggleSavePlace()" title="Save your place" aria-label="Save your place" style="background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">📍</button>
-            <span style="color:var(--text-muted);font-size:11px;">KJV</span>
-        </span>
+        <span style="color:var(--text-muted);font-size:11px;">KJV</span>
+        <button id="place-btn" onclick="toggleSavePlace()" title="Save your place" aria-label="Save your place" style="background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">📍</button>
     </div>
     <div id="display"><div id="skeleton-screen">
         <div class="skeleton-line" style="height:28px; width:95%;"></div>
