@@ -1684,7 +1684,9 @@
                 const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
                 const chapterObj = bookEntry.chapters.find(c => c.chapter === chapNum);
                 currentVerses = chapterObj.verses.map(v => {
-                    let clean = v.text.replace(/<[^>]*>/g, '').trim().replace(/[""]/g, '"').replace(/['']/g, "'");
+                    let clean = v.text.replace(/<[^>]*>/g, '').trim()
+                        .replace(/[“”]/g, '"')
+                        .replace(/[‘’ʼ]/g, "'");
                     return isEasy ? clean.toLowerCase().replace(/[^a-z0-9\s]/gi, '') : clean;
                 });
                 currentIndex = parseInt(verseSel.value) || 0;
