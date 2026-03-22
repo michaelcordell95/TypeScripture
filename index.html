@@ -148,10 +148,9 @@
             color: var(--text-muted);
         }
         #read-ref-box .ref-sub { font-size: 13px; color: var(--accent); font-weight: 600; letter-spacing: 0.3px; }
-        .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; }
-        .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); display: block; }
-        .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        .stat-icon { font-size: 12px; display: block; margin-bottom: 1px; line-height: 1; }
+        .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
+        .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); display: block; white-space: nowrap; line-height: 1.2; }
+        .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
         #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(24px, 3.5vh, 42px); line-height: 1.5; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
         .current-char { border-left: 3px solid var(--accent); background: rgba(88, 166, 255, 0.1); }
@@ -321,7 +320,8 @@
                 margin-bottom: 6px;
             }
             #type-stats, #read-stats { width: 100%; }
-            .stat-box { min-width: 0; flex: 1; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+            .stat-box { min-width: 0; flex: 1; padding: 6px 4px; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
+            .stat-value { font-size: 16px; white-space: nowrap; }
             .stat-value { font-size: 16px; }
             .stat-label { font-size: 9px; }
 
@@ -500,12 +500,12 @@
                 <span class="stat-label">WPM</span>
             </div>
             <div class="stat-box" style="min-width:0;flex:1;">
-                <span class="stat-value" id="verse-best-display" style="display:flex;align-items:center;justify-content:center;gap:3px;"><span style="font-size:12px;">👤</span><span id="verse-best-val">0</span></span>
+                <span class="stat-value" id="verse-best-display"><span style="font-size:11px;">👤</span> <span id="verse-best-val">0</span></span>
                 <span class="stat-label">My Best</span>
             </div>
             <div class="stat-box" style="min-width:0;flex:1;">
-                <span class="stat-value" id="global-best-display" style="display:flex;align-items:center;justify-content:center;gap:3px;"><span style="font-size:12px;">🏆</span><span id="global-best-val">—</span></span>
-                <span class="stat-label">World Record</span>
+                <span class="stat-value" id="global-best-display"><span style="font-size:11px;">🏆</span> <span id="global-best-val">—</span></span>
+                <span class="stat-label" style="white-space:nowrap;font-size:8px;">World Record</span>
             </div>
             <div class="stat-box" style="min-width:0;flex:1;">
                 <span class="stat-value"><span id="accuracy">100</span>%</span>
