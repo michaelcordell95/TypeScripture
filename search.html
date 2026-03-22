@@ -345,7 +345,7 @@
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' } });
 
     const GEMINI_KEY = "AIzaSyD5El6A3Xtsme9YUlMZmC7ixxdqz_kFmHA";
-    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_KEY;
+    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_KEY;
 
     const PAGE_SIZE = 20;
     let allResults = [];
@@ -503,8 +503,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    system_instruction: { parts: [{ text: `You are a KJV Bible reference expert. The user will describe a Bible story, theme, emotion, or idea. Return ONLY a JSON array (no markdown, no explanation) of up to 5 matching verses in this exact format: [{"ref":"Book Chapter:Verse","reason":"One sentence why this verse matches"}]. Use exact KJV book names (e.g. "Genesis", "1 Corinthians"). Format refs as "Book Chapter:Verse" — single verse only, no ranges. Order by relevance. If nothing matches, return [].` }] },
-                    contents: [{ parts: [{ text: query }] }],
+                    contents: [{ parts: [{ text: `You are a KJV Bible reference expert. The user will describe a Bible story, theme, emotion, or idea. Return ONLY a JSON array (no markdown, no explanation) of up to 5 matching verses in this exact format: [{"ref":"Book Chapter:Verse","reason":"One sentence why this verse matches"}]. Use exact KJV book names (e.g. "Genesis", "1 Corinthians"). Format refs as "Book Chapter:Verse" — single verse only, no ranges. Order by relevance. If nothing matches, return [].\n\nUser query: ${query}` }] }],
                     generationConfig: { temperature: 0.2, maxOutputTokens: 512 }
                 })
             });
