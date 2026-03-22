@@ -345,7 +345,7 @@
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' } });
 
     const GEMINI_KEY = "AIzaSyAnVSV4o7H4Cl3cB8WoPfIY4P5TqsKzxu0";
-    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + GEMINI_KEY;
+    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
     const PAGE_SIZE = 20;
     let allResults = [];
@@ -501,7 +501,7 @@
         try {
             const resp = await fetch(GEMINI_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: `You are a helpful KJV Bible search assistant. The user may type anything — a story, a feeling, a topic, a name, or just a few words. Always return relevant verses. Be generous and broad — never return an empty array unless the input is total gibberish. Return ONLY a JSON array (no markdown, no preamble) of 3 to 7 verses like this: [{"ref":"Book Chapter:Verse","reason":"One short sentence why this verse is relevant"}]. Use exact KJV book names (e.g. "Genesis", "Psalms", "1 Corinthians", "Song of Solomon"). Each ref must be Book Chapter:Verse — single verse only, no ranges. Order by relevance, best match first.\n\nUser query: ${query}` }] }],
                     generationConfig: { temperature: 0.7, maxOutputTokens: 768 }
