@@ -151,6 +151,7 @@
         .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; }
         .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); display: block; }
         .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-icon { font-size: 12px; display: block; margin-bottom: 1px; line-height: 1; }
         #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(24px, 3.5vh, 42px); line-height: 1.5; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
         .current-char { border-left: 3px solid var(--accent); background: rgba(88, 166, 255, 0.1); }
@@ -493,22 +494,32 @@
     </div>
     <div id="stats-bar">
         <!-- Type mode stats -->
-        <div id="type-stats" style="display:flex; gap:12px;">
-            <div class="stat-box"><span class="stat-value" id="wpm">0</span><span class="stat-label">WPM</span></div>
-            <div class="stat-box" style="flex:2;">
-                <div style="display:flex;align-items:center;width:100%;">
-                    <div style="text-align:center;flex:1;">
-                        <span class="stat-value" id="verse-best-display">0</span>
-                        <span class="stat-label">Best</span>
-                    </div>
-                    <div style="text-align:center;flex:1;">
-                        <span class="stat-value" id="global-best-display">—</span>
-                        <span class="stat-label">Record</span>
-                    </div>
-                </div>
+        <div id="type-stats" style="display:flex; gap:8px; align-items:stretch;">
+            <div class="stat-box" style="min-width:0;flex:1;">
+                <span class="stat-value" id="wpm">0</span>
+                <span class="stat-label">WPM</span>
             </div>
-            <div class="stat-box"><span class="stat-value"><span id="accuracy">100</span>%</span><span class="stat-label">Acc</span></div>
-            <div class="stat-box"><span class="stat-value" id="progress">0/0</span><span class="stat-label">Verse</span></div>
+            <div class="stat-box" style="min-width:0;flex:1;">
+                <span class="stat-icon">👤</span>
+                <span class="stat-value" id="verse-best-display">0</span>
+                <span class="stat-label">My Best</span>
+            </div>
+            <div class="stat-box" style="min-width:0;flex:1;">
+                <span class="stat-icon">🏆</span>
+                <span class="stat-value" id="global-best-display">—</span>
+                <span class="stat-label">World Record</span>
+            </div>
+            <div class="stat-box stat-box-acc" style="min-width:0;flex:1;position:relative;padding:6px 4px;">
+                <canvas id="acc-gauge" width="56" height="56" style="display:block;margin:0 auto;"></canvas>
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);text-align:center;pointer-events:none;">
+                    <span class="stat-value" style="font-size:13px;line-height:1;" id="accuracy">100</span><span class="stat-value" style="font-size:10px;">%</span>
+                </div>
+                <span class="stat-label" style="display:block;text-align:center;margin-top:2px;">ACC</span>
+            </div>
+            <div class="stat-box" style="min-width:0;flex:1;">
+                <span class="stat-value" id="progress">0/0</span>
+                <span class="stat-label">Verse</span>
+            </div>
         </div>
         <!-- Read mode stats -->
         <div id="read-stats" style="display:none; gap:12px;">
@@ -1101,6 +1112,38 @@
         const displayEl = document.getElementById('display');
         const inputEl = document.getElementById('hidden-input');
         const warningEl = document.getElementById('accuracy-warning');
+
+        function drawAccGauge(pct) {
+            const canvas = document.getElementById('acc-gauge');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            const cx = w / 2, cy = h / 2 + 4;
+            const r = w * 0.38;
+            const startAngle = Math.PI * 0.75;
+            const endAngle = Math.PI * 2.25;
+            const style = getComputedStyle(document.body);
+            const trackColor = style.getPropertyValue('--border').trim() || '#30363d';
+            const accentColor = style.getPropertyValue('--accent').trim() || '#58a6ff';
+            const fillColor = pct >= 100 ? '#2ea043' : pct >= 90 ? accentColor : '#e05a2b';
+
+            ctx.clearRect(0, 0, w, h);
+            // Track
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, startAngle, endAngle);
+            ctx.strokeStyle = trackColor;
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            // Fill
+            const fillEnd = startAngle + (endAngle - startAngle) * (pct / 100);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, startAngle, fillEnd);
+            ctx.strokeStyle = fillColor;
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
 
         function updateBibleProgress() {
             const progress = (completedSet.size / TOTAL_VERSES_BIBLE) * 100;
@@ -1851,6 +1894,7 @@
             verseStartTime = null;
             displayEl.scrollTop = 0;
             document.getElementById('accuracy').innerText = '100';
+            drawAccGauge(100);
                         if (readModeActive) onVerseLoaded();
             loadBookmarkState();
             updatePlaceBtns();
@@ -2377,6 +2421,7 @@
             const correctChars = typed.split('').filter((ch, i) => ch === activeVerseText[i]).length;
             const accuracy = typed.length > 0 ? Math.round((correctChars / typed.length) * 100) : 100;
             document.getElementById('accuracy').innerText = accuracy;
+            drawAccGauge(accuracy);
 
             if (typed.length >= activeVerseText.length && activeVerseText.length > 0) {
                 warningEl.innerText = "";
@@ -2605,6 +2650,7 @@
 
         fetchVerses();
         initStreak();
+        drawAccGauge(100);
 
         // Auth init — runs after all variables and functions are declared
         checkAuth();
