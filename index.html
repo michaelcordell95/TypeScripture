@@ -495,7 +495,7 @@
         <!-- Type mode stats -->
         <div id="type-stats" style="display:flex; gap:12px;">
             <div class="stat-box"><span class="stat-value" id="wpm">0</span><span class="stat-label">WPM</span></div>
-            <div class="stat-box"><span class="stat-value" id="verse-best-display">0</span><span class="stat-label">Best</span></div>
+            <div class="stat-box"><span class="stat-value" id="verse-best-display">0</span><span class="stat-label">Best</span><span class="stat-label" id="global-best-display" style="color:var(--text-muted);font-size:8px;margin-top:1px;"></span></div>
             <div class="stat-box"><span class="stat-value"><span id="accuracy">100</span>%</span><span class="stat-label">Acc</span></div>
             <div class="stat-box"><span class="stat-value" id="progress">0/0</span><span class="stat-label">Verse</span></div>
         </div>
@@ -1811,6 +1811,23 @@
                 if (dbWpm > 0) bestWpm = dbWpm;
             }
             document.getElementById('verse-best-display').innerText = bestWpm;
+
+            // Fetch global best for this verse
+            const globalEl = document.getElementById('global-best-display');
+            if (globalEl && !speedReadActive) {
+                globalEl.innerText = '';
+                supabaseClient.from('verse_progress')
+                    .select('best_wpm')
+                    .eq('book_name', bookName)
+                    .eq('chapter_num', chapNum)
+                    .eq('verse_num', verseNum)
+                    .order('best_wpm', { ascending: false })
+                    .limit(1)
+                    .then(({ data }) => {
+                        const top = data && data[0] && data[0].best_wpm;
+                        globalEl.innerText = top > 0 ? '🌐 ' + top : '';
+                    });
+            }
             document.getElementById('progress').innerText = `${currentIndex + 1}/${currentVerses.length}`;
 
             // Update reference label
