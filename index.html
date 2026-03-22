@@ -543,11 +543,11 @@
             </div>
         </div>
         <!-- Read mode stats -->
-        <div id="read-stats" style="display:none; gap:12px;">
-            <div class="stat-box"><span class="stat-value" id="read-verse">—</span><span class="stat-label">Verse</span></div>
-            <div class="stat-box"><span class="stat-value" id="read-chapter">—</span><span class="stat-label">Chapter</span></div>
-            <div class="stat-box"><span class="stat-value" id="read-ch-time">—</span><span class="stat-label">Ch. Left</span></div>
-            <div class="stat-box"><span class="stat-value" id="read-bk-time">—</span><span class="stat-label">Bk. Left</span></div>
+        <div id="read-stats" style="display:none; gap:8px; width:100%;">
+            <div class="stat-box" style="min-width:0;flex:1;"><span class="stat-value" id="read-verse">—</span><span class="stat-label">Verse</span></div>
+            <div class="stat-box" style="min-width:0;flex:1;"><span class="stat-value" id="read-chapter">—</span><span class="stat-label">Chapter</span></div>
+            <div class="stat-box" style="min-width:0;flex:1;"><span class="stat-value" id="read-ch-time">—</span><span class="stat-label">Ch. Left</span></div>
+            <div class="stat-box" style="min-width:0;flex:1;"><span class="stat-value" id="read-bk-time">—</span><span class="stat-label">Bk. Left</span></div>
         </div>
     </div>
     <div id="last-verse-box"></div>
@@ -1858,7 +1858,7 @@
 
             // Fetch global best for this verse
             const globalEl = document.getElementById('global-best-val');
-            if (globalEl && !speedReadActive) {
+            if (globalEl && !speedReadActive && supabaseClient) {
                 globalEl.innerText = '—';
                 supabaseClient.from('verse_progress')
                     .select('best_wpm')
@@ -2434,7 +2434,7 @@
                         localStorage.setItem(vKey, newBestWpm);
                         document.getElementById("verse-best-val").innerText = newBestWpm;
                     }
-                    if (wpm > currentWorldRecord && currentWorldRecord > 0) {
+                    if (wpm >= currentWorldRecord && isNewBest) {
                         isWorldRecord = true;
                         document.getElementById('global-best-val').innerText = wpm;
                     }
