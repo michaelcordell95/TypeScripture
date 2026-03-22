@@ -345,7 +345,7 @@
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' } });
 
     const GEMINI_KEY = "AIzaSyAnVSV4o7H4Cl3cB8WoPfIY4P5TqsKzxu0";
-    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     const PAGE_SIZE = 20;
     let allResults = [];
