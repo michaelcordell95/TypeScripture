@@ -513,10 +513,13 @@
             const data = await resp.json();
             const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '[]';
             const clean = raw.replace(/```json|```/gi, '').trim();
+            console.log("RAW Gemini response:", raw);
 
+            console.log("CLEAN:", clean);
             let results = [];
             try { results = JSON.parse(clean); } catch(e) { results = []; }
             if (!Array.isArray(results)) results = [];
+            console.log("PARSED results:", results);
 
             if (!results.length) {
                 document.getElementById('results-container').innerHTML =
