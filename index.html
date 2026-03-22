@@ -500,21 +500,19 @@
                 <span class="stat-label">WPM</span>
             </div>
             <div class="stat-box" style="min-width:0;flex:1;">
-                <span class="stat-icon">👤</span>
-                <span class="stat-value" id="verse-best-display">0</span>
+                <span class="stat-value" id="verse-best-display" style="display:flex;align-items:center;justify-content:center;gap:3px;"><span style="font-size:12px;">👤</span><span id="verse-best-val">0</span></span>
                 <span class="stat-label">My Best</span>
             </div>
             <div class="stat-box" style="min-width:0;flex:1;">
-                <span class="stat-icon">🏆</span>
-                <span class="stat-value" id="global-best-display">—</span>
+                <span class="stat-value" id="global-best-display" style="display:flex;align-items:center;justify-content:center;gap:3px;"><span style="font-size:12px;">🏆</span><span id="global-best-val">—</span></span>
                 <span class="stat-label">World Record</span>
             </div>
-            <div class="stat-box stat-box-acc" style="min-width:0;flex:1;position:relative;padding:6px 4px;">
-                <canvas id="acc-gauge" width="56" height="56" style="display:block;margin:0 auto;"></canvas>
-                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);text-align:center;pointer-events:none;">
-                    <span class="stat-value" style="font-size:13px;line-height:1;" id="accuracy">100</span><span class="stat-value" style="font-size:10px;">%</span>
+            <div class="stat-box" style="min-width:0;flex:1;position:relative;padding:4px;">
+                <canvas id="acc-gauge" width="52" height="52" style="display:block;margin:0 auto;"></canvas>
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-58%);text-align:center;pointer-events:none;line-height:1;">
+                    <span class="stat-value" style="font-size:12px;" id="accuracy">100</span><span class="stat-value" style="font-size:9px;">%</span>
                 </div>
-                <span class="stat-label" style="display:block;text-align:center;margin-top:2px;">ACC</span>
+                <span class="stat-label" style="display:block;text-align:center;">ACC</span>
             </div>
             <div class="stat-box" style="min-width:0;flex:1;">
                 <span class="stat-value" id="progress">0/0</span>
@@ -1864,10 +1862,10 @@
                 const dbWpm = await getBestWpmFromDatabase(bookName, chapNum, verseNum);
                 if (dbWpm > 0) bestWpm = dbWpm;
             }
-            document.getElementById('verse-best-display').innerText = bestWpm;
+            document.getElementById('verse-best-val').innerText = bestWpm;
 
             // Fetch global best for this verse
-            const globalEl = document.getElementById('global-best-display');
+            const globalEl = document.getElementById('global-best-val');
             if (globalEl && !speedReadActive) {
                 globalEl.innerText = '—';
                 supabaseClient.from('verse_progress')
@@ -2432,7 +2430,7 @@
                 const chapNum = parseInt(chapSel.value);
                 const verseNum = currentIndex + 1;
                 const vKey = `best_KJV_${bookName}_${chapNum}_${verseNum}`;
-                const currentBestWpm = parseInt(document.getElementById('verse-best-display').innerText) || 0;
+                const currentBestWpm = parseInt(document.getElementById('verse-best-val').innerText) || 0;
 
                 // Only save highscore if accuracy is 100%
                 let isNewBest = false;
@@ -2442,7 +2440,7 @@
                         isNewBest = true;
                         saveVerseToDatabase(bookName, chapNum, verseNum, newBestWpm);
                         localStorage.setItem(vKey, newBestWpm);
-                        document.getElementById("verse-best-display").innerText = newBestWpm;
+                        document.getElementById("verse-best-val").innerText = newBestWpm;
                     }
                 }
                 showLastVerse(wpm, accuracy, isNewBest);
