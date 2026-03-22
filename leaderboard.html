@@ -490,7 +490,8 @@
                 var result = await supabaseClient
                     .from('verse_progress')
                     .select('user_id, best_wpm')
-                    .eq('completed', true);
+                    .eq('completed', true)
+                    .limit(100000);
 
                 if (result.error) throw result.error;
 
