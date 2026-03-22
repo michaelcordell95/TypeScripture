@@ -134,7 +134,7 @@
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
         select, button { background: var(--border-inner); border: 1px solid var(--border); color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; }
         select { min-width: 80px; min-height: 38px; }
-        #stats-bar { display: flex; gap: 12px; margin-top: 8px; margin-bottom: 1.5vh; justify-content: center; }
+        #stats-bar { display: flex; gap: 12px; margin-top: 8px; margin-bottom: 1.5vh; justify-content: center; width: 92%; max-width: 1100px; box-sizing: border-box; }
         #read-ref-box {
             background: transparent;
             border: 1.5px solid rgba(88,166,255,0.3);
@@ -151,7 +151,7 @@
         .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; height: 56px; flex: 1 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
         .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); display: block; white-space: nowrap; line-height: 1.2; }
         .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-        #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(24px, 3.5vh, 42px); line-height: 1.5; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+        #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(24px, 3.5vh, 42px); font-family: 'Courier New', Courier, monospace; line-height: 1.5; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
         .current-char { border-left: 3px solid var(--accent); background: rgba(88, 166, 255, 0.1); }
         body.typing-focused .current-char { animation: blink 1s infinite; }
