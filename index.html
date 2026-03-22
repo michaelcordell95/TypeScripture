@@ -6,6 +6,9 @@
     <meta name="color-scheme" content="light">
     <script>if(localStorage.getItem('tsTheme')!=='dark'){document.documentElement.classList.add('light-mode');document.addEventListener('DOMContentLoaded',function(){document.body.classList.add('light-mode');});}</script>
     <link rel="manifest" href="/manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192-maskable.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512-maskable.png">
     <link rel="shortcut icon" href="/icon-192-maskable.png">
@@ -47,7 +50,7 @@
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
         }
         body.light-mode #display {
-            font-family: 'Georgia', 'Times New Roman', serif !important;
+            font-family: 'JetBrains Mono', 'Courier New', monospace !important;
             border-color: #c8a96e !important;
             box-shadow: 0 2px 16px rgba(139,107,40,0.13), inset 0 0 40px rgba(210,185,140,0.10) !important;
         }
@@ -151,7 +154,7 @@
         .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; height: 56px; flex: 1 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
         .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); display: block; white-space: nowrap; line-height: 1.2; }
         .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-        #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(24px, 3.5vh, 42px); font-family: 'Courier New', Courier, monospace; line-height: 1.5; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+        #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(20px, 3vh, 36px); font-family: 'JetBrains Mono', 'Courier New', monospace; line-height: 1.6; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
         .current-char { border-left: 3px solid var(--accent); background: rgba(88, 166, 255, 0.1); }
         body.typing-focused .current-char { animation: blink 1s infinite; }
@@ -494,7 +497,7 @@
     </div>
     <div id="stats-bar">
         <!-- Type mode stats -->
-        <div id="type-stats" style="display:flex; gap:8px; align-items:stretch;">
+        <div id="type-stats" style="display:flex; gap:8px; align-items:stretch; width:100%">
             <div class="stat-box" style="min-width:0;flex:1;">
                 <span class="stat-value" id="wpm">0</span>
                 <span class="stat-label">WPM</span>
