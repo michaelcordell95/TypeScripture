@@ -320,7 +320,7 @@
                 margin-bottom: 6px;
             }
             #type-stats, #read-stats { width: 100%; }
-            .stat-box { min-width: 0; flex: 1; padding: 6px 4px; max-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+            .stat-box { min-width: 0; flex: 1; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
             .stat-value { font-size: 16px; }
             .stat-label { font-size: 9px; }
 
@@ -495,7 +495,19 @@
         <!-- Type mode stats -->
         <div id="type-stats" style="display:flex; gap:12px;">
             <div class="stat-box"><span class="stat-value" id="wpm">0</span><span class="stat-label">WPM</span></div>
-            <div class="stat-box"><span class="stat-value" id="verse-best-display">0</span><span class="stat-label">Best</span><span class="stat-label" id="global-best-display" style="color:var(--text-muted);font-size:8px;margin-top:1px;"></span></div>
+            <div class="stat-box" style="flex:2;">
+                <div style="display:flex;align-items:center;gap:6px;width:100%;justify-content:center;">
+                    <div style="text-align:center;flex:1;">
+                        <span class="stat-value" id="verse-best-display">0</span>
+                        <span class="stat-label">Best</span>
+                    </div>
+                    <div style="width:1px;height:28px;background:var(--border);flex-shrink:0;"></div>
+                    <div style="text-align:center;flex:1;">
+                        <span class="stat-value" id="global-best-display" style="font-size:18px;">—</span>
+                        <span class="stat-label">Record</span>
+                    </div>
+                </div>
+            </div>
             <div class="stat-box"><span class="stat-value"><span id="accuracy">100</span>%</span><span class="stat-label">Acc</span></div>
             <div class="stat-box"><span class="stat-value" id="progress">0/0</span><span class="stat-label">Verse</span></div>
         </div>
@@ -1815,7 +1827,7 @@
             // Fetch global best for this verse
             const globalEl = document.getElementById('global-best-display');
             if (globalEl && !speedReadActive) {
-                globalEl.innerText = '';
+                globalEl.innerText = '—';
                 supabaseClient.from('verse_progress')
                     .select('best_wpm')
                     .eq('book_name', bookName)
@@ -1825,7 +1837,7 @@
                     .limit(1)
                     .then(({ data }) => {
                         const top = data && data[0] && data[0].best_wpm;
-                        globalEl.innerText = top > 0 ? '🌐 ' + top : '';
+                        globalEl.innerText = top > 0 ? top : '—';
                     });
             }
             document.getElementById('progress').innerText = `${currentIndex + 1}/${currentVerses.length}`;
