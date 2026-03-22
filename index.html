@@ -4,11 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="light">
-    <script>if(localStorage.getItem('tsTheme')!=='dark'){document.documentElement.classList.add('light-mode');document.addEventListener('DOMContentLoaded',function(){document.body.classList.add('light-mode');});}</script>
+    <script>
+        (function() {
+            var saved = localStorage.getItem('tsTheme');
+            if (saved === 'light') {
+                document.documentElement.classList.add('light-mode');
+            } else if (saved === 'dark') {
+                // explicit dark, do nothing
+            } else {
+                // No preference saved — default light on mobile, dark on desktop
+                var isMobile = window.innerWidth <= 600 || /iPhone|iPad|Android/i.test(navigator.userAgent);
+                if (isMobile) document.documentElement.classList.add('light-mode');
+            }
+            document.addEventListener('DOMContentLoaded', function() {
+                var saved = localStorage.getItem('tsTheme');
+                var isMobile = window.innerWidth <= 600 || /iPhone|iPad|Android/i.test(navigator.userAgent);
+                var isLight = saved === 'light' || (!saved && isMobile);
+                if (isLight) document.body.classList.add('light-mode');
+                var btn = document.getElementById('theme-toggle-btn');
+                if (btn) btn.textContent = isLight ? '☀️ Theme' : '🌙 Theme';
+                var m = document.querySelector('meta[name="color-scheme"]');
+                if (m) m.content = isLight ? 'light' : 'dark';
+            });
+        })();
+    </script>
     <link rel="manifest" href="/manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Droid+Sans+Mono&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192-maskable.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512-maskable.png">
     <link rel="shortcut icon" href="/icon-192-maskable.png">
@@ -50,7 +73,7 @@
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
         }
         body.light-mode #display {
-            font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+            font-family: 'Droid Sans Mono', 'Courier New', monospace !important;
             border-color: #c8a96e !important;
             box-shadow: 0 2px 16px rgba(139,107,40,0.13), inset 0 0 40px rgba(210,185,140,0.10) !important;
         }
@@ -154,7 +177,7 @@
         .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; height: 56px; flex: 1 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
         .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); display: block; white-space: nowrap; line-height: 1.2; }
         .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-        #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(20px, 3vh, 36px); font-family: 'JetBrains Mono', 'Courier New', monospace; line-height: 1.6; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+        #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(20px, 3vh, 36px); font-family: 'Droid Sans Mono', 'Courier New', monospace; line-height: 1.6; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
         .current-char { border-left: 3px solid var(--accent); background: rgba(88, 166, 255, 0.1); }
         body.typing-focused .current-char { animation: blink 1s infinite; }
@@ -1797,10 +1820,11 @@
             // If at very end (Revelation 22:21), do nothing
         }
 
-        function showLastVerse(wpm, accuracy, isNewBest) {
+        function showLastVerse(wpm, accuracy, isNewBest, isWorldRecord) {
             const box = document.getElementById('last-verse-box');
             let html = 'Last verse: <span>' + wpm + ' WPM</span> · <span>' + accuracy + '% Acc</span>';
-            if (isNewBest) html += ' · <span class="new-best">New Best!</span>';
+            if (isWorldRecord) html += ' · <span style="color:#f0b429;font-weight:700;">🏆 World Record!</span>';
+            else if (isNewBest) html += ' · <span class="new-best">New Best!</span>';
             if (verseStreak > 1) html += ' · <span style="color:#f0b429;font-weight:700;">🔥 ' + verseStreak + ' streak</span>';
             if (!currentUserId) html += ' · <span style="color:var(--text-muted);font-size:0.85em;">Sign in to save to leaderboard</span>';
             box.innerHTML = html;
@@ -2397,9 +2421,11 @@
                 const verseNum = currentIndex + 1;
                 const vKey = `best_KJV_${bookName}_${chapNum}_${verseNum}`;
                 const currentBestWpm = parseInt(document.getElementById('verse-best-val').innerText) || 0;
+                const currentWorldRecord = parseInt(document.getElementById('global-best-val').innerText) || 0;
 
                 // Only save highscore if accuracy is 100%
                 let isNewBest = false;
+                let isWorldRecord = false;
                 if (accuracy === 100) {
                     const newBestWpm = Math.max(wpm, currentBestWpm);
                     if (newBestWpm > currentBestWpm) {
@@ -2408,8 +2434,12 @@
                         localStorage.setItem(vKey, newBestWpm);
                         document.getElementById("verse-best-val").innerText = newBestWpm;
                     }
+                    if (wpm > currentWorldRecord && currentWorldRecord > 0) {
+                        isWorldRecord = true;
+                        document.getElementById('global-best-val').innerText = wpm;
+                    }
                 }
-                showLastVerse(wpm, accuracy, isNewBest);
+                showLastVerse(wpm, accuracy, isNewBest, isWorldRecord);
 
                 // Only count verse as completed if accuracy >= 50%
                 if (accuracy >= 50) {
