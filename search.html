@@ -197,6 +197,74 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* AI MODE TOGGLE */
+        .search-mode-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .mode-tab {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .mode-tab.active-kw {
+            background: var(--accent-dim);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .mode-tab.active-ai {
+            background: rgba(147,51,234,0.12);
+            border-color: #9333ea;
+            color: #c084fc;
+        }
+        .ai-badge {
+            display: inline-block;
+            background: #9333ea;
+            color: white;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .ai-reason {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-style: italic;
+        }
+        .ai-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+            opacity: 0.8;
+        }
+        #search-input.ai-mode {
+            border-color: #9333ea;
+            box-shadow: 0 0 0 3px rgba(147,51,234,0.12);
+        }
+        #search-input.ai-mode:focus {
+            border-color: #9333ea;
+            box-shadow: 0 0 0 3px rgba(147,51,234,0.18);
+        }
+        #search-input.ai-mode::placeholder { color: rgba(147,51,234,0.45); }
+        .search-btn.ai-btn {
+            background: #9333ea;
+            color: white;
+        }
+        .search-btn.ai-btn:hover { opacity: 0.85; }
+
         /* LOAD MORE */
         .load-more-wrap { max-width: 800px; margin: 16px auto 0; text-align: center; }
         .load-more-btn {
@@ -238,6 +306,10 @@
 
 <div class="search-wrap">
     <div class="search-label">Search Bible Verses</div>
+    <div class="search-mode-row">
+        <button class="mode-tab active-kw" id="tab-kw" onclick="setMode('keyword')">🔤 Keyword</button>
+        <button class="mode-tab" id="tab-ai" onclick="setMode('ai')">✨ AI Search</button>
+    </div>
     <div class="search-row">
         <input
             id="search-input"
@@ -249,8 +321,9 @@
             autocapitalize="none"
             spellcheck="false"
         />
-        <button class="search-btn" id="search-btn" onclick="runSearch()">Search</button>
+        <button class="search-btn" id="search-btn" onclick="handleSearch()">Search</button>
     </div>
+    <div class="ai-hint" id="ai-hint" style="display:none;">Describe a story, theme, or idea — AI will find the best matching verses</div>
 </div>
 
 <div class="results-meta" id="results-meta"></div>
@@ -271,12 +344,15 @@
     const { createClient } = supabase;
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' } });
 
+    const GEMINI_KEY = "AIzaSyD5El6A3Xtsme9YUlMZmC7ixxdqz_kFmHA";
+    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + GEMINI_KEY;
+
     const PAGE_SIZE = 20;
     let allResults = [];
     let shownCount = 0;
+    let currentMode = 'keyword'; // 'keyword' | 'ai'
 
     // Build flat verse index from KJV_EMBEDDED
-    // Format: [{book, chapter, verse, text}, ...]
     let verseIndex = null;
 
     function buildIndex() {
@@ -298,6 +374,52 @@
         });
     }
 
+    // ── MODE TOGGLE ──────────────────────────────────────────────
+    function setMode(mode) {
+        currentMode = mode;
+        var input = document.getElementById('search-input');
+        var btn = document.getElementById('search-btn');
+        var hint = document.getElementById('ai-hint');
+        var tabKw = document.getElementById('tab-kw');
+        var tabAi = document.getElementById('tab-ai');
+
+        if (mode === 'ai') {
+            tabKw.className = 'mode-tab';
+            tabAi.className = 'mode-tab active-ai';
+            input.className = 'search-input ai-mode';
+            input.placeholder = 'e.g. Jesus calms the storm, the prodigal son returns, do not be anxious...';
+            btn.className = 'search-btn ai-btn';
+            hint.style.display = 'block';
+        } else {
+            tabKw.className = 'mode-tab active-kw';
+            tabAi.className = 'mode-tab';
+            input.className = 'search-input';
+            input.placeholder = 'e.g. in the beginning, love one another, fear not...';
+            btn.className = 'search-btn';
+            hint.style.display = 'none';
+        }
+
+        // Clear results when switching modes
+        document.getElementById('results-meta').innerHTML = '';
+        document.getElementById('results-container').innerHTML =
+            '<div class="state-box"><div class="icon">&#128214;</div><div>' +
+            (mode === 'ai' ? 'Describe a story or theme — AI will find the best matching verses' : 'Search the entire KJV Bible by keyword or phrase') +
+            '</div>' +
+            (mode === 'keyword' ? '<p>Results show the verse reference and text with your search term highlighted</p>' : '') +
+            '</div>';
+        document.getElementById('load-more-wrap').style.display = 'none';
+        input.focus();
+    }
+
+    function handleSearch() {
+        if (currentMode === 'ai') {
+            runAiSearch();
+        } else {
+            runSearch();
+        }
+    }
+
+    // ── KEYWORD SEARCH ───────────────────────────────────────────
     function escapeRegex(str) {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
@@ -331,7 +453,6 @@
         document.getElementById('results-meta').innerHTML = '';
         document.getElementById('load-more-wrap').style.display = 'none';
 
-        // Run search (synchronous, instant on full bible)
         setTimeout(function() {
             var queryLower = query.toLowerCase();
             allResults = verseIndex.filter(function(v) {
@@ -354,6 +475,132 @@
             document.getElementById('results-container').innerHTML = '<div class="results-list" id="results-list"></div>';
             showMore();
         }, 10);
+    }
+
+    // ── AI SEARCH ────────────────────────────────────────────────
+    async function runAiSearch() {
+        var query = document.getElementById('search-input').value.trim();
+        if (!query || query.length < 4) {
+            document.getElementById('results-container').innerHTML =
+                '<div class="state-box"><div class="icon">&#9888;&#65039;</div><div>Please describe what you\'re looking for</div></div>';
+            return;
+        }
+
+        buildIndex();
+        if (!verseIndex || verseIndex.length === 0) {
+            document.getElementById('results-container').innerHTML =
+                '<div class="state-box"><div class="icon">&#128214;</div><div>Bible data not loaded yet. Make sure bible.js is included.</div></div>';
+            return;
+        }
+
+        document.getElementById('results-container').innerHTML =
+            '<div class="state-box"><div class="spinner" style="border-top-color:#9333ea;"></div><div>AI is searching for matching verses…</div></div>';
+        document.getElementById('results-meta').innerHTML = '';
+        document.getElementById('load-more-wrap').style.display = 'none';
+
+        try {
+            const resp = await fetch(GEMINI_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: `You are a KJV Bible reference expert. The user will describe a Bible story, theme, emotion, or idea. Return ONLY a JSON array (no markdown, no explanation) of up to 5 matching verses in this exact format: [{"ref":"Book Chapter:Verse","reason":"One sentence why this verse matches"}]. Use exact KJV book names (e.g. "Genesis", "1 Corinthians"). Format refs as "Book Chapter:Verse" — single verse only, no ranges. Order by relevance. If nothing matches, return [].` }] },
+                    contents: [{ parts: [{ text: query }] }],
+                    generationConfig: { temperature: 0.2, maxOutputTokens: 512 }
+                })
+            });
+
+            if (!resp.ok) throw new Error('Gemini API error ' + resp.status);
+
+            const data = await resp.json();
+            const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '[]';
+            const clean = raw.replace(/```json|```/gi, '').trim();
+
+            let results = [];
+            try { results = JSON.parse(clean); } catch(e) { results = []; }
+            if (!Array.isArray(results)) results = [];
+
+            if (!results.length) {
+                document.getElementById('results-container').innerHTML =
+                    '<div class="state-box"><div class="icon">&#128269;</div><div>AI couldn\'t find matching verses for that query</div><p>Try rephrasing or switch to keyword search</p></div>';
+                return;
+            }
+
+            // Resolve references against local verseIndex
+            var resolved = resolveAiResults(results);
+
+            if (!resolved.length) {
+                document.getElementById('results-container').innerHTML =
+                    '<div class="state-box"><div class="icon">&#128269;</div><div>AI found references but couldn\'t locate them in the KJV</div><p>Try keyword search instead</p></div>';
+                return;
+            }
+
+            document.getElementById('results-meta').innerHTML =
+                '<span class="ai-badge">AI</span> Found <strong>' + resolved.length + '</strong> verse' +
+                (resolved.length !== 1 ? 's' : '') + ' for "<strong>' + escapeHtml(query) + '</strong>"';
+
+            document.getElementById('results-container').innerHTML = '<div class="results-list" id="results-list"></div>';
+            var list = document.getElementById('results-list');
+
+            resolved.forEach(function(item) {
+                var v = item.verse;
+                var reason = item.reason;
+                var url = '/?book=' + encodeURIComponent(v.book) + '&chapter=' + v.chapter + '&verse=' + v.verse;
+
+                var card = document.createElement('div');
+                card.className = 'verse-card';
+                card.innerHTML =
+                    '<div class="verse-body">' +
+                        '<div class="verse-ref">' + v.book + ' ' + v.chapter + ':' + v.verse + '</div>' +
+                        '<div class="verse-text">' + escapeHtml(v.text) + '</div>' +
+                        (reason ? '<div class="ai-reason">✨ ' + escapeHtml(reason) + '</div>' : '') +
+                    '</div>' +
+                    '<button class="type-btn" onclick="window.location.href=\'' + url + '\'">&#9000; Type It</button>';
+                list.appendChild(card);
+            });
+
+        } catch (err) {
+            console.error('AI search error:', err);
+            document.getElementById('results-container').innerHTML =
+                '<div class="state-box"><div class="icon">&#9888;&#65039;</div>' +
+                '<div>AI Search failed</div>' +
+                '<p>' + escapeHtml(err.message || 'Unknown error') + '</p>' +
+                '</div>';
+        }
+    }
+
+    // Resolve AI-returned references against the local verse index
+    // Handles "Book Chapter:Verse" with fuzzy book name matching
+    function resolveAiResults(results) {
+        var resolved = [];
+        results.forEach(function(item) {
+            var ref = (item.ref || '').trim();
+            // Parse "Book Chapter:Verse" — book name may contain spaces
+            var match = ref.match(/^(.+?)\s+(\d+):(\d+)$/);
+            if (!match) return;
+            var bookRaw = match[1].toLowerCase();
+            var ch = parseInt(match[2], 10);
+            var vs = parseInt(match[3], 10);
+
+            var verse = verseIndex.find(function(v) {
+                return v.book.toLowerCase() === bookRaw &&
+                       v.chapter === ch &&
+                       v.verse === vs;
+            });
+
+            // Fallback: partial book name match (e.g. "Gen" → "Genesis")
+            if (!verse) {
+                verse = verseIndex.find(function(v) {
+                    return v.book.toLowerCase().startsWith(bookRaw.substring(0, 3)) &&
+                           v.chapter === ch &&
+                           v.verse === vs;
+                });
+            }
+
+            if (verse) {
+                resolved.push({ verse: verse, reason: item.reason || '' });
+            }
+        });
+        return resolved;
     }
 
     function showMore() {
@@ -397,7 +644,7 @@
 
     // Enter key to search
     document.getElementById('search-input').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') runSearch();
+        if (e.key === 'Enter') handleSearch();
     });
 </script>
 
