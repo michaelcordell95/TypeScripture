@@ -503,8 +503,8 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: `You are a KJV Bible reference expert. The user will describe a Bible story, theme, emotion, or idea. Return ONLY a JSON array (no markdown, no explanation) of up to 5 matching verses in this exact format: [{"ref":"Book Chapter:Verse","reason":"One sentence why this verse matches"}]. Use exact KJV book names (e.g. "Genesis", "1 Corinthians"). Format refs as "Book Chapter:Verse" — single verse only, no ranges. Order by relevance. If nothing matches, return [].\n\nUser query: ${query}` }] }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 512 }
+                    contents: [{ parts: [{ text: `You are a helpful KJV Bible search assistant. The user may type anything — a story, a feeling, a topic, a name, or just a few words. Always return relevant verses. Be generous and broad — never return an empty array unless the input is total gibberish. Return ONLY a JSON array (no markdown, no preamble) of 3 to 7 verses like this: [{"ref":"Book Chapter:Verse","reason":"One short sentence why this verse is relevant"}]. Use exact KJV book names (e.g. "Genesis", "Psalms", "1 Corinthians", "Song of Solomon"). Each ref must be Book Chapter:Verse — single verse only, no ranges. Order by relevance, best match first.\n\nUser query: ${query}` }] }],
+                    generationConfig: { temperature: 0.7, maxOutputTokens: 768 }
                 })
             });
 
