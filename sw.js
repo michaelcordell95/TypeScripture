@@ -1,7 +1,7 @@
 // TypeScripture Service Worker
 // Caches key files for offline use
 
-const CACHE_NAME = 'typescripture-v75';
+const CACHE_NAME = 'typescripture-v76';
 
 const PRECACHE_FILES = [
   '/',
