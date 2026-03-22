@@ -491,7 +491,7 @@
                     .from('verse_progress')
                     .select('user_id, best_wpm')
                     .eq('completed', true)
-                    .limit(100000);
+                    .range(0, 99999);
 
                 if (result.error) throw result.error;
 
