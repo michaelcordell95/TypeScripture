@@ -964,35 +964,56 @@
 
             try {
                 console.log('Loading progress for user:', currentUserId);
+                // Single query loads ALL progress (typed + read + best WPMs) from new table
                 const { data, error } = await supabaseClient
-                    .from('verse_progress')
-                    .select('*')
+                    .from('chapter_progress')
+                    .select('book_index, chapter_num, read_counts, type_counts, best_wpms')
                     .eq('user_id', currentUserId);
 
                 if (error) throw error;
 
-                if (data) {
-                    console.log('Loaded', data.length, 'completed verses from Supabase');
-                    // Always replace completedSet with exactly what's in the DB for this user
-                    completedSet = new Set();
-                    data.forEach(record => {
-                        const key = `KJV_${record.book_name}_${record.chapter_num}_${record.verse_num}`;
-                        completedSet.add(key);
+                completedSet = new Set();
+                readCompletedSet = new Set();
+
+                if (data && KJV_EMBEDDED) {
+                    console.log('Loaded', data.length, 'chapter rows from Supabase');
+                    data.forEach(row => {
+                        const bookName = BOOK_NAMES[row.book_index];
+                        if (!bookName) return;
+                        // type_counts: index 0 = verse 1, value > 0 means typed at least once
+                        if (row.type_counts) {
+                            row.type_counts.forEach((count, i) => {
+                                if (count > 0) {
+                                    completedSet.add(`KJV_${bookName}_${row.chapter_num}_${i + 1}`);
+                                }
+                            });
+                        }
+                        // read_counts: same pattern
+                        if (row.read_counts) {
+                            row.read_counts.forEach((count, i) => {
+                                if (count > 0) {
+                                    readCompletedSet.add(getReadKey(bookName, row.chapter_num, i + 1));
+                                }
+                            });
+                        }
                     });
-                    // Cache with the current user id so we can detect user switches
+                    // Cache for offline use
                     localStorage.setItem('typeScriptureProgressSet', JSON.stringify(Array.from(completedSet)));
                     localStorage.setItem('typeScriptureUserId', currentUserId);
+                    saveReadProgress();
                 }
 
                 updateBooks();
                 updateBibleProgress();
-                await loadReadProgressFromDB();
+                updateReadProgress();
             } catch (err) {
                 console.error('Error loading progress from Supabase:', err);
                 // Fall back to localStorage
                 completedSet = new Set(JSON.parse(localStorage.getItem('typeScriptureProgressSet')) || []);
+                loadReadProgressLocal();
                 updateBooks();
                 updateBibleProgress();
+                updateReadProgress();
             }
         }
 
@@ -1014,15 +1035,37 @@
             const remaining = [];
             for (const item of queue) {
                 try {
-                    const { error } = await supabaseClient.from('verse_progress').upsert({
+                    const bookIndex = BOOK_INDEX[item.book];
+                    if (!bookIndex) { console.warn('Unknown book in queue:', item.book); continue; }
+                    const verseIdx = item.verse - 1; // convert to 0-based array index
+
+                    // Fetch current row so we can do an incremental update
+                    const { data: existing } = await supabaseClient
+                        .from('chapter_progress')
+                        .select('type_counts, best_wpms')
+                        .eq('user_id', currentUserId)
+                        .eq('book_index', bookIndex)
+                        .eq('chapter_num', item.chap)
+                        .maybeSingle();
+
+                    const typeCounts = existing?.type_counts ? [...existing.type_counts] : [];
+                    const bestWpms = existing?.best_wpms ? [...existing.best_wpms] : [];
+
+                    // Ensure arrays are long enough
+                    while (typeCounts.length <= verseIdx) typeCounts.push(0);
+                    while (bestWpms.length <= verseIdx) bestWpms.push(0);
+
+                    typeCounts[verseIdx] = (typeCounts[verseIdx] || 0) + 1;
+                    if (item.wpm > (bestWpms[verseIdx] || 0)) bestWpms[verseIdx] = item.wpm;
+
+                    const { error } = await supabaseClient.from('chapter_progress').upsert({
                         user_id: currentUserId,
-                        book_name: item.book,
+                        book_index: bookIndex,
                         chapter_num: item.chap,
-                        verse_num: item.verse,
-                        best_wpm: item.wpm,
-                        completed: true,
-                        completed_at: item.completedAt
-                    }, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
+                        type_counts: typeCounts,
+                        best_wpms: bestWpms,
+                        last_activity: item.completedAt
+                    }, { onConflict: 'user_id,book_index,chapter_num' });
                     if (error) throw error;
                     console.log('✓ Synced progress:', item.book, item.chap + ':' + item.verse, 'WPM:', item.wpm);
                 } catch(e) {
@@ -1033,83 +1076,93 @@
             saveProgressQueue(remaining);
         }
 
-        // Save verse to Supabase database
+        // Save typed verse to chapter_progress
         async function saveVerseToDatabase(bookName, chapNum, verseNum, wpm) {
             if (!currentUserId) {
                 console.log('Not logged in - skipping Supabase save (using localStorage only)');
                 return;
             }
 
-            const payload = {
-                user_id: currentUserId,
-                book_name: bookName,
-                chapter_num: chapNum,
-                verse_num: verseNum,
-                best_wpm: wpm,
-                completed: true,
-                completed_at: new Date().toISOString()
-            };
+            const bookIndex = BOOK_INDEX[bookName];
+            if (!bookIndex) { console.warn('saveVerseToDatabase: unknown book', bookName); return; }
+            const verseIdx = verseNum - 1; // 0-based array index
+            const now = new Date().toISOString();
 
             if (!navigator.onLine) {
                 // Queue for later sync
                 const queue = getProgressQueue();
-                // Keep only the highest WPM for this verse in the queue
                 const idx = queue.findIndex(q => q.book === bookName && q.chap === chapNum && q.verse === verseNum);
-                const entry = { book: bookName, chap: chapNum, verse: verseNum, wpm, completedAt: payload.completed_at };
-                if (idx >= 0) {
-                    if (wpm > queue[idx].wpm) queue[idx] = entry;
-                } else {
-                    queue.push(entry);
-                }
+                const entry = { book: bookName, chap: chapNum, verse: verseNum, wpm, completedAt: now };
+                if (idx >= 0) { if (wpm > queue[idx].wpm) queue[idx] = entry; }
+                else queue.push(entry);
                 saveProgressQueue(queue);
                 console.log('📶 Offline — queued progress save for', bookName, chapNum + ':' + verseNum);
                 return;
             }
 
             try {
-                console.log('Saving to Supabase:', { bookName, chapNum, verseNum, wpm, userId: currentUserId });
-                const { error } = await supabaseClient
-                    .from('verse_progress')
-                    .upsert(payload, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
-                if (error) {
-                    console.error('❌ Supabase upsert error:', error);
-                    if (error.code === '42501') {
-                        console.error('→ RLS policy blocking write.');
-                    }
-                    throw error;
-                }
+                // Fetch current row to do incremental update
+                const { data: existing } = await supabaseClient
+                    .from('chapter_progress')
+                    .select('type_counts, best_wpms')
+                    .eq('user_id', currentUserId)
+                    .eq('book_index', bookIndex)
+                    .eq('chapter_num', chapNum)
+                    .maybeSingle();
+
+                const typeCounts = existing?.type_counts ? [...existing.type_counts] : [];
+                const bestWpms = existing?.best_wpms ? [...existing.best_wpms] : [];
+
+                while (typeCounts.length <= verseIdx) typeCounts.push(0);
+                while (bestWpms.length <= verseIdx) bestWpms.push(0);
+
+                typeCounts[verseIdx] = (typeCounts[verseIdx] || 0) + 1;
+                if (wpm > (bestWpms[verseIdx] || 0)) bestWpms[verseIdx] = wpm;
+
+                const { error } = await supabaseClient.from('chapter_progress').upsert({
+                    user_id: currentUserId,
+                    book_index: bookIndex,
+                    chapter_num: chapNum,
+                    type_counts: typeCounts,
+                    best_wpms: bestWpms,
+                    last_activity: now
+                }, { onConflict: 'user_id,book_index,chapter_num' });
+
+                if (error) throw error;
                 console.log('✓ Saved to Supabase:', bookName, chapNum + ':' + verseNum, '- WPM:', wpm);
             } catch (err) {
                 console.error('❌ Error saving verse to database, queuing:', err);
                 const queue = getProgressQueue();
                 const idx = queue.findIndex(q => q.book === bookName && q.chap === chapNum && q.verse === verseNum);
-                const entry = { book: bookName, chap: chapNum, verse: verseNum, wpm, completedAt: payload.completed_at };
+                const entry = { book: bookName, chap: chapNum, verse: verseNum, wpm, completedAt: now };
                 if (idx >= 0) { if (wpm > queue[idx].wpm) queue[idx] = entry; }
                 else queue.push(entry);
                 saveProgressQueue(queue);
             }
         }
 
-        // Get best WPM from database
+        // Get best WPM from chapter_progress array
         async function getBestWpmFromDatabase(bookName, chapNum, verseNum) {
             if (!currentUserId) return 0;
 
-            // Check pending queue first — may have a higher WPM not yet synced
             const queued = getProgressQueue().find(q => q.book === bookName && q.chap === chapNum && q.verse === verseNum);
-
             if (!navigator.onLine) return queued?.wpm || 0;
 
             try {
+                const bookIndex = BOOK_INDEX[bookName];
+                if (!bookIndex) return queued?.wpm || 0;
+
                 const { data, error } = await supabaseClient
-                    .from('verse_progress')
-                    .select('best_wpm')
+                    .from('chapter_progress')
+                    .select('best_wpms')
                     .eq('user_id', currentUserId)
-                    .eq('book_name', bookName)
+                    .eq('book_index', bookIndex)
                     .eq('chapter_num', chapNum)
-                    .eq('verse_num', verseNum)
                     .maybeSingle();
+
                 if (error) throw error;
-                const dbWpm = data?.best_wpm || 0;
+                const verseIdx = verseNum - 1;
+                const dbWpm = data?.best_wpms?.[verseIdx] || 0;
                 return Math.max(dbWpm, queued?.wpm || 0);
             } catch (err) {
                 return queued?.wpm || 0;
@@ -1120,6 +1173,26 @@
         const books = ["Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","Judges","Ruth","1 Samuel","2 Samuel","1 Kings","2 Kings","1 Chronicles","2 Chronicles","Ezra","Nehemiah","Esther","Job","Psalms","Proverbs","Ecclesiastes","Song of Solomon","Isaiah","Jeremiah","Lamentations","Ezekiel","Daniel","Hosea","Joel","Amos","Obadiah","Jonah","Micah","Nahum","Habakkuk","Zephaniah","Haggai","Zechariah","Malachi","Matthew","Mark","Luke","John","Acts","Romans","1 Corinthians","2 Corinthians","Galatians","Ephesians","Philippians","Colossians","1 Thessalonians","2 Thessalonians","1 Timothy","2 Timothy","Titus","Philemon","Hebrews","James","1 Peter","2 Peter","1 John","2 John","3 John","Jude","Revelation"];
         const chapCounts = [50,40,27,36,34,24,21,4,31,24,22,25,29,36,10,13,10,42,150,31,12,8,66,52,5,48,12,14,3,9,1,4,7,3,3,3,2,14,4,28,16,24,21,28,16,16,13,6,6,4,4,5,3,6,4,3,1,13,5,5,3,5,1,1,1,22];
         const TOTAL_VERSES_BIBLE = 31102;
+
+        // Book name <-> index lookup (1-based, matching chapter_progress.book_index in DB)
+        const BOOK_INDEX = {
+            "Genesis":1,"Exodus":2,"Leviticus":3,"Numbers":4,"Deuteronomy":5,
+            "Joshua":6,"Judges":7,"Ruth":8,"1 Samuel":9,"2 Samuel":10,
+            "1 Kings":11,"2 Kings":12,"1 Chronicles":13,"2 Chronicles":14,
+            "Ezra":15,"Nehemiah":16,"Esther":17,"Job":18,"Psalms":19,"Proverbs":20,
+            "Ecclesiastes":21,"Song of Solomon":22,"Isaiah":23,"Jeremiah":24,
+            "Lamentations":25,"Ezekiel":26,"Daniel":27,"Hosea":28,"Joel":29,
+            "Amos":30,"Obadiah":31,"Jonah":32,"Micah":33,"Nahum":34,
+            "Habakkuk":35,"Zephaniah":36,"Haggai":37,"Zechariah":38,"Malachi":39,
+            "Matthew":40,"Mark":41,"Luke":42,"John":43,"Acts":44,"Romans":45,
+            "1 Corinthians":46,"2 Corinthians":47,"Galatians":48,"Ephesians":49,
+            "Philippians":50,"Colossians":51,"1 Thessalonians":52,"2 Thessalonians":53,
+            "1 Timothy":54,"2 Timothy":55,"Titus":56,"Philemon":57,"Hebrews":58,
+            "James":59,"1 Peter":60,"2 Peter":61,"1 John":62,"2 John":63,
+            "3 John":64,"Jude":65,"Revelation":66
+        };
+        // Reverse lookup: book_index (1-66) -> book name. Index 0 is null (1-based).
+        const BOOK_NAMES = [null, ...Object.keys(BOOK_INDEX)];
 
 // Bible data loaded from bible.js
         let completedSet = new Set(); // will be populated after auth check
@@ -1313,32 +1386,22 @@
         }
 
         function syncStreakToSupabase() {
-            if (!currentUserId || !supabaseClient) return;
-            const streak = parseInt(localStorage.getItem('tsDailyStreak') || '0');
-            const longest = parseInt(localStorage.getItem('tsLongestStreak') || '0');
-            if (streak === 0 && longest === 0) return;
-            supabaseClient.from('profiles')
-                .update({ current_streak: streak, longest_streak: longest })
-                .eq('id', currentUserId)
-                .then(({ error }) => {
-                    if (error) console.warn('Streak sync error:', error.message);
-                    else console.log('Streak synced:', streak, '/', longest);
-                });
+            // Streaks now live in localStorage only — no DB sync needed
         }
 
         function markStreakActivity() {
             const today = new Date().toDateString();
             const lastActive = localStorage.getItem('tsLastActive');
-            if (lastActive === today) return; // already earned today, nothing to do
+            if (lastActive === today) return;
 
             let streak = parseInt(localStorage.getItem('tsDailyStreak') || '0');
             let longest = parseInt(localStorage.getItem('tsLongestStreak') || '0');
             const yesterday = new Date(Date.now() - 86400000).toDateString();
 
             if (lastActive === yesterday) {
-                streak++; // extend streak
+                streak++;
             } else {
-                streak = 1; // start fresh
+                streak = 1;
             }
 
             if (streak > longest) longest = streak;
@@ -1347,16 +1410,6 @@
             localStorage.setItem('tsLongestStreak', longest);
             localStorage.setItem('tsLastActive', today);
             updateStreakBanner(streak, true);
-
-            // Sync to Supabase if logged in
-            if (currentUserId && supabaseClient) {
-                supabaseClient.from('profiles')
-                    .update({ current_streak: streak, longest_streak: longest })
-                    .eq('id', currentUserId)
-                    .then(({ error }) => {
-                        if (error) console.warn('Streak sync error:', error.message);
-                    });
-            }
         }
 
         function updateStreakBanner(streak, earnedToday) {
@@ -1463,7 +1516,6 @@
         }
 
         async function markVerseRead(skipTimeCheck = false) {
-            // Integrity threshold: must have been on verse for at least 400ms (skipped when called from typing)
             if (!skipTimeCheck) {
                 const elapsed = verseReadStartTime ? Date.now() - verseReadStartTime : 0;
                 if (elapsed < 400) {
@@ -1475,8 +1527,8 @@
             const chapNum = parseInt(chapSel.value);
             const verseNum = parseInt(verseSel.value) + 1;
             const key = getReadKey(bookName, chapNum, verseNum);
-            if (readCompletedSet.has(key)) return; // already read
 
+            // Always increment in-memory set (for UI markers)
             readCompletedSet.add(key);
             saveReadProgress();
             updateReadProgress();
@@ -1486,38 +1538,32 @@
 
             if (!currentUserId || !supabaseClient) return;
 
-            // Check if chapter is now complete
-            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
-            const chapEntry = bookEntry && bookEntry.chapters.find(c => c.chapter === chapNum);
-            if (chapEntry) {
-                const allRead = chapEntry.verses.every(v => readCompletedSet.has(getReadKey(bookName, chapNum, v.verse)));
-                if (allRead) {
-                    await zipChapter(bookName, chapNum, chapEntry.verses.length);
-                    return;
-                }
-            }
-
-            // Save verse read to DB
             try {
-                await supabaseClient.from('verses_read').upsert({
-                    user_id: currentUserId, book_name: bookName,
-                    chapter_num: chapNum, verse_num: verseNum
-                }, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
+                const bookIndex = BOOK_INDEX[bookName];
+                if (!bookIndex) return;
+                const verseIdx = verseNum - 1;
+
+                // Fetch current row for this chapter
+                const { data: existing } = await supabaseClient
+                    .from('chapter_progress')
+                    .select('read_counts')
+                    .eq('user_id', currentUserId)
+                    .eq('book_index', bookIndex)
+                    .eq('chapter_num', chapNum)
+                    .maybeSingle();
+
+                const readCounts = existing?.read_counts ? [...existing.read_counts] : [];
+                while (readCounts.length <= verseIdx) readCounts.push(0);
+                readCounts[verseIdx] = (readCounts[verseIdx] || 0) + 1;
+
+                await supabaseClient.from('chapter_progress').upsert({
+                    user_id: currentUserId,
+                    book_index: bookIndex,
+                    chapter_num: chapNum,
+                    read_counts: readCounts,
+                    last_activity: new Date().toISOString()
+                }, { onConflict: 'user_id,book_index,chapter_num' });
             } catch(e) { console.warn('Could not save verse read:', e); }
-        }
-
-        async function zipChapter(bookName, chapNum, verseCount) {
-            if (!currentUserId || !supabaseClient) return;
-            try {
-                // Delete individual verse rows for this chapter
-                await supabaseClient.from('verses_read').delete()
-                    .eq('user_id', currentUserId).eq('book_name', bookName).eq('chapter_num', chapNum);
-                // Insert chapter completion row
-                await supabaseClient.from('chapters_read').upsert({
-                    user_id: currentUserId, book_name: bookName, chapter_num: chapNum, verse_count: verseCount
-                }, { onConflict: 'user_id,book_name,chapter_num' });
-                console.log('✓ Zipped chapter:', bookName, chapNum);
-            } catch(e) { console.warn('Could not zip chapter:', e); }
         }
 
         function saveReadProgress() {
@@ -1534,26 +1580,32 @@
         async function loadReadProgressFromDB() {
             if (!currentUserId || !supabaseClient) return;
             try {
-                // Load individual verses not yet zipped
-                const { data: verses } = await supabaseClient.from('verses_read')
-                    .select('book_name,chapter_num,verse_num').eq('user_id', currentUserId);
-                // Load completed chapters
-                const { data: chapters } = await supabaseClient.from('chapters_read')
-                    .select('book_name,chapter_num').eq('user_id', currentUserId);
+                const { data: chapters, error } = await supabaseClient
+                    .from('chapter_progress')
+                    .select('book_index, chapter_num, read_counts')
+                    .eq('user_id', currentUserId);
+
+                if (error) throw error;
 
                 readCompletedSet = new Set();
-                if (verses) verses.forEach(v => readCompletedSet.add(getReadKey(v.book_name, v.chapter_num, v.verse_num)));
-                // For zipped chapters, add all their verses
+
                 if (chapters && KJV_EMBEDDED) {
-                    chapters.forEach(c => {
-                        const book = KJV_EMBEDDED.books.find(b => b.name === c.book_name);
-                        const chap = book && book.chapters.find(ch => ch.chapter === c.chapter_num);
-                        if (chap) chap.verses.forEach(v => readCompletedSet.add(getReadKey(c.book_name, c.chapter_num, v.verse)));
+                    chapters.forEach(row => {
+                        const bookName = BOOK_NAMES[row.book_index];
+                        if (!bookName) return;
+                        if (row.read_counts) {
+                            row.read_counts.forEach((count, i) => {
+                                if (count > 0) {
+                                    readCompletedSet.add(getReadKey(bookName, row.chapter_num, i + 1));
+                                }
+                            });
+                        }
                     });
                 }
+
                 saveReadProgress();
                 updateReadProgress();
-                updateBooks(); // refresh dropdowns to show 📖 markers
+                updateBooks();
             } catch(e) { console.warn('Could not load read progress:', e); }
         }
 
@@ -1856,21 +1908,28 @@
             }
             document.getElementById('verse-best-val').innerText = bestWpm;
 
-            // Fetch global best for this verse
+            // Fetch global best WPM for this verse across all users
             const globalEl = document.getElementById('global-best-val');
             if (globalEl && !speedReadActive && supabaseClient) {
                 globalEl.innerText = '—';
-                supabaseClient.from('verse_progress')
-                    .select('best_wpm')
-                    .eq('book_name', bookName)
-                    .eq('chapter_num', chapNum)
-                    .eq('verse_num', verseNum)
-                    .order('best_wpm', { ascending: false })
-                    .limit(1)
-                    .then(({ data }) => {
-                        const top = data && data[0] && data[0].best_wpm;
-                        globalEl.innerText = top > 0 ? top : '—';
-                    });
+                const bookIndex = BOOK_INDEX[bookName];
+                const verseIdx = verseNum - 1;
+                if (bookIndex) {
+                    supabaseClient.from('chapter_progress')
+                        .select('best_wpms')
+                        .eq('book_index', bookIndex)
+                        .eq('chapter_num', chapNum)
+                        .then(({ data }) => {
+                            if (!data) return;
+                            // Find the highest WPM for this verse across all users
+                            let top = 0;
+                            data.forEach(row => {
+                                const w = row.best_wpms?.[verseIdx] || 0;
+                                if (w > top) top = w;
+                            });
+                            globalEl.innerText = top > 0 ? top : '—';
+                        });
+                }
             }
             document.getElementById('progress').innerText = `${currentIndex + 1}/${currentVerses.length}`;
 
@@ -2444,31 +2503,18 @@
                 // Only count verse as completed if accuracy >= 50%
                 if (accuracy >= 50) {
                     verseStreak++;
-                    // Typing a verse counts as reading it
+                    // Typing a verse counts as reading it too
                     readCompletedSet.add(getReadKey(bookName, chapNum, verseNum));
                     saveReadProgress();
                     updateReadProgress();
                     completedSet.add(`KJV_${bookName}_${chapNum}_${verseNum}`);
                     localStorage.setItem('typeScriptureProgressSet', JSON.stringify(Array.from(completedSet)));
                     if (currentUserId) {
-                        // Get current best WPM so we don't overwrite it with 0
+                        // saveVerseToDatabase handles type_counts + best_wpms in chapter_progress
                         const existingWpm = parseInt(localStorage.getItem(`best_KJV_${bookName}_${chapNum}_${verseNum}`)) || 0;
-                        supabaseClient?.from('verse_progress').upsert({
-                            user_id: currentUserId,
-                            book_name: bookName,
-                            chapter_num: chapNum,
-                            verse_num: verseNum,
-                            best_wpm: existingWpm,
-                            completed: true,
-                            completed_at: new Date().toISOString()
-                        }, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
-                        // Dual tracking: typing also counts as reading in DB
-                        supabaseClient?.from('verses_read').upsert({
-                            user_id: currentUserId,
-                            book_name: bookName,
-                            chapter_num: chapNum,
-                            verse_num: verseNum
-                        }, { onConflict: 'user_id,book_name,chapter_num,verse_num' });
+                        saveVerseToDatabase(bookName, chapNum, verseNum, Math.max(wpm, existingWpm));
+                        // Also increment read_counts since typing = reading
+                        markVerseRead(true);
                     }
                     updateBibleProgress();
                     updateBooks();
