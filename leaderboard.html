@@ -218,9 +218,19 @@
                     <div class="stat-card"><div class="value" id="stat-avg">0</div><div class="label">Average WPM</div></div>
                     <div class="stat-card"><div class="value" id="stat-best">0</div><div class="label">Best WPM Ever</div></div>
                 </div>
-                <div class="stats-grid" style="margin-top:0;margin-bottom:0;">
-                    <div class="stat-card" style="grid-column:span 3;">
-                        <div class="value" id="stat-most-typed" style="font-size:15px;">—</div>
+                <div class="stats-grid" style="margin-bottom:0;">
+                    <div class="stat-card">
+                        <div class="value" id="stat-fastest-wpm" style="font-size:20px;">—</div>
+                        <div class="label">Fastest Verse</div>
+                        <div id="stat-fastest-ref" style="font-size:10px;color:var(--text-muted);margin-top:3px;"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value" id="stat-slowest-wpm" style="font-size:20px;">—</div>
+                        <div class="label">Slowest Verse</div>
+                        <div id="stat-slowest-ref" style="font-size:10px;color:var(--text-muted);margin-top:3px;"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value" id="stat-most-typed" style="font-size:13px;line-height:1.4;">—</div>
                         <div class="label">Most Typed Verse</div>
                     </div>
                 </div>
@@ -228,10 +238,8 @@
                 <div class="stats-grid">
                     <div class="stat-card"><div class="value" id="stat-read-pct">0%</div><div class="label">Bible Read</div></div>
                     <div class="stat-card"><div class="value" id="stat-read-books">0 / 66</div><div class="label">Books Fully Read</div></div>
-                </div>
-                <div class="stats-grid" style="margin-top:0;margin-bottom:0;">
-                    <div class="stat-card" style="grid-column:span 3;">
-                        <div class="value" id="stat-most-read" style="font-size:15px;">—</div>
+                    <div class="stat-card">
+                        <div class="value" id="stat-most-read" style="font-size:13px;line-height:1.4;">—</div>
                         <div class="label">Most Read Verse</div>
                     </div>
                 </div>
@@ -390,15 +398,14 @@
                     var verseIdx = verse - 1;
                     var result = await supabaseClient
                         .from('chapter_progress')
-                        .select('user_id, type_counts, read_counts, best_wpms')
+                        .select('user_id, type_counts, best_wpms')
                         .eq('book_index', bookIndex).eq('chapter_num', chap);
                     if (result.error) throw result.error;
                     var verseScores = [];
                     (result.data || []).forEach(function(r) {
                         var wpm = r.best_wpms && r.best_wpms[verseIdx] ? r.best_wpms[verseIdx] : 0;
                         var timesTyped = r.type_counts && r.type_counts[verseIdx] ? r.type_counts[verseIdx] : 0;
-                        var timesRead  = r.read_counts && r.read_counts[verseIdx]  ? r.read_counts[verseIdx]  : 0;
-                        if (wpm > 0 || timesTyped > 0 || timesRead > 0) verseScores.push({ user_id: r.user_id, best_wpm: wpm, timesTyped: timesTyped, timesRead: timesRead });
+                        if (wpm > 0 || timesTyped > 0) verseScores.push({ user_id: r.user_id, best_wpm: wpm, timesTyped: timesTyped });
                     });
                     verseScores.sort(function(a, b) { return b.best_wpm - a.best_wpm; });
                     verseScores = verseScores.slice(0, 50);
@@ -418,11 +425,8 @@
                         var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
                         var username = usernameMap[row.user_id] || 'Anonymous';
                         var isYou = row.user_id === currentUserId;
-                        var wpmStr = row.best_wpm > 0 ? row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span>' : '<span class="wpm-label">—</span>';
-                        var typedBit = row.timesTyped > 0 ? '<span style="font-size:11px;color:var(--text-muted);">&#9000;&#65039;&times;' + row.timesTyped + '</span>' : '';
-                        var readBit  = row.timesRead  > 0 ? '<span style="font-size:11px;color:var(--text-muted);">&#128214;&times;' + row.timesRead  + '</span>' : '';
-                        var countsBit = [typedBit, readBit].filter(Boolean).join(' ');
-                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + wpmStr + (countsBit ? ' ' + countsBit : '') + '</td></tr>';
+                        var timesCell = row.timesTyped > 0 ? ' <span style="font-size:11px;color:var(--text-muted);">&#9000;&#65039;&times;' + row.timesTyped + '</span>' : '';
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + (row.best_wpm > 0 ? row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span>' : '<span class="wpm-label">—</span>') + timesCell + '</td></tr>';
                     }).join('');
                     var yourRankRow = '';
                     if (currentUserId && myRankIdx === -1) {
@@ -437,12 +441,12 @@
                     if (!bookIndex) return;
                     var result = await supabaseClient
                         .from('chapter_progress')
-                        .select('user_id, type_counts, best_wpms')
+                        .select('user_id, type_counts, read_counts, best_wpms')
                         .eq('book_index', bookIndex).eq('chapter_num', chap);
                     if (result.error) throw result.error;
                     var userData = {};
                     (result.data || []).forEach(function(r) {
-                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0, minCount: Infinity };
+                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0, minCount: Infinity, readCount: 0, readMinCount: Infinity };
                         if (r.type_counts) r.type_counts.forEach(function(count, i) {
                             if (count > 0) {
                                 userData[r.user_id].count++;
@@ -450,6 +454,9 @@
                                 var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
                                 if (wpm > 0) { userData[r.user_id].totalWpm += wpm; userData[r.user_id].scoredVerses++; }
                             }
+                        });
+                        if (r.read_counts) r.read_counts.forEach(function(count) {
+                            if (count > 0) { userData[r.user_id].readCount++; }
                         });
                     });
                     var completers = Object.keys(userData).filter(function(uid) { return userData[uid].count >= chapVerseTotal; });
@@ -477,8 +484,8 @@
                         var isYou = userId === currentUserId;
                         var avg = userData[userId].scoredVerses > 0 ? Math.round(userData[userId].totalWpm / userData[userId].scoredVerses) : 0;
                         var timesCompleted = userData[userId].minCount === Infinity ? 0 : userData[userId].minCount;
-                        var timesCell = timesCompleted > 1 ? ' <span style="font-size:11px;color:var(--text-muted);">&times;' + timesCompleted + '</span>' : '';
-                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span>' + timesCell + '</td></tr>';
+                        var typedBit = timesCompleted > 0 ? ' <span style="font-size:11px;color:var(--text-muted);">&#9000;&#65039;&times;' + timesCompleted + '</span>' : '';
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span>' + typedBit + '</td></tr>';
                     }).join('');
                     document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Avg WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
 
@@ -489,12 +496,12 @@
                     if (!bookIndex) return;
                     var result = await supabaseClient
                         .from('chapter_progress')
-                        .select('user_id, type_counts, best_wpms')
+                        .select('user_id, type_counts, read_counts, best_wpms')
                         .eq('book_index', bookIndex);
                     if (result.error) throw result.error;
                     var userData = {};
                     (result.data || []).forEach(function(r) {
-                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0, minCount: Infinity };
+                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0, minCount: Infinity, readCount: 0 };
                         if (r.type_counts) r.type_counts.forEach(function(count, i) {
                             if (count > 0) {
                                 userData[r.user_id].count++;
@@ -502,6 +509,9 @@
                                 var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
                                 if (wpm > 0) { userData[r.user_id].totalWpm += wpm; userData[r.user_id].scoredVerses++; }
                             }
+                        });
+                        if (r.read_counts) r.read_counts.forEach(function(count) {
+                            if (count > 0) userData[r.user_id].readCount++;
                         });
                     });
                     var completers = Object.keys(userData).filter(function(uid) { return userData[uid].count >= bookVerseTotal; });
@@ -528,7 +538,8 @@
                         var username = usernameMap[userId] || 'Anonymous';
                         var isYou = userId === currentUserId;
                         var avg = userData[userId].scoredVerses > 0 ? Math.round(userData[userId].totalWpm / userData[userId].scoredVerses) : 0;
-                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span></td></tr>';
+                        var bkTypedBit = (userData[userId].minCount !== Infinity && userData[userId].minCount > 0) ? ' <span style="font-size:11px;color:var(--text-muted);">&#9000;&#65039;&times;' + userData[userId].minCount + '</span>' : '';
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span>' + bkTypedBit + '</td></tr>';
                     }).join('');
                     document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Avg WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
                 }
@@ -681,7 +692,8 @@
                 var typedVerseCount = 0, totalWpm = 0, scoredVerses = 0, bestWpm = 0;
                 var typedKeys = {}, readKeys = {};
                 var graphPoints = [];
-
+                var fastestWpm = 0, fastestRef = '';
+                var slowestWpm = Infinity, slowestRef = '';
                 var bestTypedCount = 0, bestTypedRef = '—';
                 var bestReadCount = 0, bestReadRef = '—';
 
@@ -698,6 +710,9 @@
                                     totalWpm += wpm; scoredVerses++;
                                     chapWpmSum += wpm; chapWpmCount++;
                                     if (wpm > bestWpm) bestWpm = wpm;
+                                    var ref = bookName + ' ' + r.chapter_num + ':' + (i + 1);
+                                    if (wpm > fastestWpm) { fastestWpm = wpm; fastestRef = ref; }
+                                    if (wpm < slowestWpm) { slowestWpm = wpm; slowestRef = ref; }
                                 }
                                 if (count > bestTypedCount) {
                                     bestTypedCount = count;
@@ -752,6 +767,11 @@
                 document.getElementById('stat-chapters').innerText = chaptersCompleted + ' / 1189';
                 document.getElementById('stat-avg').innerText = avgWpm;
                 document.getElementById('stat-best').innerText = bestWpm;
+                document.getElementById('stat-fastest-wpm').innerText = fastestWpm > 0 ? fastestWpm + ' WPM' : '—';
+                document.getElementById('stat-fastest-ref').innerText = fastestRef;
+                document.getElementById('stat-slowest-wpm').innerText = (slowestWpm < Infinity && slowestWpm > 0) ? slowestWpm + ' WPM' : '—';
+                document.getElementById('stat-slowest-ref').innerText = slowestRef;
+                document.getElementById('stat-most-typed').innerText = bestTypedCount > 0 ? bestTypedRef : '—';
 
                 var readVerseCount = Object.keys(readKeys).length;
                 var readPct = (readVerseCount / TOTAL_VERSES_BIBLE) * 100;
@@ -768,7 +788,6 @@
 
                 document.getElementById('stat-read-pct').innerText = readDisplayPct;
                 document.getElementById('stat-read-books').innerText = booksFullyRead + ' / 66';
-                document.getElementById('stat-most-typed').innerText = bestTypedCount > 0 ? bestTypedRef : '—';
                 document.getElementById('stat-most-read').innerText = bestReadCount > 0 ? bestReadRef : '—';
 
                 allVerseData = graphPoints;
@@ -989,9 +1008,12 @@
 
                 var userData = {};
                 (result.data || []).forEach(function(r) {
-                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0 };
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0, minReadCount: Infinity };
                     if (r.read_counts) r.read_counts.forEach(function(count) {
-                        if (count > 0) userData[r.user_id].verseCount++;
+                        if (count > 0) {
+                            userData[r.user_id].verseCount++;
+                            if (count < userData[r.user_id].minReadCount) userData[r.user_id].minReadCount = count;
+                        }
                     });
                 });
 
@@ -1034,12 +1056,14 @@
                     var isFull = u.verseCount >= total && total > 0;
                     var medal = isFull ? '&#128081;' : (rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank);
                     var barWidth = Math.max(pct, 0.5);
+                    var readLapBit = (isFull && u.minReadCount !== Infinity && u.minReadCount > 1) ? ' <span style="font-size:11px;color:var(--text-muted);">&#128214;&times;' + u.minReadCount + '</span>' : '';
                     return '<tr>' +
                         '<td class="rank ' + rankClass + '">' + medal + '</td>' +
                         '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
                         '<td style="text-align:right;">' +
                             '<span style="font-weight:800;color:var(--accent);">' + displayPct + '</span>' +
                             '<span style="color:var(--text-muted);font-size:11px;"> (' + u.verseCount + '/' + total + ')</span>' +
+                            readLapBit +
                             '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%;"></div></div>' +
                         '</td>' +
                     '</tr>';
