@@ -218,10 +218,22 @@
                     <div class="stat-card"><div class="value" id="stat-avg">0</div><div class="label">Average WPM</div></div>
                     <div class="stat-card"><div class="value" id="stat-best">0</div><div class="label">Best WPM Ever</div></div>
                 </div>
+                <div class="stats-grid" style="margin-top:0;margin-bottom:0;">
+                    <div class="stat-card" style="grid-column:span 3;">
+                        <div class="value" id="stat-most-typed" style="font-size:15px;">—</div>
+                        <div class="label">Most Typed Verse</div>
+                    </div>
+                </div>
                 <h4 style="color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px;font-weight:600;">&#128214; Reading</h4>
                 <div class="stats-grid">
                     <div class="stat-card"><div class="value" id="stat-read-pct">0%</div><div class="label">Bible Read</div></div>
                     <div class="stat-card"><div class="value" id="stat-read-books">0 / 66</div><div class="label">Books Fully Read</div></div>
+                </div>
+                <div class="stats-grid" style="margin-top:0;margin-bottom:0;">
+                    <div class="stat-card" style="grid-column:span 3;">
+                        <div class="value" id="stat-most-read" style="font-size:15px;">—</div>
+                        <div class="label">Most Read Verse</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -378,14 +390,15 @@
                     var verseIdx = verse - 1;
                     var result = await supabaseClient
                         .from('chapter_progress')
-                        .select('user_id, type_counts, best_wpms')
+                        .select('user_id, type_counts, read_counts, best_wpms')
                         .eq('book_index', bookIndex).eq('chapter_num', chap);
                     if (result.error) throw result.error;
                     var verseScores = [];
                     (result.data || []).forEach(function(r) {
                         var wpm = r.best_wpms && r.best_wpms[verseIdx] ? r.best_wpms[verseIdx] : 0;
                         var timesTyped = r.type_counts && r.type_counts[verseIdx] ? r.type_counts[verseIdx] : 0;
-                        if (wpm > 0 || timesTyped > 0) verseScores.push({ user_id: r.user_id, best_wpm: wpm, timesTyped: timesTyped });
+                        var timesRead  = r.read_counts && r.read_counts[verseIdx]  ? r.read_counts[verseIdx]  : 0;
+                        if (wpm > 0 || timesTyped > 0 || timesRead > 0) verseScores.push({ user_id: r.user_id, best_wpm: wpm, timesTyped: timesTyped, timesRead: timesRead });
                     });
                     verseScores.sort(function(a, b) { return b.best_wpm - a.best_wpm; });
                     verseScores = verseScores.slice(0, 50);
@@ -405,8 +418,11 @@
                         var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
                         var username = usernameMap[row.user_id] || 'Anonymous';
                         var isYou = row.user_id === currentUserId;
-                        var timesCell = row.timesTyped > 1 ? ' <span style="font-size:11px;color:var(--text-muted);">&times;' + row.timesTyped + '</span>' : '';
-                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span>' + timesCell + '</td></tr>';
+                        var wpmStr = row.best_wpm > 0 ? row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span>' : '<span class="wpm-label">—</span>';
+                        var typedBit = row.timesTyped > 0 ? '<span style="font-size:11px;color:var(--text-muted);">&#9000;&#65039;&times;' + row.timesTyped + '</span>' : '';
+                        var readBit  = row.timesRead  > 0 ? '<span style="font-size:11px;color:var(--text-muted);">&#128214;&times;' + row.timesRead  + '</span>' : '';
+                        var countsBit = [typedBit, readBit].filter(Boolean).join(' ');
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + wpmStr + (countsBit ? ' ' + countsBit : '') + '</td></tr>';
                     }).join('');
                     var yourRankRow = '';
                     if (currentUserId && myRankIdx === -1) {
@@ -666,7 +682,11 @@
                 var typedKeys = {}, readKeys = {};
                 var graphPoints = [];
 
+                var bestTypedCount = 0, bestTypedRef = '—';
+                var bestReadCount = 0, bestReadRef = '—';
+
                 rows.forEach(function(r) {
+                    var bookName = BOOK_NAMES[r.book_index] || '?';
                     if (r.type_counts) {
                         var chapWpmSum = 0, chapWpmCount = 0;
                         r.type_counts.forEach(function(count, i) {
@@ -679,6 +699,10 @@
                                     chapWpmSum += wpm; chapWpmCount++;
                                     if (wpm > bestWpm) bestWpm = wpm;
                                 }
+                                if (count > bestTypedCount) {
+                                    bestTypedCount = count;
+                                    bestTypedRef = bookName + ' ' + r.chapter_num + ':' + (i + 1) + ' ×' + count;
+                                }
                             }
                         });
                         if (chapWpmCount > 0 && r.last_activity) {
@@ -687,7 +711,13 @@
                     }
                     if (r.read_counts) {
                         r.read_counts.forEach(function(count, i) {
-                            if (count > 0) readKeys[r.book_index + '|' + r.chapter_num + '|' + i] = true;
+                            if (count > 0) {
+                                readKeys[r.book_index + '|' + r.chapter_num + '|' + i] = true;
+                                if (count > bestReadCount) {
+                                    bestReadCount = count;
+                                    bestReadRef = bookName + ' ' + r.chapter_num + ':' + (i + 1) + ' ×' + count;
+                                }
+                            }
                         });
                     }
                 });
@@ -738,6 +768,8 @@
 
                 document.getElementById('stat-read-pct').innerText = readDisplayPct;
                 document.getElementById('stat-read-books').innerText = booksFullyRead + ' / 66';
+                document.getElementById('stat-most-typed').innerText = bestTypedCount > 0 ? bestTypedRef : '—';
+                document.getElementById('stat-most-read').innerText = bestReadCount > 0 ? bestReadRef : '—';
 
                 allVerseData = graphPoints;
                 setGraphRange(currentGraphRange);
