@@ -159,19 +159,26 @@
 
         <!-- DEDICATION TAB -->
         <div id="tab-dedication" style="display:none;">
+            <!-- Single master toggle for entire tab -->
+            <div style="display:flex;gap:6px;justify-content:center;margin-bottom:16px;">
+                <button id="ded-typed-btn" onclick="setDedicationMode('typed')" style="background:rgba(88,166,255,0.12);border:1px solid var(--accent);color:var(--accent);padding:6px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">&#9000;&#65039; Typed</button>
+                <button id="ded-read-btn" onclick="setDedicationMode('read')" style="background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:6px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">&#128214; Read</button>
+            </div>
+            <!-- Laps panel -->
             <div class="lb-panel" style="margin-bottom:16px;">
                 <div class="lb-header">
-                    <h3>&#128081; Bible Laps</h3>
+                    <h3 id="laps-title">&#128081; Bible Laps &mdash; Typed</h3>
                     <span id="laps-lb-count"></span>
                 </div>
                 <div id="laps-lb-body"><div class="loading">Loading...</div></div>
             </div>
+            <!-- Hotlist panel -->
             <div class="lb-panel">
-                <div class="lb-header">
-                    <h3>&#128293; Most Re-typed Verse</h3>
-                    <span id="retyped-lb-count"></span>
+                <div class="lb-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                    <h3 id="hotlist-title">&#128293; Most Typed Verses &mdash; All Time</h3>
+                    <span id="hotlist-stat" style="font-size:12px;color:var(--text-muted);"></span>
                 </div>
-                <div id="retyped-lb-body"><div class="loading">Loading...</div></div>
+                <div id="hotlist-body"><div class="loading">Loading...</div></div>
             </div>
         </div>
         <!-- BIBLE COMPLETION TAB -->
@@ -1020,106 +1027,160 @@
 
 
         // ===== DEDICATION TAB =====
+        var dedicationMode = 'typed';
+        var dedicationData = null;
+
+        function setDedicationMode(mode) {
+            dedicationMode = mode;
+            var typedBtn = document.getElementById('ded-typed-btn');
+            var readBtn = document.getElementById('ded-read-btn');
+            typedBtn.style.background = mode === 'typed' ? 'rgba(88,166,255,0.12)' : 'transparent';
+            typedBtn.style.borderColor = mode === 'typed' ? 'var(--accent)' : 'var(--border)';
+            typedBtn.style.color = mode === 'typed' ? 'var(--accent)' : 'var(--text-muted)';
+            readBtn.style.background = mode === 'read' ? 'rgba(88,166,255,0.12)' : 'transparent';
+            readBtn.style.borderColor = mode === 'read' ? 'var(--accent)' : 'var(--border)';
+            readBtn.style.color = mode === 'read' ? 'var(--accent)' : 'var(--text-muted)';
+            if (dedicationData) renderDedication();
+        }
+
+        function renderDedication() {
+            var d = dedicationData;
+            var isTyped = dedicationMode === 'typed';
+
+            // Titles
+            document.getElementById('laps-title').innerHTML = isTyped
+                ? '&#128081; Bible Laps &mdash; Typed'
+                : '&#128081; Bible Laps &mdash; Read';
+            document.getElementById('hotlist-title').innerHTML = isTyped
+                ? '&#128293; Most Typed Verses &mdash; All Time'
+                : '&#128214; Most Read Verses &mdash; All Time';
+
+            // Stat line
+            var totalCount = isTyped ? d.totalTyped : d.totalRead;
+            document.getElementById('hotlist-stat').innerText = totalCount.toLocaleString() + ' verse ' + (isTyped ? 'typings' : 'readings') + ' on TypeScripture';
+
+            // ── Laps ──
+            var lapField = isTyped ? 'typeLaps' : 'readLaps';
+            var lappers = d.allUserIds.filter(function(uid) { return (d.userData[uid][lapField] || 0) >= 1; });
+            lappers.sort(function(a, b) { return (d.userData[b][lapField] || 0) - (d.userData[a][lapField] || 0); });
+
+            if (lappers.length === 0) {
+                document.getElementById('laps-lb-count').innerText = '';
+                document.getElementById('laps-lb-body').innerHTML = '<div class="empty">Nobody has ' + (isTyped ? 'typed' : 'read') + ' through the full Bible yet — be the first! &#128081;</div>';
+            } else {
+                document.getElementById('laps-lb-count').innerText = lappers.length + ' player' + (lappers.length !== 1 ? 's' : '');
+                var rows = lappers.map(function(uid, i) {
+                    var rank = i + 1;
+                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                    var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                    var username = d.usernameMap[uid] || 'Anonymous';
+                    var isYou = uid === currentUserId;
+                    var laps = d.userData[uid][lapField] || 0;
+                    return '<tr>' +
+                        '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                        '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                        '<td style="text-align:right;"><span style="color:#ffd700;font-size:16px;">&#128081;</span> <span class="wpm-val">&times;' + laps + '</span> <span class="wpm-label">lap' + (laps !== 1 ? 's' : '') + '</span></td>' +
+                    '</tr>';
+                }).join('');
+                document.getElementById('laps-lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Full Laps</th></tr></thead><tbody>' + rows + '</tbody></table>';
+            }
+
+            // ── Hotlist ──
+            var verses = isTyped ? d.topTyped : d.topRead;
+            if (!verses || verses.length === 0) {
+                document.getElementById('hotlist-body').innerHTML = '<div class="empty">No data yet.</div>';
+                return;
+            }
+            var medals = ['&#129351;','&#129352;','&#129353;'];
+            var hotRows = verses.map(function(v, i) {
+                var rank = i + 1;
+                var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                var medal = rank <= 3 ? medals[rank - 1] : rank;
+                return '<tr>' +
+                    '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                    '<td style="font-weight:600;color:var(--text-main);">' + v.ref + '</td>' +
+                    '<td style="text-align:right;"><span class="wpm-val">' + v.total.toLocaleString() + '</span> <span class="wpm-label">times</span></td>' +
+                '</tr>';
+            });
+            document.getElementById('hotlist-body').innerHTML =
+                '<table class="lb-table"><thead><tr><th>#</th><th>Verse</th><th style="text-align:right;">Global Count</th></tr></thead><tbody>' + hotRows.join('') + '</tbody></table>';
+        }
+
         async function loadDedicationLeaderboard() {
             document.getElementById('laps-lb-body').innerHTML = '<div class="loading">Loading...</div>';
-            document.getElementById('retyped-lb-body').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('hotlist-body').innerHTML = '<div class="loading">Loading...</div>';
 
             try {
                 var result = await supabaseClient
                     .from('chapter_progress')
-                    .select('user_id, book_index, chapter_num, type_counts');
+                    .select('user_id, book_index, chapter_num, type_counts, read_counts');
 
                 if (result.error) throw result.error;
 
-                // Build per-user: all type_counts flattened, plus per-verse tracking for most re-typed
                 var userData = {};
+                var verseMap = {};
+                var totalTyped = 0, totalRead = 0;
+
                 (result.data || []).forEach(function(r) {
-                    if (!userData[r.user_id]) userData[r.user_id] = { allCounts: [], bestVerseCount: 0, bestVerseRef: '' };
+                    var bookName = BOOK_NAMES[r.book_index] || '?';
+                    if (!userData[r.user_id]) userData[r.user_id] = { typeAllCounts: [], readAllCounts: [] };
+
                     if (r.type_counts) {
                         r.type_counts.forEach(function(count, i) {
-                            userData[r.user_id].allCounts.push(count);
-                            if (count > userData[r.user_id].bestVerseCount) {
-                                userData[r.user_id].bestVerseCount = count;
-                                var bookName = BOOK_NAMES[r.book_index] || '?';
-                                userData[r.user_id].bestVerseRef = bookName + ' ' + r.chapter_num + ':' + (i + 1);
+                            userData[r.user_id].typeAllCounts.push(count);
+                            if (count > 0) {
+                                totalTyped += count;
+                                var key = r.book_index + '|' + r.chapter_num + '|' + i;
+                                if (!verseMap[key]) verseMap[key] = { ref: bookName + ' ' + r.chapter_num + ':' + (i + 1), typedTotal: 0, readTotal: 0 };
+                                verseMap[key].typedTotal += count;
+                            }
+                        });
+                    }
+                    if (r.read_counts) {
+                        r.read_counts.forEach(function(count, i) {
+                            userData[r.user_id].readAllCounts.push(count);
+                            if (count > 0) {
+                                totalRead += count;
+                                var key = r.book_index + '|' + r.chapter_num + '|' + i;
+                                if (!verseMap[key]) verseMap[key] = { ref: bookName + ' ' + r.chapter_num + ':' + (i + 1), typedTotal: 0, readTotal: 0 };
+                                verseMap[key].readTotal += count;
                             }
                         });
                     }
                 });
 
-                // Calculate laps for each user
+                // Calculate typed and read laps separately
                 Object.keys(userData).forEach(function(uid) {
                     var u = userData[uid];
-                    // Pad to full Bible so untyped chapters count as 0
-                    while (u.allCounts.length < TOTAL_VERSES_BIBLE) u.allCounts.push(0);
-                    u.laps = Math.min.apply(null, u.allCounts);
+                    var tc = u.typeAllCounts.slice();
+                    var rc = u.readAllCounts.slice();
+                    while (tc.length < TOTAL_VERSES_BIBLE) tc.push(0);
+                    while (rc.length < TOTAL_VERSES_BIBLE) rc.push(0);
+                    u.typeLaps = Math.min.apply(null, tc);
+                    u.readLaps = Math.min.apply(null, rc);
                 });
 
+                // Top 10 hotlists
+                var allVerses = Object.values(verseMap);
+                var topTyped = allVerses.slice().sort(function(a, b) { return b.typedTotal - a.typedTotal; }).slice(0, 10).map(function(v) { return { ref: v.ref, total: v.typedTotal }; });
+                var topRead  = allVerses.slice().sort(function(a, b) { return b.readTotal  - a.readTotal;  }).slice(0, 10).map(function(v) { return { ref: v.ref, total: v.readTotal  }; });
+
+                // Fetch usernames
                 var allUserIds = Object.keys(userData);
                 var profResult = await supabaseClient.from('profiles').select('id, username').in('id', allUserIds);
                 var usernameMap = {};
                 (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
 
-                // ── Bible Laps panel ──
-                var lappers = allUserIds.filter(function(uid) { return userData[uid].laps >= 1; });
-                lappers.sort(function(a, b) { return userData[b].laps - userData[a].laps; });
+                dedicationData = { userData: userData, usernameMap: usernameMap, allUserIds: allUserIds, topTyped: topTyped, topRead: topRead, totalTyped: totalTyped, totalRead: totalRead };
 
-                if (lappers.length === 0) {
-                    document.getElementById('laps-lb-count').innerText = '';
-                    document.getElementById('laps-lb-body').innerHTML = '<div class="empty">Nobody has typed through the full Bible yet — be the first! &#128081;</div>';
-                } else {
-                    document.getElementById('laps-lb-count').innerText = lappers.length + ' player' + (lappers.length !== 1 ? 's' : '');
-                    var rows = lappers.map(function(uid, i) {
-                        var rank = i + 1;
-                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
-                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
-                        var username = usernameMap[uid] || 'Anonymous';
-                        var isYou = uid === currentUserId;
-                        var laps = userData[uid].laps;
-                        return '<tr>' +
-                            '<td class="rank ' + rankClass + '">' + medal + '</td>' +
-                            '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
-                            '<td style="text-align:right;"><span style="color:#ffd700;font-size:16px;">&#128081;</span> <span class="wpm-val">&times;' + laps + '</span> <span class="wpm-label">lap' + (laps !== 1 ? 's' : '') + '</span></td>' +
-                        '</tr>';
-                    }).join('');
-                    document.getElementById('laps-lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Full Laps</th></tr></thead><tbody>' + rows + '</tbody></table>';
-                }
-
-                // ── Most Re-typed panel ──
-                var retypedUsers = allUserIds.filter(function(uid) { return userData[uid].bestVerseCount > 1; });
-                retypedUsers.sort(function(a, b) { return userData[b].bestVerseCount - userData[a].bestVerseCount; });
-                retypedUsers = retypedUsers.slice(0, 50);
-
-                if (retypedUsers.length === 0) {
-                    document.getElementById('retyped-lb-count').innerText = '';
-                    document.getElementById('retyped-lb-body').innerHTML = '<div class="empty">No re-typed verses yet — keep typing!</div>';
-                } else {
-                    document.getElementById('retyped-lb-count').innerText = retypedUsers.length + ' player' + (retypedUsers.length !== 1 ? 's' : '');
-                    var rows = retypedUsers.map(function(uid, i) {
-                        var rank = i + 1;
-                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
-                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
-                        var username = usernameMap[uid] || 'Anonymous';
-                        var isYou = uid === currentUserId;
-                        var count = userData[uid].bestVerseCount;
-                        var ref = userData[uid].bestVerseRef;
-                        return '<tr>' +
-                            '<td class="rank ' + rankClass + '">' + medal + '</td>' +
-                            '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
-                            '<td style="color:var(--text-muted);font-size:13px;">' + ref + '</td>' +
-                            '<td style="text-align:right;"><span class="wpm-val">&times;' + count + '</span></td>' +
-                        '</tr>';
-                    }).join('');
-                    document.getElementById('retyped-lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Verse</th><th style="text-align:right;">Times Typed</th></tr></thead><tbody>' + rows + '</tbody></table>';
-                }
+                renderDedication();
 
             } catch(err) {
                 console.error('Dedication leaderboard error:', err);
                 document.getElementById('laps-lb-body').innerHTML = '<div class="empty">Error loading data.</div>';
-                document.getElementById('retyped-lb-body').innerHTML = '<div class="empty">Error loading data.</div>';
+                document.getElementById('hotlist-body').innerHTML = '<div class="empty">Error loading data.</div>';
             }
         }
-
         async function searchPlayer() {
             var username = document.getElementById('search-input').value.trim();
             var resultEl = document.getElementById('search-result');
