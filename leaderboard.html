@@ -98,6 +98,7 @@
             <button class="tab active" onclick="switchTab('read')">&#128214; Most Read</button>
             <button class="tab" onclick="switchTab('bible')">&#9997;&#65039; Bible Completion</button>
             <button class="tab" onclick="switchTab('scores')">&#127963; Scores</button>
+            <button class="tab" onclick="switchTab('dedication')">&#128293; Dedication</button>
             <button class="tab" onclick="switchTab('personal')">&#128100; My Stats</button>
             <button class="tab" onclick="switchTab('search')">&#128269; Player Search</button>
         </div>
@@ -155,6 +156,24 @@
 
 
 
+
+        <!-- DEDICATION TAB -->
+        <div id="tab-dedication" style="display:none;">
+            <div class="lb-panel" style="margin-bottom:16px;">
+                <div class="lb-header">
+                    <h3>&#128081; Bible Laps</h3>
+                    <span id="laps-lb-count"></span>
+                </div>
+                <div id="laps-lb-body"><div class="loading">Loading...</div></div>
+            </div>
+            <div class="lb-panel">
+                <div class="lb-header">
+                    <h3>&#128293; Most Re-typed Verse</h3>
+                    <span id="retyped-lb-count"></span>
+                </div>
+                <div id="retyped-lb-body"><div class="loading">Loading...</div></div>
+            </div>
+        </div>
         <!-- BIBLE COMPLETION TAB -->
         <div id="tab-bible" style="display:none;">
             <div class="lb-panel">
@@ -253,16 +272,17 @@
 
         function switchTab(tab) {
             var tabs = document.querySelectorAll('.tab');
-            var tabNames = ['read', 'bible', 'scores', 'personal', 'search'];
+            var tabNames = ['read', 'bible', 'scores', 'dedication', 'personal', 'search'];
             tabs.forEach(function(t, i) { t.classList.toggle('active', tabNames[i] === tab); });
             document.getElementById('tab-bible').style.display = tab === 'bible' ? 'block' : 'none';
+            document.getElementById('tab-dedication').style.display = tab === 'dedication' ? 'block' : 'none';
             document.getElementById('tab-scores').style.display = tab === 'scores' ? 'block' : 'none';
             document.getElementById('tab-personal').style.display = tab === 'personal' ? 'block' : 'none';
             document.getElementById('tab-search').style.display = tab === 'search' ? 'block' : 'none';
             document.getElementById('tab-read').style.display = tab === 'read' ? 'block' : 'none';
             if (tab === 'read') loadReadLeaderboard();
             if (tab === 'bible') loadBibleCompletionLeaderboard();
-            if (tab === 'read' && !document.getElementById('read-lb-body').innerHTML.includes('loading')) return;
+            if (tab === 'dedication') loadDedicationLeaderboard();
             if (tab === 'scores') populateScoresBookSelect();
             if (tab === 'personal') loadPersonalStats();
         }
@@ -351,13 +371,14 @@
                     var verseIdx = verse - 1;
                     var result = await supabaseClient
                         .from('chapter_progress')
-                        .select('user_id, best_wpms')
+                        .select('user_id, type_counts, best_wpms')
                         .eq('book_index', bookIndex).eq('chapter_num', chap);
                     if (result.error) throw result.error;
                     var verseScores = [];
                     (result.data || []).forEach(function(r) {
                         var wpm = r.best_wpms && r.best_wpms[verseIdx] ? r.best_wpms[verseIdx] : 0;
-                        if (wpm > 0) verseScores.push({ user_id: r.user_id, best_wpm: wpm });
+                        var timesTyped = r.type_counts && r.type_counts[verseIdx] ? r.type_counts[verseIdx] : 0;
+                        if (wpm > 0 || timesTyped > 0) verseScores.push({ user_id: r.user_id, best_wpm: wpm, timesTyped: timesTyped });
                     });
                     verseScores.sort(function(a, b) { return b.best_wpm - a.best_wpm; });
                     verseScores = verseScores.slice(0, 50);
@@ -377,7 +398,8 @@
                         var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
                         var username = usernameMap[row.user_id] || 'Anonymous';
                         var isYou = row.user_id === currentUserId;
-                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span></td></tr>';
+                        var timesCell = row.timesTyped > 1 ? ' <span style="font-size:11px;color:var(--text-muted);">&times;' + row.timesTyped + '</span>' : '';
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span>' + timesCell + '</td></tr>';
                     }).join('');
                     var yourRankRow = '';
                     if (currentUserId && myRankIdx === -1) {
@@ -397,10 +419,11 @@
                     if (result.error) throw result.error;
                     var userData = {};
                     (result.data || []).forEach(function(r) {
-                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0 };
+                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0, minCount: Infinity };
                         if (r.type_counts) r.type_counts.forEach(function(count, i) {
                             if (count > 0) {
                                 userData[r.user_id].count++;
+                                if (count < userData[r.user_id].minCount) userData[r.user_id].minCount = count;
                                 var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
                                 if (wpm > 0) { userData[r.user_id].totalWpm += wpm; userData[r.user_id].scoredVerses++; }
                             }
@@ -430,7 +453,9 @@
                         var username = usernameMap[userId] || 'Anonymous';
                         var isYou = userId === currentUserId;
                         var avg = userData[userId].scoredVerses > 0 ? Math.round(userData[userId].totalWpm / userData[userId].scoredVerses) : 0;
-                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span></td></tr>';
+                        var timesCompleted = userData[userId].minCount === Infinity ? 0 : userData[userId].minCount;
+                        var timesCell = timesCompleted > 1 ? ' <span style="font-size:11px;color:var(--text-muted);">&times;' + timesCompleted + '</span>' : '';
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span>' + timesCell + '</td></tr>';
                     }).join('');
                     document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Avg WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
 
@@ -446,10 +471,11 @@
                     if (result.error) throw result.error;
                     var userData = {};
                     (result.data || []).forEach(function(r) {
-                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0 };
+                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0, minCount: Infinity };
                         if (r.type_counts) r.type_counts.forEach(function(count, i) {
                             if (count > 0) {
                                 userData[r.user_id].count++;
+                                if (count < userData[r.user_id].minCount) userData[r.user_id].minCount = count;
                                 var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
                                 if (wpm > 0) { userData[r.user_id].totalWpm += wpm; userData[r.user_id].scoredVerses++; }
                             }
@@ -502,11 +528,13 @@
 
                 var userData = {};
                 (result.data || []).forEach(function(r) {
-                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0, totalWpm: 0, scoredVerses: 0, bestWpm: 0 };
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0, totalTyped: 0, totalWpm: 0, scoredVerses: 0, bestWpm: 0, verseCounts: [] };
                     if (r.type_counts) {
                         r.type_counts.forEach(function(count, i) {
+                            userData[r.user_id].verseCounts.push(count);
                             if (count > 0) {
                                 userData[r.user_id].verseCount++;
+                                userData[r.user_id].totalTyped += count;
                                 var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
                                 if (wpm > 0) {
                                     userData[r.user_id].totalWpm += wpm;
@@ -516,6 +544,14 @@
                             }
                         });
                     }
+                });
+                // Calculate laps: min type_count across ALL 31102 verses (missing = 0)
+                Object.keys(userData).forEach(function(uid) {
+                    var u = userData[uid];
+                    var allCounts = u.verseCounts;
+                    // Pad to full Bible length so untyped verses count as 0
+                    while (allCounts.length < TOTAL_VERSES_BIBLE) allCounts.push(0);
+                    u.laps = Math.min.apply(null, allCounts);
                 });
 
                 if (Object.keys(userData).length === 0) {
@@ -554,12 +590,17 @@
                     var medal = isFull ? '&#128081;' : (rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank);
                     var avgWpm = u.scoredVerses > 0 ? Math.round(u.totalWpm / u.scoredVerses) : 0;
                     var bestWpm = u.bestWpm || 0;
+                    var laps = u.laps || 0;
                     var avgCell = avgWpm > 0
                         ? '<span class="wpm-val">' + avgWpm + '</span> <span class="wpm-label">WPM</span>'
                         : '<span class="wpm-label">—</span>';
                     var bestCell = bestWpm > 0
                         ? '<span class="wpm-val">' + bestWpm + '</span> <span class="wpm-label">WPM</span>'
                         : '<span class="wpm-label">—</span>';
+                    var lapsCell = laps > 0
+                        ? '<span style="color:#ffd700;font-weight:800;">&#128081;</span> <span class="wpm-val">&times;' + laps + '</span>'
+                        : '<span class="wpm-label">—</span>';
+                    var totalTypedCell = '<span class="wpm-val">' + (u.totalTyped || 0).toLocaleString() + '</span>';
                     return '<tr>' +
                         '<td class="rank ' + rankClass + '">' + medal + '</td>' +
                         '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
@@ -568,6 +609,8 @@
                             '<span style="color:var(--text-muted);font-size:11px;"> (' + verseCount.toLocaleString() + ')</span>' +
                             '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%"></div></div>' +
                         '</td>' +
+                        '<td class="wpm-cell hide-mobile">' + totalTypedCell + '</td>' +
+                        '<td class="wpm-cell hide-mobile">' + lapsCell + '</td>' +
                         '<td class="wpm-cell hide-mobile">' + avgCell + '</td>' +
                         '<td class="wpm-cell hide-mobile">' + bestCell + '</td>' +
                     '</tr>';
@@ -579,6 +622,8 @@
                             '<th>#</th>' +
                             '<th>Player</th>' +
                             '<th style="text-align:right;">Completion</th>' +
+                            '<th class="hide-mobile" style="text-align:right;">Total Typed</th>' +
+                            '<th class="hide-mobile" style="text-align:right;">Laps</th>' +
                             '<th class="hide-mobile" style="text-align:right;">Avg WPM</th>' +
                             '<th class="hide-mobile" style="text-align:right;">Best WPM</th>' +
                         '</tr></thead>' +
@@ -834,11 +879,9 @@
                 var userData = {};
                 (result.data || []).forEach(function(r) {
                     if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0 };
-                    if (r.read_counts) {
-                        r.read_counts.forEach(function(count) {
-                            if (count > 0) userData[r.user_id].verseCount++;
-                        });
-                    }
+                    if (r.read_counts) r.read_counts.forEach(function(count) {
+                        if (count > 0) userData[r.user_id].verseCount++;
+                    });
                 });
 
                 if (Object.keys(userData).length === 0) {
@@ -908,11 +951,9 @@
                 var userData = {};
                 (result.data || []).forEach(function(r) {
                     if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0 };
-                    if (r.read_counts) {
-                        r.read_counts.forEach(function(count) {
-                            if (count > 0) userData[r.user_id].verseCount++;
-                        });
-                    }
+                    if (r.read_counts) r.read_counts.forEach(function(count) {
+                        if (count > 0) userData[r.user_id].verseCount++;
+                    });
                 });
 
                 // Calculate total verses for book/chapter
@@ -977,6 +1018,107 @@
             }
         }
 
+
+        // ===== DEDICATION TAB =====
+        async function loadDedicationLeaderboard() {
+            document.getElementById('laps-lb-body').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('retyped-lb-body').innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                var result = await supabaseClient
+                    .from('chapter_progress')
+                    .select('user_id, book_index, chapter_num, type_counts');
+
+                if (result.error) throw result.error;
+
+                // Build per-user: all type_counts flattened, plus per-verse tracking for most re-typed
+                var userData = {};
+                (result.data || []).forEach(function(r) {
+                    if (!userData[r.user_id]) userData[r.user_id] = { allCounts: [], bestVerseCount: 0, bestVerseRef: '' };
+                    if (r.type_counts) {
+                        r.type_counts.forEach(function(count, i) {
+                            userData[r.user_id].allCounts.push(count);
+                            if (count > userData[r.user_id].bestVerseCount) {
+                                userData[r.user_id].bestVerseCount = count;
+                                var bookName = BOOK_NAMES[r.book_index] || '?';
+                                userData[r.user_id].bestVerseRef = bookName + ' ' + r.chapter_num + ':' + (i + 1);
+                            }
+                        });
+                    }
+                });
+
+                // Calculate laps for each user
+                Object.keys(userData).forEach(function(uid) {
+                    var u = userData[uid];
+                    // Pad to full Bible so untyped chapters count as 0
+                    while (u.allCounts.length < TOTAL_VERSES_BIBLE) u.allCounts.push(0);
+                    u.laps = Math.min.apply(null, u.allCounts);
+                });
+
+                var allUserIds = Object.keys(userData);
+                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', allUserIds);
+                var usernameMap = {};
+                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+
+                // ── Bible Laps panel ──
+                var lappers = allUserIds.filter(function(uid) { return userData[uid].laps >= 1; });
+                lappers.sort(function(a, b) { return userData[b].laps - userData[a].laps; });
+
+                if (lappers.length === 0) {
+                    document.getElementById('laps-lb-count').innerText = '';
+                    document.getElementById('laps-lb-body').innerHTML = '<div class="empty">Nobody has typed through the full Bible yet — be the first! &#128081;</div>';
+                } else {
+                    document.getElementById('laps-lb-count').innerText = lappers.length + ' player' + (lappers.length !== 1 ? 's' : '');
+                    var rows = lappers.map(function(uid, i) {
+                        var rank = i + 1;
+                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                        var username = usernameMap[uid] || 'Anonymous';
+                        var isYou = uid === currentUserId;
+                        var laps = userData[uid].laps;
+                        return '<tr>' +
+                            '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                            '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                            '<td style="text-align:right;"><span style="color:#ffd700;font-size:16px;">&#128081;</span> <span class="wpm-val">&times;' + laps + '</span> <span class="wpm-label">lap' + (laps !== 1 ? 's' : '') + '</span></td>' +
+                        '</tr>';
+                    }).join('');
+                    document.getElementById('laps-lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Full Laps</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                }
+
+                // ── Most Re-typed panel ──
+                var retypedUsers = allUserIds.filter(function(uid) { return userData[uid].bestVerseCount > 1; });
+                retypedUsers.sort(function(a, b) { return userData[b].bestVerseCount - userData[a].bestVerseCount; });
+                retypedUsers = retypedUsers.slice(0, 50);
+
+                if (retypedUsers.length === 0) {
+                    document.getElementById('retyped-lb-count').innerText = '';
+                    document.getElementById('retyped-lb-body').innerHTML = '<div class="empty">No re-typed verses yet — keep typing!</div>';
+                } else {
+                    document.getElementById('retyped-lb-count').innerText = retypedUsers.length + ' player' + (retypedUsers.length !== 1 ? 's' : '');
+                    var rows = retypedUsers.map(function(uid, i) {
+                        var rank = i + 1;
+                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                        var username = usernameMap[uid] || 'Anonymous';
+                        var isYou = uid === currentUserId;
+                        var count = userData[uid].bestVerseCount;
+                        var ref = userData[uid].bestVerseRef;
+                        return '<tr>' +
+                            '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                            '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                            '<td style="color:var(--text-muted);font-size:13px;">' + ref + '</td>' +
+                            '<td style="text-align:right;"><span class="wpm-val">&times;' + count + '</span></td>' +
+                        '</tr>';
+                    }).join('');
+                    document.getElementById('retyped-lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th>Verse</th><th style="text-align:right;">Times Typed</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                }
+
+            } catch(err) {
+                console.error('Dedication leaderboard error:', err);
+                document.getElementById('laps-lb-body').innerHTML = '<div class="empty">Error loading data.</div>';
+                document.getElementById('retyped-lb-body').innerHTML = '<div class="empty">Error loading data.</div>';
+            }
+        }
 
         async function searchPlayer() {
             var username = document.getElementById('search-input').value.trim();
