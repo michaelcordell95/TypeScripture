@@ -174,7 +174,7 @@
             color: var(--text-muted);
         }
         #read-ref-box .ref-sub { font-size: 13px; color: var(--accent); font-weight: 600; letter-spacing: 0.3px; }
-        .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; height: 56px; flex: 1 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
+        .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; min-height: 56px; height: auto; flex: 1 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
         .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); display: block; white-space: nowrap; line-height: 1.2; }
         .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
         #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(20px, 3vh, 36px); font-family: 'Droid Sans Mono', 'Courier New', monospace; line-height: 1.6; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
@@ -346,7 +346,7 @@
                 margin-bottom: 6px;
             }
             #type-stats, #read-stats { width: 100%; }
-            .stat-box { min-width: 0; flex: 1 0 0; padding: 6px 4px; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
+            .stat-box { min-width: 0; flex: 1 0 0; padding: 6px 4px; min-height: 56px; height: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
             .stat-value { font-size: 16px; white-space: nowrap; }
             .stat-value { font-size: 16px; }
             .stat-label { font-size: 9px; }
@@ -532,7 +532,7 @@
             <div class="stat-box" style="min-width:0;flex:1;">
                 <span class="stat-value" id="global-best-display"><span style="font-size:11px;">🏆</span> <span id="global-best-val">—</span></span>
                 <span class="stat-label" style="white-space:nowrap;font-size:8px;">World Record</span>
-                <span id="global-best-user" style="font-size:8px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block;"></span>
+                <span id="global-best-user" style="font-size:8px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block;margin-top:2px;"></span>
             </div>
             <div class="stat-box" style="min-width:0;flex:1;">
                 <span class="stat-value"><span id="accuracy">100</span>%</span>
@@ -1924,14 +1924,12 @@
                         .eq('chapter_num', chapNum)
                         .then(async ({ data }) => {
                             if (!data) return;
-                            // Find the user with the highest WPM for this verse
                             let top = 0, topUserId = null;
                             data.forEach(row => {
                                 const w = row.best_wpms?.[verseIdx] || 0;
                                 if (w > top) { top = w; topUserId = row.user_id; }
                             });
                             globalEl.innerText = top > 0 ? top : '—';
-                            // Fetch username for the record holder
                             if (topUserId && globalUserEl) {
                                 const { data: profile } = await supabaseClient
                                     .from('profiles')
