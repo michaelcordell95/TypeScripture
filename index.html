@@ -532,6 +532,7 @@
             <div class="stat-box" style="min-width:0;flex:1;">
                 <span class="stat-value" id="global-best-display"><span style="font-size:11px;">🏆</span> <span id="global-best-val">—</span></span>
                 <span class="stat-label" style="white-space:nowrap;font-size:8px;">World Record</span>
+                <span id="global-best-user" style="font-size:8px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block;"></span>
             </div>
             <div class="stat-box" style="min-width:0;flex:1;">
                 <span class="stat-value"><span id="accuracy">100</span>%</span>
@@ -1910,24 +1911,35 @@
 
             // Fetch global best WPM for this verse across all users
             const globalEl = document.getElementById('global-best-val');
+            const globalUserEl = document.getElementById('global-best-user');
             if (globalEl && !speedReadActive && supabaseClient) {
                 globalEl.innerText = '—';
+                if (globalUserEl) globalUserEl.innerText = '';
                 const bookIndex = BOOK_INDEX[bookName];
                 const verseIdx = verseNum - 1;
                 if (bookIndex) {
                     supabaseClient.from('chapter_progress')
-                        .select('best_wpms')
+                        .select('user_id, best_wpms')
                         .eq('book_index', bookIndex)
                         .eq('chapter_num', chapNum)
-                        .then(({ data }) => {
+                        .then(async ({ data }) => {
                             if (!data) return;
-                            // Find the highest WPM for this verse across all users
-                            let top = 0;
+                            // Find the user with the highest WPM for this verse
+                            let top = 0, topUserId = null;
                             data.forEach(row => {
                                 const w = row.best_wpms?.[verseIdx] || 0;
-                                if (w > top) top = w;
+                                if (w > top) { top = w; topUserId = row.user_id; }
                             });
                             globalEl.innerText = top > 0 ? top : '—';
+                            // Fetch username for the record holder
+                            if (topUserId && globalUserEl) {
+                                const { data: profile } = await supabaseClient
+                                    .from('profiles')
+                                    .select('username')
+                                    .eq('id', topUserId)
+                                    .maybeSingle();
+                                globalUserEl.innerText = profile?.username ? '@' + profile.username : '';
+                            }
                         });
                 }
             }
