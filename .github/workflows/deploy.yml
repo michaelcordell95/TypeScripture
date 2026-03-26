@@ -1,21 +1,25 @@
-name: Deploy to GitHub Pages
+name: Inject secrets
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  deploy:
+  inject:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject API keys
+      - name: Inject Groq API key
         run: |
           sed -i 's|GROQ_API_KEY_PLACEHOLDER|${{ secrets.GROQ_API_KEY }}|g' search.html
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
+      - name: Commit injected file
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add search.html
+          git diff --staged --quiet || git commit -m "Inject API keys [skip ci]"
+          git push
