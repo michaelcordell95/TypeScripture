@@ -507,11 +507,21 @@
                 </div>
             </div>
 
-            <!-- Read/Type Mode buttons — always visible -->
+            <!-- AI Search + Read/Type Mode buttons — always visible -->
             <div class="nav-btn-wrap" style="flex-shrink:0;">
-                <div style="display:flex;gap:4px;">
+                <div style="display:flex;gap:4px;align-items:center;">
                     <button id="type-mode-btn" onclick="setTypeMode()" title="Switch to Type Mode" aria-label="Switch to Type Mode">⌨️ Type</button>
                     <button id="read-mode-btn" onclick="setReadMode()" title="Switch to Read Mode" aria-label="Switch to Read Mode">📖 Read</button>
+                    <!-- AI Search button / input -->
+                    <div id="ai-search-wrap" style="display:flex;align-items:center;gap:4px;">
+                        <button id="ai-search-btn" onclick="openAiSearch()" title="AI Verse Search" style="background:rgba(88,166,255,0.08);border:1.5px solid var(--border);color:var(--text-muted);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700;transition:all 0.2s;white-space:nowrap;">✨ AI</button>
+                        <div id="ai-search-input-wrap" style="display:none;align-items:center;gap:4px;">
+                            <input id="ai-search-input" type="text" placeholder="Search by topic or theme..." autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                                style="background:var(--panel-bg);border:1.5px solid var(--accent);color:var(--text-bright);padding:7px 12px;border-radius:6px;font-size:13px;font-family:inherit;outline:none;width:200px;transition:all 0.2s;"
+                                onkeydown="handleAiSearchKey(event)">
+                            <button onclick="closeAiSearch()" title="Cancel" style="background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;">✕</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1457,6 +1467,32 @@
             } else {
                 typeBtn.classList.add('active-mode');
                 readBtn.classList.remove('active-mode');
+            }
+        }
+
+        function openAiSearch() {
+            document.getElementById('ai-search-btn').style.display = 'none';
+            const wrap = document.getElementById('ai-search-input-wrap');
+            wrap.style.display = 'flex';
+            const input = document.getElementById('ai-search-input');
+            input.value = '';
+            input.focus();
+        }
+
+        function closeAiSearch() {
+            document.getElementById('ai-search-btn').style.display = '';
+            document.getElementById('ai-search-input-wrap').style.display = 'none';
+        }
+
+        function handleAiSearchKey(e) {
+            if (e.key === 'Enter') {
+                const q = document.getElementById('ai-search-input').value.trim();
+                if (q) {
+                    window.location.href = '/search.html?mode=ai&q=' + encodeURIComponent(q);
+                }
+            }
+            if (e.key === 'Escape') {
+                closeAiSearch();
             }
         }
 
@@ -2717,10 +2753,10 @@
         const savedEasy = localStorage.getItem('tsEasyMode');
         if (savedEasy === 'true') document.getElementById('easy-mode').checked = true;
 
-        // Auto-enable Read Mode on mobile before fetching verses
+        // Auto-enable Read Mode on mobile or if coming from a Read It link
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 600;
         updateModeBtns(false); // default: Type mode active
-        if (isMobile) toggleReadMode();
+        if (isMobile || urlParams.get('read') === '1') toggleReadMode();
 
         fetchVerses();
         initStreak();
