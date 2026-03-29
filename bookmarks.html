@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>TypeScripture — Bookmarks</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* === THEME === */
+        :root {
+            --bg-dark: #0d1117; --panel-bg: #161b22; --accent: #58a6ff;
+            --accent-dim: rgba(88,166,255,0.12); --text-main: #c9d1d9;
+            --text-muted: #484f58; --text-bright: #ffffff; --error: #f85149;
+            --border: #30363d; --border-inner: #21262d; --progress-bg: #21262d;
+        }
+        body.light-mode {
+            --bg-dark: #f2e8d5; --panel-bg: #faf3e0; --accent: #b8860b;
+            --accent-dim: rgba(184,134,11,0.12); --text-main: #1a1208;
+            --text-muted: #8a7560; --text-bright: #0a0600; --error: #8b1a1a;
+            --border: #c8a96e; --border-inner: #e8d9b8; --progress-bg: #d9c9a8;
+        }
+        *, *::before, *::after { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+        #theme-toggle-btn { color: var(--text-muted); font-size: 12px; border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; background: transparent; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+        #theme-toggle-btn:hover { border-color: var(--accent); color: var(--text-main); }
+        body.light-mode .logo-text { color: #1a1208 !important; }
+        body.light-mode .logo-text span { color: var(--accent) !important; }
+        body.light-mode .moment-card, body.light-mode .support-card, body.light-mode .social-card,
+        body.light-mode .stat-row, body.light-mode .podium-card, body.light-mode .rank-row,
+        body.light-mode .verse-card, body.light-mode .bookmark-card { background: #efe5cc !important; }
+        body.light-mode .note-area { background: #f2e8d5 !important; }
+        /* === END THEME === */
+        * { box-sizing: border-box; }
+        body {
+            background: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+        .logo-text { font-size: 32px; font-weight: 800; color: var(--text-bright); letter-spacing: -1px; }
+        .logo-text span { color: var(--accent); }
+        .nav-links { display: flex; gap: 10px; margin-bottom: 24px; }
+        .nav-links a {
+            color: var(--text-muted); font-size: 12px; text-decoration: none;
+            border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px;
+        }
+        .nav-links a:hover { border-color: var(--accent); color: var(--text-main); }
+        .nav-links a.active { border-color: var(--gold); color: var(--gold); }
+        .container { width: 90%; max-width: 700px; }
+        .page-title { font-size: 20px; font-weight: 800; color: var(--text-bright); margin-bottom: 4px; }
+        .page-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+        .bookmark-list { display: flex; flex-direction: column; gap: 10px; }
+        .bookmark-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .bookmark-card:hover { border-color: #444d56; }
+        .bookmark-ref { font-weight: 700; color: var(--accent); font-size: 15px; }
+        .bookmark-text { font-size: 13px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+        .bookmark-date { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+        .remove-btn {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-muted); padding: 5px 10px; border-radius: 6px;
+            cursor: pointer; font-size: 12px; white-space: nowrap;
+        }
+        .remove-btn:hover { border-color: var(--error); color: var(--error); }
+        .note-btn {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-muted); padding: 5px 10px; border-radius: 6px;
+            cursor: pointer; font-size: 12px; white-space: nowrap;
+        }
+        .note-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .note-btn.has-note { border-color: #f0b429; color: #f0b429; }
+        .note-area {
+            display: none; width: 100%; margin-top: 10px;
+            background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px;
+            color: var(--text-main); font-size: 13px; padding: 10px;
+            resize: vertical; min-height: 72px; font-family: inherit; line-height: 1.5;
+        }
+        .note-area:focus { outline: none; border-color: var(--accent); }
+        .note-area.open { display: block; }
+        .loading { text-align: center; color: var(--text-muted); padding: 40px; }
+        .empty { text-align: center; color: var(--text-muted); padding: 60px 20px; font-size: 14px; }
+        .empty .emoji { font-size: 40px; display: block; margin-bottom: 12px; }
+        .signed-out { text-align: center; padding: 60px 20px; }
+        .signed-out .emoji { font-size: 40px; display: block; margin-bottom: 12px; }
+        .count { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+        #auth-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); }
+        #auth-bar button {
+            background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+            padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+        }
+        #auth-bar button:hover { border-color: var(--error); color: var(--error); }
+        @media (max-width: 600px) {
+            .bookmark-card { flex-wrap: wrap; }
+            .bookmark-date { display: none; }
+        }
+    </style>
+    <meta name="color-scheme" content="light">
+</head>
+<body>
+    <div class="header">
+        <span style="font-size:40px; line-height:1; color:var(--accent);">✝</span>
+        <div class="logo-text">Type<span>Scripture</span></div>
+    </div>
+    <div class="nav-links">
+        <a href="/">🏠 Home</a>
+        <a href="/leaderboard.html">🏆 Leaderboard</a>
+        <a href="/bookmarks.html" class="active">⭐ Bookmarks</a>
+        <a href="/search.html">🔍 Search</a>
+    </div>
+    <div class="container">
+        <div id="auth-bar" style="display:none;">
+            <span id="auth-username"></span>
+            <button onclick="handleLogout()">Logout</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
+            <div id="bookmark-page-title" class="page-title" style="margin-bottom:0;flex:1;min-width:0;">⭐ My Bookmarks</div>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+                <input id="player-search-input" type="text" placeholder="Search player..." style="background:var(--border-inner);border:1px solid var(--border);color:var(--text-main);padding:6px 12px;border-radius:6px;font-size:13px;font-family:inherit;outline:none;width:130px;" />
+                <button onclick="searchPlayerBookmarks()" style="background:var(--accent);color:#0d1117;border:none;padding:6px 14px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">Go</button>
+            </div>
+        </div>
+        <div id="bookmark-page-subtitle" class="page-subtitle">Verses you've saved for easy reference</div>
+        <div id="bookmark-count" class="count"></div>
+        <div id="bookmark-list"><div class="loading">Loading...</div></div>
+
+    <script src="/bible.js"></script>
+    <script>
+        const SUPABASE_URL = "https://ddubjpmuomforwickzyb.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdWJqcG11b21mb3J3aWNrenliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTI0ODMsImV4cCI6MjA4ODE2ODQ4M30.wOiDepkS64pRFEpul_sKJ9MIVIVTWzg8BZ1fMTOK3_U";
+        const { createClient } = supabase;
+        const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' } });
+
+        function getVerseText(bookName, chapNum, verseNum) {
+            const book = KJV_EMBEDDED.books.find(function(b) { return b.name === bookName; });
+            if (!book) return null;
+            const chap = book.chapters.find(function(c) { return c.chapter === chapNum; });
+            if (!chap) return null;
+            const verse = chap.verses.find(function(v) { return v.verse === verseNum; });
+            return verse ? verse.text : null;
+        }
+
+        let currentUserId = null;
+
+        // Handle PKCE redirect
+        async function init() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('code')) {
+                await sb.auth.exchangeCodeForSession(window.location.href);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            const { data: { session } } = await sb.auth.getSession();
+            if (session) {
+                currentUserId = session.user.id;
+                const { data: profile } = await sb.from('profiles').select('username').eq('id', currentUserId).maybeSingle();
+                const username = profile ? profile.username : session.user.email;
+                document.getElementById('auth-bar').style.display = 'flex';
+                document.getElementById('auth-username').innerText = '✓ ' + username;
+                loadBookmarks();
+            } else {
+                document.getElementById('bookmark-list').innerHTML = '<div class="signed-out"><span class="emoji">⭐</span>Sign in on the main page to view your bookmarks.</div>';
+                document.getElementById('bookmark-count').innerText = '';
+            }
+        }
+
+        // ===== OFFLINE BOOKMARK CACHE (mirrors main app logic) =====
+        function bmCacheKey() { return 'tsBookmarks_' + currentUserId; }
+        function bmPendingKey() { return 'tsBookmarksPending_' + currentUserId; }
+        function bmKey(book, chap, verse) { return book + '|' + chap + '|' + verse; }
+
+        function getCachedBookmarks() {
+            try { return new Set(JSON.parse(localStorage.getItem(bmCacheKey())) || []); }
+            catch(e) { return new Set(); }
+        }
+        function getCachedBookmarkList() {
+            try { return JSON.parse(localStorage.getItem(bmCacheKey() + '_list')) || []; }
+            catch(e) { return []; }
+        }
+        function saveCachedBookmarkList(list) {
+            localStorage.setItem(bmCacheKey() + '_list', JSON.stringify(list));
+            // Also update the set cache
+            const set = new Set(list.map(function(b) { return bmKey(b.book_name, b.chapter_num, b.verse_num); }));
+            localStorage.setItem(bmCacheKey(), JSON.stringify(Array.from(set)));
+        }
+        function getPendingQueue() {
+            try { return JSON.parse(localStorage.getItem(bmPendingKey())) || []; }
+            catch(e) { return []; }
+        }
+        function savePendingQueue(queue) {
+            localStorage.setItem(bmPendingKey(), JSON.stringify(queue));
+        }
+
+        async function flushPendingBookmarks() {
+            if (!currentUserId || !navigator.onLine) return;
+            const queue = getPendingQueue();
+            if (queue.length === 0) return;
+            const remaining = [];
+            for (const item of queue) {
+                try {
+                    if (item.action === 'add') {
+                        await sb.from('bookmarks').insert({
+                            user_id: currentUserId, book_name: item.book,
+                            chapter_num: item.chap, verse_num: item.verse
+                        });
+                    } else {
+                        await sb.from('bookmarks').delete()
+                            .eq('user_id', currentUserId).eq('book_name', item.book)
+                            .eq('chapter_num', item.chap).eq('verse_num', item.verse);
+                    }
+                } catch(e) { remaining.push(item); }
+            }
+            savePendingQueue(remaining);
+        }
+
+        function renderBookmarks(list, fromCache) {
+            if (!list || list.length === 0) {
+                document.getElementById('bookmark-count').innerText = '';
+                document.getElementById('bookmark-list').innerHTML = '<div class="empty"><span class="emoji">⭐</span>No bookmarks yet — tap the ⭐ button on any verse to save it here.</div>';
+                return;
+            }
+            const offlineBadge = fromCache && !navigator.onLine
+                ? '<div style="font-size:12px;color:#f0b429;text-align:center;margin-bottom:10px;">📶 Offline — showing cached bookmarks</div>'
+                : '';
+            document.getElementById('bookmark-count').innerText = list.length + ' bookmark' + (list.length !== 1 ? 's' : '');
+            const cards = list.map(function(b) {
+                const ref = b.book_name + ' ' + b.chapter_num + ':' + b.verse_num;
+                const date = b.created_at
+                    ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'Cached';
+                const verseText = getVerseText(b.book_name, b.chapter_num, b.verse_num);
+                const verseUrl = '/?book=' + encodeURIComponent(b.book_name) + '&chapter=' + b.chapter_num + '&verse=' + b.verse_num;
+                const noteKey = 'tsNote_' + currentUserId + '_' + b.book_name + '_' + b.chapter_num + '_' + b.verse_num;
+                const savedNote = localStorage.getItem(noteKey) || (b.notes || '');
+                const hasNote = savedNote.trim().length > 0;
+                const cardId = 'bm-' + b.book_name.replace(/\s/g,'_') + '_' + b.chapter_num + '_' + b.verse_num;
+                return '<div class="bookmark-card" id="' + cardId + '" style="flex-wrap:wrap;">' +
+                    '<div style="flex:1;min-width:0;">' +
+                        '<a href="' + verseUrl + '" style="text-decoration:none;"><div class="bookmark-ref" style="cursor:pointer;">↗ ' + ref + '</div></a>' +
+                        (verseText ? '<div class="bookmark-text">' + verseText + '</div>' : '') +
+                        '<textarea class="note-area" id="note-' + cardId + '" placeholder="Add a note..." ' +
+                            'onblur="saveNote(this, \'' + b.book_name.replace(/'/g,"\'") + '\',' + b.chapter_num + ',' + b.verse_num + ')">' + savedNote + '</textarea>' +
+                    '</div>' +
+                    '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">' +
+                        '<span class="bookmark-date">Saved ' + date + '</span>' +
+                        '<button class="note-btn' + (hasNote ? ' has-note' : '') + '" id="notebtn-' + cardId + '" onclick="toggleNote(\'' + cardId + '\')">📝</button>' +
+                        '<button class="remove-btn" onclick="removeBookmark(\'' + b.book_name.replace(/'/g,"\'") + '\',' + b.chapter_num + ',' + b.verse_num + ')">✕</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+            document.getElementById('bookmark-list').innerHTML = offlineBadge + '<div class="bookmark-list">' + cards + '</div>';
+        }
+
+        async function loadBookmarks() {
+            document.getElementById('bookmark-list').innerHTML = '<div class="loading">Loading bookmarks...</div>';
+
+            // Show cached bookmarks immediately while we fetch
+            const cached = getCachedBookmarkList();
+            if (cached.length > 0) renderBookmarks(cached, true);
+
+            if (!navigator.onLine) {
+                // Fully offline — cached render is all we can do
+                return;
+            }
+
+            // Flush any pending changes first, then fetch fresh list
+            await flushPendingBookmarks();
+
+            try {
+                const { data, error } = await sb.from('bookmarks')
+                    .select('*').eq('user_id', currentUserId)
+                    .order('created_at', { ascending: false });
+                if (error) throw error;
+                saveCachedBookmarkList(data || []);
+                renderBookmarks(data, false);
+            } catch(e) {
+                // Network failed — cached render already shown above
+                console.warn('Could not load bookmarks from DB:', e);
+            }
+        }
+
+        async function removeBookmark(bookName, chapNum, verseNum) {
+            // Optimistic UI update
+            const id = 'bm-' + bookName.replace(/\s/g,'_') + '_' + chapNum + '_' + verseNum;
+            const el = document.getElementById(id);
+            if (el) el.remove();
+            const remaining = document.querySelectorAll('.bookmark-card').length;
+            if (remaining === 0) {
+                document.getElementById('bookmark-count').innerText = '';
+                document.getElementById('bookmark-list').innerHTML = '<div class="empty"><span class="emoji">⭐</span>No bookmarks yet — tap the ⭐ button on any verse to save it here.</div>';
+            } else {
+                document.getElementById('bookmark-count').innerText = remaining + ' bookmark' + (remaining !== 1 ? 's' : '');
+            }
+
+            // Update local cache
+            const list = getCachedBookmarkList().filter(function(b) {
+                return !(b.book_name === bookName && b.chapter_num === chapNum && b.verse_num === verseNum);
+            });
+            saveCachedBookmarkList(list);
+
+            // Sync to Supabase or queue
+            if (navigator.onLine) {
+                try {
+                    await sb.from('bookmarks').delete()
+                        .eq('user_id', currentUserId).eq('book_name', bookName)
+                        .eq('chapter_num', chapNum).eq('verse_num', verseNum);
+                } catch(e) {
+                    const queue = getPendingQueue();
+                    queue.push({ action: 'remove', book: bookName, chap: chapNum, verse: verseNum });
+                    savePendingQueue(queue);
+                }
+            } else {
+                const queue = getPendingQueue().filter(function(q) {
+                    return !(q.book === bookName && q.chap === chapNum && q.verse === verseNum);
+                });
+                queue.push({ action: 'remove', book: bookName, chap: chapNum, verse: verseNum });
+                savePendingQueue(queue);
+            }
+        }
+
+        window.addEventListener('online', function() {
+            flushPendingBookmarks().then(loadBookmarks);
+        });
+
+        async function handleLogout() {
+            await sb.auth.signOut();
+            window.location.reload();
+        }
+
+        function toggleNote(cardId) {
+            const area = document.getElementById('note-' + cardId);
+            const btn = document.getElementById('notebtn-' + cardId);
+            if (!area) return;
+            area.classList.toggle('open');
+            if (area.classList.contains('open')) {
+                area.focus();
+                btn.style.borderColor = 'var(--accent)';
+                btn.style.color = 'var(--accent)';
+            } else {
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }
+        }
+
+        async function saveNote(textarea, bookName, chapNum, verseNum) {
+            const note = textarea.value.trim();
+            const noteKey = 'tsNote_' + currentUserId + '_' + bookName + '_' + chapNum + '_' + verseNum;
+            // Save to localStorage immediately
+            localStorage.setItem(noteKey, note);
+            // Update note button style
+            const cardId = 'bm-' + bookName.replace(/\s/g,'_') + '_' + chapNum + '_' + verseNum;
+            const btn = document.getElementById('notebtn-' + cardId);
+            if (btn) {
+                if (note.length > 0) {
+                    btn.classList.add('has-note');
+                } else {
+                    btn.classList.remove('has-note');
+                }
+            }
+            // Sync to Supabase
+            if (navigator.onLine && currentUserId) {
+                try {
+                    await sb.from('bookmarks').update({ notes: note })
+                        .eq('user_id', currentUserId)
+                        .eq('book_name', bookName)
+                        .eq('chapter_num', chapNum)
+                        .eq('verse_num', verseNum);
+                } catch(e) {
+                    console.warn('Could not save note to DB:', e);
+                }
+            }
+        }
+
+        // Enter key triggers search
+        document.addEventListener('DOMContentLoaded', function() {
+            var inp = document.getElementById('player-search-input');
+            if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') searchPlayerBookmarks(); });
+        });
+
+        async function searchPlayerBookmarks() {
+            const username = document.getElementById('player-search-input').value.trim();
+            if (!username) return;
+
+            const listEl = document.getElementById('bookmark-list');
+            const countEl = document.getElementById('bookmark-count');
+            const titleEl = document.getElementById('bookmark-page-title');
+            const subtitleEl = document.getElementById('bookmark-page-subtitle');
+
+            listEl.innerHTML = '<div class="loading">Searching...</div>';
+            countEl.innerText = '';
+
+            try {
+                const { data: profile } = await sb.from('profiles')
+                    .select('id, username')
+                    .ilike('username', username)
+                    .maybeSingle();
+
+                if (!profile) {
+                    listEl.innerHTML = '<div class="empty">No player found with that username.</div>';
+                    return;
+                }
+
+                const { data: bms } = await sb.from('bookmarks')
+                    .select('book_name, chapter_num, verse_num, notes, created_at')
+                    .eq('user_id', profile.id)
+                    .order('created_at', { ascending: false });
+
+                // Update header
+                titleEl.innerHTML = '⭐ ' + profile.username + '\'s Bookmarks '
+                    + '<button onclick="resetToMyBookmarks()" style="font-size:12px;font-weight:600;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:3px 10px;border-radius:6px;cursor:pointer;font-family:inherit;vertical-align:middle;">← Mine</button>';
+                subtitleEl.style.display = 'none';
+
+                if (!bms || bms.length === 0) {
+                    countEl.innerText = '';
+                    listEl.innerHTML = '<div class="empty">' + profile.username + ' has no bookmarks yet.</div>';
+                    return;
+                }
+
+                countEl.innerText = bms.length + ' bookmark' + (bms.length !== 1 ? 's' : '');
+
+                const cards = bms.map(function(b) {
+                    const ref = b.book_name + ' ' + b.chapter_num + ':' + b.verse_num;
+                    const verseText = getVerseText(b.book_name, b.chapter_num, b.verse_num);
+                    const verseUrl = '/?book=' + encodeURIComponent(b.book_name) + '&chapter=' + b.chapter_num + '&verse=' + b.verse_num;
+                    const date = b.created_at
+                        ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '';
+                    return '<div class="bookmark-card">' +
+                        '<div style="flex:1;min-width:0;">' +
+                            '<a href="' + verseUrl + '" style="text-decoration:none;"><div class="bookmark-ref" style="cursor:pointer;">↗ ' + ref + '</div></a>' +
+                            (verseText ? '<div class="bookmark-text">' + verseText + '</div>' : '') +
+                            (b.notes ? '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;font-style:italic;">📝 ' + b.notes + '</div>' : '') +
+                        '</div>' +
+                        '<span class="bookmark-date">Saved ' + date + '</span>' +
+                    '</div>';
+                }).join('');
+
+                listEl.innerHTML = '<div class="bookmark-list">' + cards + '</div>';
+
+            } catch(err) {
+                console.error('Player bookmark search error:', err);
+                listEl.innerHTML = '<div class="empty">Error loading bookmarks.</div>';
+            }
+        }
+
+        function resetToMyBookmarks() {
+            document.getElementById('bookmark-page-title').innerText = '⭐ My Bookmarks';
+            document.getElementById('bookmark-page-subtitle').style.display = '';
+            document.getElementById('player-search-input').value = '';
+            loadBookmarks();
+        }
+
+        init();
+    </script>
+    <script>
+        (function(){if(localStorage.getItem('tsTheme')!=='dark'){document.documentElement.classList.add('light-mode');}})();
+        document.addEventListener('DOMContentLoaded',function(){
+            if(localStorage.getItem('tsTheme')!=='dark'){document.body.classList.add('light-mode');}
+            var nav=document.querySelector('.nav-links');
+            if(nav){var b=document.createElement('button');b.id='theme-toggle-btn';b.title='Toggle theme';
+            b.textContent=document.body.classList.contains('light-mode')?'☀️ Theme':'🌙 Theme';
+            b.onclick=function(){var l=document.body.classList.toggle('light-mode');
+            localStorage.setItem('tsTheme',l?'light':'dark');b.textContent=l?'☀️ Theme':'🌙 Theme';
+            var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=l?'light':'dark';};
+            nav.appendChild(b);}
+        });
+    </script>
+</body>
+</html>

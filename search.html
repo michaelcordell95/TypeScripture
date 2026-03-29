@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeScripture — Verse Search</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/bible.js"></script>
+    <style>
+        /* === THEME === */
+        :root {
+            --bg-dark: #0d1117; --panel-bg: #161b22; --accent: #58a6ff;
+            --accent-dim: rgba(88,166,255,0.12); --text-main: #c9d1d9;
+            --text-muted: #484f58; --text-bright: #ffffff; --error: #f85149;
+            --border: #30363d; --border-inner: #21262d; --progress-bg: #21262d;
+        }
+        body.light-mode {
+            --bg-dark: #f2e8d5; --panel-bg: #faf3e0; --accent: #b8860b;
+            --accent-dim: rgba(184,134,11,0.12); --text-main: #1a1208;
+            --text-muted: #8a7560; --text-bright: #0a0600; --error: #8b1a1a;
+            --border: #c8a96e; --border-inner: #e8d9b8; --progress-bg: #d9c9a8;
+        }
+        *, *::before, *::after { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+        #theme-toggle-btn { color: var(--text-muted); font-size: 12px; border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; background: transparent; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+        #theme-toggle-btn:hover { border-color: var(--accent); color: var(--text-main); }
+        body.light-mode .logo-text { color: #1a1208 !important; }
+        body.light-mode .logo-text span { color: var(--accent) !important; }
+        body.light-mode .moment-card, body.light-mode .support-card, body.light-mode .social-card,
+        body.light-mode .stat-row, body.light-mode .podium-card, body.light-mode .rank-row,
+        body.light-mode .verse-card, body.light-mode .bookmark-card { background: #efe5cc !important; }
+        body.light-mode .note-area { background: #f2e8d5 !important; }
+        /* === END THEME === */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* HEADER */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 800px;
+            margin: 0 auto 32px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+        .logo-text { font-size: 22px; font-weight: 800; color: var(--text-bright); letter-spacing: -1px; }
+        .logo-text span { color: var(--accent); }
+        .nav-links { display: flex; gap: 8px; }
+        .nav-link {
+            color: var(--text-muted);
+            font-size: 13px;
+            text-decoration: none;
+            border: 1px solid var(--border);
+            padding: 5px 12px;
+            border-radius: 6px;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .nav-link:hover { color: var(--text-main); border-color: var(--accent); }
+        .nav-link.active { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+
+        /* SEARCH AREA */
+        .search-wrap { max-width: 800px; margin: 0 auto 28px; }
+        .search-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+        .search-row { display: flex; gap: 10px; }
+        .search-input {
+            flex: 1;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            color: var(--text-bright);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .search-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(88,166,255,0.1);
+        }
+        .search-input::placeholder { color: var(--text-muted); }
+        .search-btn {
+            background: var(--accent);
+            color: #0d1117;
+            border: none;
+            padding: 12px 22px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: opacity 0.15s;
+            white-space: nowrap;
+        }
+        .search-btn:hover { opacity: 0.85; }
+        .search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* RESULTS INFO BAR */
+        .results-meta {
+            max-width: 800px;
+            margin: 0 auto 14px;
+            font-size: 12px;
+            color: var(--text-muted);
+            min-height: 18px;
+        }
+        .results-meta strong { color: var(--accent); }
+
+        /* RESULT CARDS */
+        .results-list { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+
+        .verse-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            transition: border-color 0.15s;
+        }
+        .verse-card:hover { border-color: #444c56; }
+
+        .verse-body { flex: 1; min-width: 0; }
+        .verse-ref {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .verse-text {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-main);
+        }
+        .verse-text mark {
+            background: rgba(88,166,255,0.2);
+            color: var(--text-bright);
+            border-radius: 2px;
+            padding: 0 1px;
+        }
+
+        .type-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: color 0.15s, border-color 0.15s, background 0.15s;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .type-btn:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+            background: var(--accent-dim);
+        }
+
+        /* STATES */
+        .state-box {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+        .state-box .icon { font-size: 36px; margin-bottom: 12px; }
+        .state-box p { margin-top: 6px; font-size: 13px; }
+
+        .spinner {
+            width: 24px; height: 24px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* AI MODE TOGGLE */
+        .search-mode-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .mode-tab {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .mode-tab.active-kw {
+            background: var(--accent-dim);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .mode-tab.active-ai {
+            background: rgba(147,51,234,0.12);
+            border-color: #9333ea;
+            color: #c084fc;
+        }
+        .ai-badge {
+            display: inline-block;
+            background: #9333ea;
+            color: white;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .ai-reason {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-style: italic;
+        }
+        .ai-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+            opacity: 0.8;
+        }
+        #search-input.ai-mode {
+            border-color: #9333ea;
+            box-shadow: 0 0 0 3px rgba(147,51,234,0.12);
+        }
+        #search-input.ai-mode:focus {
+            border-color: #9333ea;
+            box-shadow: 0 0 0 3px rgba(147,51,234,0.18);
+        }
+        #search-input.ai-mode::placeholder { color: rgba(147,51,234,0.45); }
+        .search-btn.ai-btn {
+            background: #9333ea;
+            color: white;
+        }
+        .search-btn.ai-btn:hover { opacity: 0.85; }
+
+        /* LOAD MORE */
+        .load-more-wrap { max-width: 800px; margin: 16px auto 0; text-align: center; }
+        .load-more-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 10px 28px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .load-more-btn:hover { color: var(--text-main); border-color: var(--accent); }
+
+        @media (max-width: 600px) {
+            .search-row { flex-direction: column; }
+            .type-btn { align-self: flex-start; margin-top: 10px; }
+            .verse-card { flex-direction: column; gap: 10px; }
+        }
+    </style>
+    <meta name="color-scheme" content="light">
+</head>
+<body>
+
+<div class="header">
+    <a class="brand" href="/">
+        <span style="font-size:40px; line-height:1; color:var(--accent);">✝</span>
+        <div class="logo-text">Type<span>Scripture</span></div>
+    </a>
+    <div class="nav-links">
+        <a class="nav-link" href="/">&#127381; Type</a>
+        <a class="nav-link" href="/leaderboard.html">&#127942; Leaderboard</a>
+        <a class="nav-link" href="/bookmarks.html">⭐ Bookmarks</a>
+        <a class="nav-link active" href="/search.html">&#128269; Search</a>
+    </div>
+</div>
+
+<div class="search-wrap">
+    <div class="search-label">Search Bible Verses</div>
+    <div class="search-mode-row">
+        <button class="mode-tab active-kw" id="tab-kw" onclick="setMode('keyword')">🔤 Keyword</button>
+        <button class="mode-tab" id="tab-ai" onclick="setMode('ai')">✨ AI Search</button>
+    </div>
+    <div class="search-row">
+        <input
+            id="search-input"
+            class="search-input"
+            type="text"
+            placeholder="e.g. in the beginning, love one another, fear not..."
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
+            spellcheck="false"
+        />
+        <button class="search-btn" id="search-btn" onclick="handleSearch()">Search</button>
+    </div>
+    <div class="ai-hint" id="ai-hint" style="display:none;">Describe a story, theme, or idea — AI will find the best matching verses</div>
+</div>
+
+<div class="results-meta" id="results-meta"></div>
+<div id="results-container">
+    <div class="state-box">
+        <div class="icon">&#128214;</div>
+        <div>Search the entire KJV Bible by keyword or phrase</div>
+        <p>Results show the verse reference and text with your search term highlighted</p>
+    </div>
+</div>
+<div class="load-more-wrap" id="load-more-wrap" style="display:none;">
+    <button class="load-more-btn" onclick="showMore()">Show more results</button>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://ddubjpmuomforwickzyb.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdWJqcG11b21mb3J3aWNrenliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTI0ODMsImV4cCI6MjA4ODE2ODQ4M30.wOiDepkS64pRFEpul_sKJ9MIVIVTWzg8BZ1fMTOK3_U";
+    const { createClient } = supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' } });
+
+    const GROQ_KEY = "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";
+    const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+    const PAGE_SIZE = 20;
+    let allResults = [];
+    let shownCount = 0;
+    let currentMode = 'keyword'; // 'keyword' | 'ai'
+
+    // Build flat verse index from KJV_EMBEDDED
+    let verseIndex = null;
+
+    function buildIndex() {
+        if (verseIndex) return;
+        verseIndex = [];
+        if (typeof KJV_EMBEDDED === 'undefined') return;
+        KJV_EMBEDDED.books.forEach(function(b) {
+            b.chapters.forEach(function(ch) {
+                ch.verses.forEach(function(v) {
+                    verseIndex.push({
+                        book: b.name,
+                        chapter: ch.chapter,
+                        verse: v.verse,
+                        text: v.text,
+                        textLower: v.text.toLowerCase()
+                    });
+                });
+            });
+        });
+    }
+
+    // ── MODE TOGGLE ──────────────────────────────────────────────
+    function setMode(mode) {
+        currentMode = mode;
+        var input = document.getElementById('search-input');
+        var btn = document.getElementById('search-btn');
+        var hint = document.getElementById('ai-hint');
+        var tabKw = document.getElementById('tab-kw');
+        var tabAi = document.getElementById('tab-ai');
+
+        if (mode === 'ai') {
+            tabKw.className = 'mode-tab';
+            tabAi.className = 'mode-tab active-ai';
+            input.className = 'search-input ai-mode';
+            input.placeholder = 'e.g. Jesus calms the storm, the prodigal son returns, do not be anxious...';
+            btn.className = 'search-btn ai-btn';
+            hint.style.display = 'block';
+        } else {
+            tabKw.className = 'mode-tab active-kw';
+            tabAi.className = 'mode-tab';
+            input.className = 'search-input';
+            input.placeholder = 'e.g. in the beginning, love one another, fear not...';
+            btn.className = 'search-btn';
+            hint.style.display = 'none';
+        }
+
+        // Clear results when switching modes
+        document.getElementById('results-meta').innerHTML = '';
+        document.getElementById('results-container').innerHTML =
+            '<div class="state-box"><div class="icon">&#128214;</div><div>' +
+            (mode === 'ai' ? 'Describe a story or theme — AI will find the best matching verses' : 'Search the entire KJV Bible by keyword or phrase') +
+            '</div>' +
+            (mode === 'keyword' ? '<p>Results show the verse reference and text with your search term highlighted</p>' : '') +
+            '</div>';
+        document.getElementById('load-more-wrap').style.display = 'none';
+        input.focus();
+    }
+
+    function handleSearch() {
+        if (currentMode === 'ai') {
+            runAiSearch();
+        } else {
+            runSearch();
+        }
+    }
+
+    // ── KEYWORD SEARCH ───────────────────────────────────────────
+    function escapeRegex(str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function highlightText(text, query) {
+        var escaped = escapeRegex(query);
+        var regex = new RegExp('(' + escaped + ')', 'gi');
+        return text.replace(regex, '<mark>$1</mark>');
+    }
+
+    function runSearch() {
+        var query = document.getElementById('search-input').value.trim();
+        if (!query || query.length < 2) {
+            document.getElementById('results-meta').innerHTML = '';
+            document.getElementById('results-container').innerHTML =
+                '<div class="state-box"><div class="icon">&#9888;&#65039;</div><div>Please enter at least 2 characters</div></div>';
+            document.getElementById('load-more-wrap').style.display = 'none';
+            return;
+        }
+
+        buildIndex();
+
+        if (!verseIndex || verseIndex.length === 0) {
+            document.getElementById('results-container').innerHTML =
+                '<div class="state-box"><div class="icon">&#128214;</div><div>Bible data not loaded yet. Make sure bible.js is included.</div></div>';
+            return;
+        }
+
+        document.getElementById('results-container').innerHTML =
+            '<div class="state-box"><div class="spinner"></div><div>Searching...</div></div>';
+        document.getElementById('results-meta').innerHTML = '';
+        document.getElementById('load-more-wrap').style.display = 'none';
+
+        setTimeout(function() {
+            var queryLower = query.toLowerCase();
+            allResults = verseIndex.filter(function(v) {
+                return v.textLower.indexOf(queryLower) !== -1;
+            });
+
+            if (allResults.length === 0) {
+                document.getElementById('results-meta').innerHTML = '';
+                document.getElementById('results-container').innerHTML =
+                    '<div class="state-box"><div class="icon">&#128269;</div><div>No verses found for "<strong style="color:var(--text-main);">' + escapeHtml(query) + '</strong>"</div><p>Try a different word or phrase</p></div>';
+                return;
+            }
+
+            shownCount = 0;
+            var total = allResults.length;
+            document.getElementById('results-meta').innerHTML =
+                'Found <strong>' + total.toLocaleString() + '</strong> verse' + (total !== 1 ? 's' : '') +
+                ' matching "<strong>' + escapeHtml(query) + '</strong>"';
+
+            document.getElementById('results-container').innerHTML = '<div class="results-list" id="results-list"></div>';
+            showMore();
+        }, 10);
+    }
+
+    // ── AI SEARCH ────────────────────────────────────────────────
+    async function runAiSearch() {
+        var query = document.getElementById('search-input').value.trim();
+        if (!query || query.length < 4) {
+            document.getElementById('results-container').innerHTML =
+                '<div class="state-box"><div class="icon">&#9888;&#65039;</div><div>Please describe what you\'re looking for</div></div>';
+            return;
+        }
+
+        buildIndex();
+        if (!verseIndex || verseIndex.length === 0) {
+            document.getElementById('results-container').innerHTML =
+                '<div class="state-box"><div class="icon">&#128214;</div><div>Bible data not loaded yet. Make sure bible.js is included.</div></div>';
+            return;
+        }
+
+        document.getElementById('results-container').innerHTML =
+            '<div class="state-box"><div class="spinner" style="border-top-color:#9333ea;"></div><div>AI is searching for matching verses…</div></div>';
+        document.getElementById('results-meta').innerHTML = '';
+        document.getElementById('load-more-wrap').style.display = 'none';
+
+        try {
+            const resp = await fetch(GROQ_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_KEY },
+                body: JSON.stringify({
+                    model: 'llama-3.3-70b-versatile',
+                    temperature: 0.7,
+                    max_tokens: 2048,
+                    messages: [
+                        { role: 'system', content: 'You are a helpful KJV Bible search assistant. The user may type anything — a story, a feeling, a topic, a name, or just a few words. Always return relevant verses. Be generous and broad — never return an empty array unless the input is total gibberish. Return ONLY a JSON array (no markdown, no preamble) of 3 to 7 verses like this: [{"ref":"Book Chapter:Verse","reason":"One short sentence why this verse is relevant"}]. Use exact KJV book names (e.g. "Genesis", "Psalms", "1 Corinthians", "Song of Solomon"). Each ref must be Book Chapter:Verse — single verse only, no ranges. Order by relevance, best match first.' },
+                        { role: 'user', content: query }
+                    ]
+                })
+            });
+
+            if (!resp.ok) throw new Error('Gemini API error ' + resp.status);
+
+            const data = await resp.json();
+            const raw = data?.choices?.[0]?.message?.content ?? '[]';
+            const clean = raw.replace(/```json|```/gi, '').trim();
+
+            let results = [];
+            try { results = JSON.parse(clean); } catch(e) { results = []; }
+            if (!Array.isArray(results)) results = [];
+
+            if (!results.length) {
+                document.getElementById('results-container').innerHTML =
+                    '<div class="state-box"><div class="icon">&#128269;</div><div>AI couldn\'t find matching verses for that query</div><p>Try rephrasing or switch to keyword search</p></div>';
+                return;
+            }
+
+            // Resolve references against local verseIndex
+            var resolved = resolveAiResults(results);
+
+            if (!resolved.length) {
+                document.getElementById('results-container').innerHTML =
+                    '<div class="state-box"><div class="icon">&#128269;</div><div>AI found references but couldn\'t locate them in the KJV</div><p>Try keyword search instead</p></div>';
+                return;
+            }
+
+            document.getElementById('results-meta').innerHTML =
+                '<span class="ai-badge">AI</span> Found <strong>' + resolved.length + '</strong> verse' +
+                (resolved.length !== 1 ? 's' : '') + ' for "<strong>' + escapeHtml(query) + '</strong>"';
+
+            document.getElementById('results-container').innerHTML = '<div class="results-list" id="results-list"></div>';
+            var list = document.getElementById('results-list');
+
+            resolved.forEach(function(item) {
+                var v = item.verse;
+                var reason = item.reason;
+                var url = '/?book=' + encodeURIComponent(v.book) + '&chapter=' + v.chapter + '&verse=' + v.verse;
+
+                var card = document.createElement('div');
+                card.className = 'verse-card';
+                card.innerHTML =
+                    '<div class="verse-body">' +
+                        '<div class="verse-ref">' + v.book + ' ' + v.chapter + ':' + v.verse + '</div>' +
+                        '<div class="verse-text">' + escapeHtml(v.text) + '</div>' +
+                        (reason ? '<div class="ai-reason">✨ ' + escapeHtml(reason) + '</div>' : '') +
+                    '</div>' +
+                    '<button class="type-btn" onclick="window.location.href=\'' + url + '\'">&#9000; Type It</button>';
+                list.appendChild(card);
+            });
+
+        } catch (err) {
+            console.error('AI search error:', err);
+            document.getElementById('results-container').innerHTML =
+                '<div class="state-box"><div class="icon">&#9888;&#65039;</div>' +
+                '<div>AI Search failed</div>' +
+                '<p>' + escapeHtml(err.message || 'Unknown error') + '</p>' +
+                '</div>';
+        }
+    }
+
+    // Resolve AI-returned references against the local verse index
+    // Handles "Book Chapter:Verse" with fuzzy book name matching
+    function resolveAiResults(results) {
+        var resolved = [];
+        results.forEach(function(item) {
+            var ref = (item.ref || '').trim();
+            // Parse "Book Chapter:Verse" — book name may contain spaces
+            var match = ref.match(/^(.+?)\s+(\d+):(\d+)$/);
+            if (!match) return;
+            var bookRaw = match[1].toLowerCase();
+            var ch = parseInt(match[2], 10);
+            var vs = parseInt(match[3], 10);
+
+            var verse = verseIndex.find(function(v) {
+                return v.book.toLowerCase() === bookRaw &&
+                       v.chapter === ch &&
+                       v.verse === vs;
+            });
+
+            // Fallback: partial book name match (e.g. "Gen" → "Genesis")
+            if (!verse) {
+                verse = verseIndex.find(function(v) {
+                    return v.book.toLowerCase().startsWith(bookRaw.substring(0, 3)) &&
+                           v.chapter === ch &&
+                           v.verse === vs;
+                });
+            }
+
+            if (verse) {
+                resolved.push({ verse: verse, reason: item.reason || '' });
+            }
+        });
+        return resolved;
+    }
+
+    function showMore() {
+        var query = document.getElementById('search-input').value.trim();
+        var list = document.getElementById('results-list');
+        if (!list) return;
+
+        var batch = allResults.slice(shownCount, shownCount + PAGE_SIZE);
+        batch.forEach(function(v) {
+            var card = document.createElement('div');
+            card.className = 'verse-card';
+
+            var url = '/?book=' + encodeURIComponent(v.book) + '&chapter=' + v.chapter + '&verse=' + v.verse;
+            var highlighted = highlightText(escapeHtml(v.text), query);
+
+            card.innerHTML =
+                '<div class="verse-body">' +
+                    '<div class="verse-ref">' + v.book + ' ' + v.chapter + ':' + v.verse + '</div>' +
+                    '<div class="verse-text">' + highlighted + '</div>' +
+                '</div>' +
+                '<button class="type-btn" onclick="window.location.href=\'' + url + '\'">&#9000; Type It</button>';
+
+            list.appendChild(card);
+        });
+
+        shownCount += batch.length;
+
+        if (shownCount < allResults.length) {
+            document.getElementById('load-more-wrap').style.display = 'block';
+            var remaining = allResults.length - shownCount;
+            document.querySelector('.load-more-btn').innerText =
+                'Show more (' + remaining.toLocaleString() + ' remaining)';
+        } else {
+            document.getElementById('load-more-wrap').style.display = 'none';
+        }
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Enter key to search
+    document.getElementById('search-input').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') handleSearch();
+    });
+</script>
+
+    <script>
+        (function(){if(localStorage.getItem('tsTheme')!=='dark'){document.documentElement.classList.add('light-mode');}})();
+        document.addEventListener('DOMContentLoaded',function(){
+            if(localStorage.getItem('tsTheme')!=='dark'){document.body.classList.add('light-mode');}
+            var nav=document.querySelector('.nav-links');
+            if(nav){var b=document.createElement('button');b.id='theme-toggle-btn';b.title='Toggle theme';
+            b.textContent=document.body.classList.contains('light-mode')?'☀️ Theme':'🌙 Theme';
+            b.onclick=function(){var l=document.body.classList.toggle('light-mode');
+            localStorage.setItem('tsTheme',l?'light':'dark');b.textContent=l?'☀️ Theme':'🌙 Theme';
+            var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=l?'light':'dark';};
+            nav.appendChild(b);}
+        });
+    </script>
+</body>
+</html>

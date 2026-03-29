@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeScripture — Leaderboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* === THEME === */
+        :root {
+            --bg-dark: #0d1117; --panel-bg: #161b22; --accent: #58a6ff;
+            --accent-dim: rgba(88,166,255,0.12); --text-main: #c9d1d9;
+            --text-muted: #484f58; --text-bright: #ffffff; --error: #f85149;
+            --border: #30363d; --border-inner: #21262d; --progress-bg: #21262d;
+        }
+        body.light-mode {
+            --bg-dark: #f2e8d5; --panel-bg: #faf3e0; --accent: #b8860b;
+            --accent-dim: rgba(184,134,11,0.12); --text-main: #1a1208;
+            --text-muted: #8a7560; --text-bright: #0a0600; --error: #8b1a1a;
+            --border: #c8a96e; --border-inner: #e8d9b8; --progress-bg: #d9c9a8;
+        }
+        *, *::before, *::after { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+        #theme-toggle-btn { color: var(--text-muted); font-size: 12px; border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; background: transparent; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+        #theme-toggle-btn:hover { border-color: var(--accent); color: var(--text-main); }
+        body.light-mode .logo-text { color: #1a1208 !important; }
+        body.light-mode .logo-text span { color: var(--accent) !important; }
+        body.light-mode .moment-card, body.light-mode .support-card, body.light-mode .social-card,
+        body.light-mode .stat-row, body.light-mode .podium-card, body.light-mode .rank-row,
+        body.light-mode .verse-card, body.light-mode .bookmark-card { background: #efe5cc !important; }
+        body.light-mode .note-area { background: #f2e8d5 !important; }
+        /* === END THEME === */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: var(--bg-dark); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 20px; }
+        .header { display: flex; align-items: center; justify-content: space-between; max-width: 1000px; margin: 0 auto 24px; }
+        .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+        .logo-text { font-size: 22px; font-weight: 800; color: var(--text-bright); letter-spacing: -1px; }
+        .logo-text span { color: var(--accent); }
+        .back-link { color: var(--text-muted); font-size: 13px; text-decoration: none; border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; }
+        .back-link:hover { color: var(--text-main); border-color: var(--accent); }
+        #user-display { color: var(--text-muted); font-size: 12px; }
+        .tabs { display: flex; gap: 4px; max-width: 1000px; margin: 0 auto 20px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab { padding: 10px 16px; cursor: pointer; font-size: 14px; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
+        .tab:hover { color: var(--text-main); }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+        .content { max-width: 1000px; margin: 0 auto; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+        .stat-card { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+        .stat-card .value { font-size: 26px; font-weight: 800; color: var(--accent); }
+        .stat-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; letter-spacing: 0.5px; }
+        .graph-range-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+        .graph-range-btn:hover { border-color: var(--accent); color: var(--text-main); }
+        .graph-range-btn.active-range { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .browse-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+        select { background: var(--border-inner); border: 1px solid var(--border); color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; min-width: 140px; }
+        select:focus { outline: none; border-color: var(--accent); }
+        .lb-panel { background: var(--panel-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .lb-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .lb-header h3 { font-size: 14px; color: var(--text-main); font-weight: 600; }
+        .lb-header span { font-size: 12px; color: var(--text-muted); }
+        .lb-table { width: 100%; border-collapse: collapse; }
+        .lb-table th { padding: 10px 20px; text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+        .lb-table td { padding: 12px 20px; font-size: 14px; border-bottom: 1px solid var(--border-inner); }
+        .lb-table tr:last-child td { border-bottom: none; }
+        .lb-table tr:hover td { background: rgba(88,166,255,0.04); }
+        .rank { font-weight: 800; color: var(--text-muted); width: 40px; }
+        .rank-1 { color: #ffd700; } .rank-2 { color: #c0c0c0; } .rank-3 { color: #cd7f32; }
+        .username { font-weight: 600; color: var(--text-main); }
+        .username.is-you { color: var(--accent); }
+        .username.is-you::after { content: ' (you)'; font-size: 11px; font-weight: 400; color: var(--text-muted); }
+        .score-cell { font-weight: 800; color: var(--accent); text-align: right; }
+        .wpm-cell { text-align: right; white-space: nowrap; }
+        .wpm-val { font-weight: 700; color: var(--text-main); }
+        .wpm-label { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+        .progress-bar-wrap { width: 120px; background: var(--border-inner); border-radius: 4px; height: 6px; display: inline-block; vertical-align: middle; margin-left: 8px; }
+        .progress-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #2ea043, var(--accent)); }
+        .empty, .loading { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
+        @media (max-width: 700px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .header { flex-wrap: wrap; gap: 10px; }
+            .progress-bar-wrap { display: none; }
+            .lb-table .hide-mobile { display: none; }
+        }
+    </style>
+    <meta name="color-scheme" content="light">
+</head>
+<body>
+    <div class="header">
+        <a class="brand" href="/">
+            <span style="font-size:40px; line-height:1; color:var(--accent);">✝</span>
+            <div class="logo-text">Type<span>Scripture</span></div>
+        </a>
+        <span id="user-display"></span>
+        <a class="back-link" href="/">&#8592; Back to Typing</a>
+    </div>
+    <div class="content">
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('read')">&#128214; Most Read</button>
+            <button class="tab" onclick="switchTab('bible')">&#9997;&#65039; Bible Completion</button>
+            <button class="tab" onclick="switchTab('scores')">&#127963; Scores</button>
+            <button class="tab" onclick="switchTab('dedication')">&#128293; Dedication</button>
+            <button class="tab" onclick="switchTab('personal')">&#128100; My Stats</button>
+            <button class="tab" onclick="switchTab('search')">&#128269; Player Search</button>
+        </div>
+
+        <!-- SCORES TAB -->
+        <div id="tab-scores" style="display:none;">
+            <div style="display:flex; gap:8px; justify-content:center; margin-bottom:12px;">
+                <button id="scores-mode-typed" onclick="setScoresMode('typed')" style="background:rgba(88,166,255,0.12); border:1px solid var(--accent); color:var(--accent); padding:6px 18px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit;">⌨️ Typed</button>
+                <button id="scores-mode-read" onclick="setScoresMode('read')" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:6px 18px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit;">📖 Read</button>
+            </div>
+            <div class="browse-row">
+                <select id="scores-book" onchange="onScoresBookChange()">
+                    <option value="">&#8212; Select Book &#8212;</option>
+                </select>
+                <select id="scores-chapter" onchange="onScoresChapterChange()">
+                    <option value="">&#8212; Chapter &#8212;</option>
+                </select>
+                <select id="scores-verse" onchange="onScoresVerseChange()">
+                    <option value="">&#8212; Verse &#8212;</option>
+                </select>
+            </div>
+            <div class="lb-panel">
+                <div class="lb-header">
+                    <h3 id="scores-title">Select a book to see scores</h3>
+                    <span id="scores-count"></span>
+                </div>
+                <div id="scores-personal" style="display:none; padding:10px 20px; font-size:13px; color:var(--text-muted); border-bottom:1px solid var(--border);">
+                    <span id="scores-personal-text"></span>
+                    <div style="margin-top:6px; background:var(--border-inner); border-radius:4px; height:6px; width:100%;">
+                        <div id="scores-personal-bar" style="height:100%; border-radius:4px; background:linear-gradient(90deg,#2ea043,var(--accent)); width:0%; transition:width 0.5s;"></div>
+                    </div>
+                </div>
+                <div id="scores-body"><div class="loading">Select a book above</div></div>
+            </div>
+        </div>
+
+        <!-- PLAYER SEARCH TAB -->
+        <div id="tab-read">
+            <div class="lb-panel">
+                <div class="lb-header">
+                    <h3>Most Bible Read</h3>
+                    <span id="read-lb-count"></span>
+                </div>
+                <div id="read-lb-body"><div class="loading">Loading...</div></div>
+            </div>
+        </div>
+
+        <div id="tab-search" style="display:none;">
+            <div class="browse-row" style="gap:10px;">
+                <input id="search-input" type="text" placeholder="Enter username..." style="background:var(--border-inner);border:1px solid var(--border);color:#c9d1d9;padding:8px 14px;border-radius:6px;font-size:14px;min-width:220px;" />
+                <button onclick="searchPlayer()" style="background:var(--accent);color:#0d1117;border:none;padding:8px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;">Search</button>
+            </div>
+            <div id="search-result"></div>
+        </div>
+
+
+
+
+        <!-- DEDICATION TAB -->
+        <div id="tab-dedication" style="display:none;">
+            <!-- Single master toggle for entire tab -->
+            <div style="display:flex;gap:6px;justify-content:center;margin-bottom:16px;">
+                <button id="ded-typed-btn" onclick="setDedicationMode('typed')" style="background:rgba(88,166,255,0.12);border:1px solid var(--accent);color:var(--accent);padding:6px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">&#9000;&#65039; Typed</button>
+                <button id="ded-read-btn" onclick="setDedicationMode('read')" style="background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:6px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">&#128214; Read</button>
+            </div>
+            <!-- Laps panel -->
+            <div class="lb-panel" style="margin-bottom:16px;">
+                <div class="lb-header">
+                    <h3 id="laps-title">&#128081; Bible Laps &mdash; Typed</h3>
+                    <span id="laps-lb-count"></span>
+                </div>
+                <div id="laps-lb-body"><div class="loading">Loading...</div></div>
+            </div>
+            <!-- Hotlist panel -->
+            <div class="lb-panel">
+                <div class="lb-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                    <h3 id="hotlist-title">&#128293; Most Typed Verses &mdash; All Time</h3>
+                    <span id="hotlist-stat" style="font-size:12px;color:var(--text-muted);"></span>
+                </div>
+                <div id="hotlist-body"><div class="loading">Loading...</div></div>
+            </div>
+        </div>
+        <!-- BIBLE COMPLETION TAB -->
+        <div id="tab-bible" style="display:none;">
+            <div class="lb-panel">
+                <div class="lb-header">
+                    <h3>Global Bible Completion</h3>
+                    <span id="bible-lb-count"></span>
+                </div>
+                <div id="bible-lb-body"><div class="loading">Loading...</div></div>
+            </div>
+        </div>
+
+        <!-- PERSONAL STATS TAB -->
+        <div id="tab-personal" style="display:none;">
+            <div id="personal-logged-out" style="display:none;">
+                <div class="lb-panel"><div class="empty">Sign in to see your personal stats</div></div>
+            </div>
+            <div id="personal-content" style="display:none;">
+                <h4 style="color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px;font-weight:600;">📈 WPM Over Time</h4>
+                <div id="wpm-graph-wrap" style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:4px;">
+                    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                        <button onclick="setGraphRange('week')" id="graph-btn-week" class="graph-range-btn active-range">7 days</button>
+                        <button onclick="setGraphRange('month')" id="graph-btn-month" class="graph-range-btn">30 days</button>
+                        <button onclick="setGraphRange('year')" id="graph-btn-year" class="graph-range-btn">1 year</button>
+                        <button onclick="setGraphRange('all')" id="graph-btn-all" class="graph-range-btn">All time</button>
+                    </div>
+                    <canvas id="wpm-graph" height="180" style="width:100%;display:block;"></canvas>
+                    <div id="wpm-graph-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted);font-size:13px;">No typing data yet — start typing verses to see your progress!</div>
+                </div>
+                <h4 style="color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px;font-weight:600;">⌨️ Typing</h4>
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="value" id="stat-completion">0%</div><div class="label">Bible Typed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-verses">0</div><div class="label">Verses Typed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-books">0</div><div class="label">Books Typed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-chapters">0</div><div class="label">Chapters Typed</div></div>
+                    <div class="stat-card"><div class="value" id="stat-avg">0</div><div class="label">Average WPM</div></div>
+                    <div class="stat-card"><div class="value" id="stat-best">0</div><div class="label">Best WPM Ever</div></div>
+                </div>
+                <div class="stats-grid" style="margin-bottom:0;">
+                    <div class="stat-card">
+                        <div class="value" id="stat-fastest-wpm" style="font-size:20px;">—</div>
+                        <div class="label">Fastest Verse</div>
+                        <div id="stat-fastest-ref" style="font-size:10px;color:var(--text-muted);margin-top:3px;"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value" id="stat-slowest-wpm" style="font-size:20px;">—</div>
+                        <div class="label">Slowest Verse</div>
+                        <div id="stat-slowest-ref" style="font-size:10px;color:var(--text-muted);margin-top:3px;"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value" id="stat-most-typed" style="font-size:13px;line-height:1.4;">—</div>
+                        <div class="label">Most Typed Verse</div>
+                    </div>
+                </div>
+                <h4 style="color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px;font-weight:600;">&#128214; Reading</h4>
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="value" id="stat-read-pct">0%</div><div class="label">Bible Read</div></div>
+                    <div class="stat-card"><div class="value" id="stat-read-books">0 / 66</div><div class="label">Books Fully Read</div></div>
+                    <div class="stat-card">
+                        <div class="value" id="stat-most-read" style="font-size:13px;line-height:1.4;">—</div>
+                        <div class="label">Most Read Verse</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://ddubjpmuomforwickzyb.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdWJqcG11b21mb3J3aWNrenliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTI0ODMsImV4cCI6MjA4ODE2ODQ4M30.wOiDepkS64pRFEpul_sKJ9MIVIVTWzg8BZ1fMTOK3_U";
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' } });
+
+        const TOTAL_VERSES_BIBLE = 31102;
+        const books = ["Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","Judges","Ruth","1 Samuel","2 Samuel","1 Kings","2 Kings","1 Chronicles","2 Chronicles","Ezra","Nehemiah","Esther","Job","Psalms","Proverbs","Ecclesiastes","Song of Solomon","Isaiah","Jeremiah","Lamentations","Ezekiel","Daniel","Hosea","Joel","Amos","Obadiah","Jonah","Micah","Nahum","Habakkuk","Zephaniah","Haggai","Zechariah","Malachi","Matthew","Mark","Luke","John","Acts","Romans","1 Corinthians","2 Corinthians","Galatians","Ephesians","Philippians","Colossians","1 Thessalonians","2 Thessalonians","1 Timothy","2 Timothy","Titus","Philemon","Hebrews","James","1 Peter","2 Peter","1 John","2 John","3 John","Jude","Revelation"];
+        const chapCounts = [50,40,27,36,34,24,21,4,31,24,22,25,29,36,10,13,10,42,150,31,12,8,66,52,5,48,12,14,3,9,1,4,7,3,3,3,2,14,4,28,16,24,21,28,16,16,13,6,6,4,4,5,3,6,4,3,1,13,5,5,3,5,1,1,1,22];
+        const verseCounts = {"Genesis":[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,38,18,34,23,20,67,34,35,46,22,35,43,55,32,20,31,29,43,36,30,23,23,57,38,34,34,28,34,31,22,33,26],"Exodus":[22,25,22,31,23,30,25,32,35,29,10,51,22,31,27,36,16,27,25,26,36,31,33,18,40,37,21,43,46,38,18,35,23,35,35,38,29,31,43,38],"Leviticus":[17,16,17,35,19,30,38,36,24,20,47,8,59,57,33,34,16,30,24,46,22,22,15,17,14,24,20,17,22],"Numbers":[54,34,51,49,31,27,89,26,23,36,35,16,33,45,41,50,13,32,22,29,35,41,30,25,18,65,23,31,40,16,54,42,56,29,34,13],"Deuteronomy":[46,37,29,49,33,25,26,20,29,22,32,32,18,29,23,22,20,22,21,20,23,30,25,22,19,19,26,68,29,20,30,52,29,12],"Joshua":[18,24,17,24,15,27,26,35,27,43,23,24,33,15,63,10,18,28,51,9,45,34,16,33],"Judges":[36,23,31,24,31,40,25,35,57,18,40,15,25,20,20,31,13,31,30,48,25],"Ruth":[22,23,18,22],"1 Samuel":[28,36,21,22,12,21,17,22,27,27,15,25,23,52,35,23,58,30,24,42,15,23,29,22,44,25,12,25,11,31,13],"2 Samuel":[27,32,39,12,25,23,29,18,13,19,27,31,39,33,37,23,29,33,43,26,22,51,39,25],"1 Kings":[53,46,28,34,18,38,51,66,28,29,43,33,34,31,34,34,24,46,21,43,29,53],"2 Kings":[18,25,27,44,27,33,20,29,37,36,21,21,25,29,38,20,41,37,37,21,26,20,37,20,30],"1 Chronicles":[54,55,24,43,26,81,40,40,44,14,47,40,14,17,29,43,27,17,19,8,30,19,32,31,31,32,34,21,30],"2 Chronicles":[17,18,17,22,14,42,22,18,31,19,23,16,22,15,19,14,19,34,11,37,20,12,21,27,28,23,9,27,36,27,21,33,25,33,27,23],"Ezra":[11,70,13,24,17,22,28,36,15,44],"Nehemiah":[11,20,32,23,19,19,73,18,38,39,36,47,31],"Esther":[22,23,15,17,14,14,10,17,32,3],"Job":[22,13,26,21,27,30,21,22,35,22,20,25,28,22,35,22,16,21,29,29,34,30,17,25,6,14,23,28,25,31,40,22,33,37,16,33,24,41,30,24,34,17],"Psalms":[6,12,8,8,12,10,17,9,20,18,7,8,6,7,5,11,15,50,14,9,13,31,6,10,22,12,14,9,11,13,25,11,22,23,28,13,40,23,14,18,14,12,5,27,18,12,10,15,21,23,21,11,7,9,24,14,12,12,18,14,9,13,12,11,14,20,8,36,37,6,24,20,28,23,11,13,21,72,13,20,17,8,19,13,14,17,7,19,53,17,16,16,5,23,11,13,12,9,9,5,8,28,22,35,45,48,43,13,31,7,10,10,9,8,18,19,2,29,176,7,8,9,4,8,5,6,5,6,8,8,3,18,3,3,21,26,9,8,24,14,10,8,12,15,21,10,20,14,9,6],"Proverbs":[33,22,35,27,23,35,27,36,18,32,31,28,25,35,33,33,28,24,29,30,31,29,35,34,28,28,27,28,27,33,31],"Ecclesiastes":[18,26,22,16,20,12,29,17,18,20,10,14],"Song of Solomon":[17,17,11,16,16,13,13,14],"Isaiah":[31,22,26,6,30,13,25,22,21,34,16,6,22,32,9,14,14,7,25,6,17,25,18,23,12,21,13,29,24,33,9,20,24,21,29,15,25,20,29,22,11,14,17,17,13,22,6,38,18,41,49,4,21,47,70,30,30,10],"Jeremiah":[19,37,25,31,31,30,34,22,26,25,23,17,27,22,21,21,27,23,15,18,14,30,40,10,38,24,22,17,32,24,40,44,26,22,19,32,21,28,18,16,18,22,13,30,5,28,7,47,39,46,64,34],"Lamentations":[22,22,66,22,22],"Ezekiel":[28,10,27,21,17,21,11,20,12,28,16,16,13,16,20,15,16,15,22,27,20,21,22,22,30,25,29,22,23,23,31,29,23,25,18,22,32,25,29,15,20,65,23,31,40,16,24,20,25,17,17],"Daniel":[21,49,30,37,31,28,28,27,27,21,45,13],"Hosea":[11,23,5,19,15,11,16,14,17,15,12,14,16,9],"Joel":[20,32,21],"Amos":[15,16,15,13,27,14,17,14,15],"Obadiah":[21],"Jonah":[17,10,10,11],"Micah":[16,13,12,13,15,16,20],"Nahum":[15,13,19],"Habakkuk":[17,20,19],"Zephaniah":[18,15,20],"Haggai":[15,23],"Zechariah":[21,13,10,14,11,15,14,23,17,12,17,14,9,21],"Malachi":[14,17,18,6],"Matthew":[25,23,17,25,48,34,29,34,38,42,45,27,31,32,29,43,22,51,29,23,37,35,45,38,47,19,44,31,27,36,30,22,25,28,46,20,64,31],"Mark":[45,28,35,41,43,56,37,38,50,52,33,44,37,72,47,20],"Luke":[80,52,38,44,39,49,50,56,62,42,54,59,35,35,32,31,37,43,48,47,38,71,56,53],"John":[51,25,36,54,47,71,53,59,41,42,57,50,38,31,27,33,26,40,42,31,25],"Acts":[26,47,26,37,42,15,60,40,43,48,30,25,52,28,41,40,34,28,41,38,40,30,35,27,27,32,44,31],"Romans":[32,29,31,25,21,23,25,39,33,21,36,21,14,23,33,27],"1 Corinthians":[31,16,23,21,13,20,40,34,16,30,54,23,18,25,21,29],"2 Corinthians":[24,17,18,18,21,18,16,24,15,18,33,21,14],"Galatians":[24,21,29,31,26,18],"Ephesians":[23,22,21,28,30,14],"Philippians":[30,18,19,16],"Colossians":[14,16,12,27],"1 Thessalonians":[10,20,13,18,28],"2 Thessalonians":[12,17,18],"1 Timothy":[20,15,16,16,25,21],"2 Timothy":[18,26,17,22],"Titus":[16,15,15],"Philemon":[25],"Hebrews":[14,18,19,16,14,20,28,13,28,39,40,29,25],"James":[27,26,18,17,20],"1 Peter":[25,25,22,19,14],"2 Peter":[21,22,18],"1 John":[10,29,24,21,21],"2 John":[13],"3 John":[14],"Jude":[25],"Revelation":[20,29,22,11,14,17,17,13,21,11,19,17,18,20,8,21,18,24,21,15,27,21]};
+
+
+        const BOOK_INDEX = {"Genesis":1,"Exodus":2,"Leviticus":3,"Numbers":4,"Deuteronomy":5,"Joshua":6,"Judges":7,"Ruth":8,"1 Samuel":9,"2 Samuel":10,"1 Kings":11,"2 Kings":12,"1 Chronicles":13,"2 Chronicles":14,"Ezra":15,"Nehemiah":16,"Esther":17,"Job":18,"Psalms":19,"Proverbs":20,"Ecclesiastes":21,"Song of Solomon":22,"Isaiah":23,"Jeremiah":24,"Lamentations":25,"Ezekiel":26,"Daniel":27,"Hosea":28,"Joel":29,"Amos":30,"Obadiah":31,"Jonah":32,"Micah":33,"Nahum":34,"Habakkuk":35,"Zephaniah":36,"Haggai":37,"Zechariah":38,"Malachi":39,"Matthew":40,"Mark":41,"Luke":42,"John":43,"Acts":44,"Romans":45,"1 Corinthians":46,"2 Corinthians":47,"Galatians":48,"Ephesians":49,"Philippians":50,"Colossians":51,"1 Thessalonians":52,"2 Thessalonians":53,"1 Timothy":54,"2 Timothy":55,"Titus":56,"Philemon":57,"Hebrews":58,"James":59,"1 Peter":60,"2 Peter":61,"1 John":62,"2 John":63,"3 John":64,"Jude":65,"Revelation":66};
+        const BOOK_NAMES = [null, ...Object.keys(BOOK_INDEX)];
+        let currentUserId = null;
+        let currentUsername = null;
+
+        async function init() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                currentUserId = session.user.id;
+                const { data } = await supabaseClient.from('profiles').select('username').eq('id', currentUserId).maybeSingle();
+                currentUsername = data ? data.username : session.user.email;
+                document.getElementById('user-display').innerText = '✓ ' + currentUsername;
+            }
+        }
+
+        let scoresMode = 'typed'; // 'typed' or 'read'
+
+        function setScoresMode(mode) {
+            scoresMode = mode;
+            var typedBtn = document.getElementById('scores-mode-typed');
+            var readBtn = document.getElementById('scores-mode-read');
+            typedBtn.style.background = mode === 'typed' ? 'rgba(88,166,255,0.12)' : 'transparent';
+            typedBtn.style.borderColor = mode === 'typed' ? 'var(--accent)' : 'var(--border)';
+            typedBtn.style.color = mode === 'typed' ? 'var(--accent)' : 'var(--text-muted)';
+            readBtn.style.background = mode === 'read' ? 'rgba(88,166,255,0.12)' : 'transparent';
+            readBtn.style.borderColor = mode === 'read' ? 'var(--accent)' : 'var(--border)';
+            readBtn.style.color = mode === 'read' ? 'var(--accent)' : 'var(--text-muted)';
+            // Hide verse select in read mode (reading tracked at verse level but no WPM)
+            document.getElementById('scores-verse').style.display = mode === 'read' ? 'none' : '';
+            document.getElementById('scores-title').innerText = 'Select a book to see ' + (mode === 'typed' ? 'scores' : 'reading progress');
+            document.getElementById('scores-body').innerHTML = '<div class="loading">Select a book above</div>';
+            document.getElementById('scores-count').innerText = '';
+            document.getElementById('scores-personal').style.display = 'none';
+            // Re-run with current book/chapter selection
+            var book = document.getElementById('scores-book').value;
+            if (book) loadScoresLeaderboard();
+        }
+
+        function switchTab(tab) {
+            var tabs = document.querySelectorAll('.tab');
+            var tabNames = ['read', 'bible', 'scores', 'dedication', 'personal', 'search'];
+            tabs.forEach(function(t, i) { t.classList.toggle('active', tabNames[i] === tab); });
+            document.getElementById('tab-bible').style.display = tab === 'bible' ? 'block' : 'none';
+            document.getElementById('tab-dedication').style.display = tab === 'dedication' ? 'block' : 'none';
+            document.getElementById('tab-scores').style.display = tab === 'scores' ? 'block' : 'none';
+            document.getElementById('tab-personal').style.display = tab === 'personal' ? 'block' : 'none';
+            document.getElementById('tab-search').style.display = tab === 'search' ? 'block' : 'none';
+            document.getElementById('tab-read').style.display = tab === 'read' ? 'block' : 'none';
+            if (tab === 'read') loadReadLeaderboard();
+            if (tab === 'bible') loadBibleCompletionLeaderboard();
+            if (tab === 'dedication') loadDedicationLeaderboard();
+            if (tab === 'scores') populateScoresBookSelect();
+            if (tab === 'personal') loadPersonalStats();
+        }
+
+        // ===== VERSE SCORES TAB =====
+        function showPersonalStat(label, done, total) {
+            var el = document.getElementById('scores-personal');
+            var textEl = document.getElementById('scores-personal-text');
+            var barEl = document.getElementById('scores-personal-bar');
+            if (!currentUserId || total === 0) { el.style.display = 'none'; return; }
+            var pct = (done / total) * 100;
+            var displayPct = pct < 0.1 ? pct.toFixed(3) : pct < 1 ? pct.toFixed(2) : Math.round(pct);
+            textEl.innerHTML = 'Your completion: <span style="color:var(--accent);font-weight:700;">' + displayPct + '%</span> <span style="font-size:11px;">(' + done + '/' + total + ' ' + label + ')</span>';
+            barEl.style.width = Math.max(pct, 0.3) + '%';
+            el.style.display = 'block';
+        }
+
+        function populateScoresBookSelect() {
+            var sel = document.getElementById('scores-book');
+            if (sel.options.length > 1) return;
+            books.forEach(function(b) {
+                var opt = document.createElement('option');
+                opt.value = b; opt.innerText = b;
+                sel.appendChild(opt);
+            });
+        }
+
+        function onScoresBookChange() {
+            var book = document.getElementById('scores-book').value;
+            var chapSel = document.getElementById('scores-chapter');
+            var verseSel = document.getElementById('scores-verse');
+            chapSel.innerHTML = '<option value="">&#8212; Chapter &#8212;</option>';
+            verseSel.innerHTML = '<option value="">&#8212; Verse &#8212;</option>';
+            document.getElementById('scores-count').innerText = '';
+            if (!book) {
+                document.getElementById('scores-title').innerText = 'Select a book to see scores';
+                document.getElementById('scores-body').innerHTML = '<div class="loading">Select a book above</div>';
+                document.getElementById('scores-personal').style.display = 'none';
+                return;
+            }
+            var count = chapCounts[books.indexOf(book)];
+            for (var i = 1; i <= count; i++) {
+                var opt = document.createElement('option');
+                opt.value = i; opt.innerText = 'Chapter ' + i;
+                chapSel.appendChild(opt);
+            }
+            loadScoresLeaderboard();
+        }
+
+        function onScoresChapterChange() {
+            var book = document.getElementById('scores-book').value;
+            var chap = parseInt(document.getElementById('scores-chapter').value);
+            var verseSel = document.getElementById('scores-verse');
+            verseSel.innerHTML = '<option value="">&#8212; Verse &#8212;</option>';
+            if (!book || !chap) { loadScoresLeaderboard(); return; }
+            var count = (verseCounts[book] && verseCounts[book][chap - 1]) || 30;
+            for (var i = 1; i <= count; i++) {
+                var opt = document.createElement('option');
+                opt.value = i; opt.innerText = 'Verse ' + i;
+                verseSel.appendChild(opt);
+            }
+            loadScoresLeaderboard();
+        }
+
+        function onScoresVerseChange() {
+            loadScoresLeaderboard();
+        }
+
+        async function loadScoresLeaderboard() {
+            var book = document.getElementById('scores-book').value;
+            var chap = parseInt(document.getElementById('scores-chapter').value) || 0;
+            var verse = parseInt(document.getElementById('scores-verse').value) || 0;
+            if (!book) return;
+
+            document.getElementById('scores-body').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('scores-count').innerText = '';
+
+            if (scoresMode === 'read') { loadReadScores(book, chap); return; }
+
+            try {
+                if (verse && chap) {
+                    document.getElementById('scores-title').innerText = book + ' ' + chap + ':' + verse;
+                    document.getElementById('scores-personal').style.display = 'none';
+                    var bookIndex = BOOK_INDEX[book];
+                    if (!bookIndex) return;
+                    var verseIdx = verse - 1;
+                    var result = await supabaseClient
+                        .from('chapter_progress')
+                        .select('user_id, type_counts, best_wpms')
+                        .eq('book_index', bookIndex).eq('chapter_num', chap);
+                    if (result.error) throw result.error;
+                    var verseScores = [];
+                    (result.data || []).forEach(function(r) {
+                        var wpm = r.best_wpms && r.best_wpms[verseIdx] ? r.best_wpms[verseIdx] : 0;
+                        var timesTyped = r.type_counts && r.type_counts[verseIdx] ? r.type_counts[verseIdx] : 0;
+                        if (wpm > 0 || timesTyped > 0) verseScores.push({ user_id: r.user_id, best_wpm: wpm, timesTyped: timesTyped });
+                    });
+                    verseScores.sort(function(a, b) { return b.best_wpm - a.best_wpm; });
+                    verseScores = verseScores.slice(0, 50);
+                    if (verseScores.length === 0) {
+                        document.getElementById('scores-body').innerHTML = '<div class="empty">No scores yet &#8212; be the first!</div>';
+                        return;
+                    }
+                    var userIds = verseScores.map(function(r) { return r.user_id; });
+                    var profResult = await supabaseClient.from('profiles').select('id, username').in('id', userIds);
+                    var usernameMap = {};
+                    (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+                    document.getElementById('scores-count').innerText = verseScores.length + ' score' + (verseScores.length !== 1 ? 's' : '');
+                    var myRankIdx = currentUserId ? verseScores.findIndex(function(r){ return r.user_id === currentUserId; }) : -1;
+                    var rows = verseScores.map(function(row, i) {
+                        var rank = i + 1;
+                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                        var username = usernameMap[row.user_id] || 'Anonymous';
+                        var isYou = row.user_id === currentUserId;
+                        var timesCell = row.timesTyped > 0 ? ' <span style="font-size:11px;color:var(--text-muted);">&#9000;&#65039;&times;' + row.timesTyped + '</span>' : '';
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + (row.best_wpm > 0 ? row.best_wpm + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">WPM</span>' : '<span class="wpm-label">—</span>') + timesCell + '</td></tr>';
+                    }).join('');
+                    var yourRankRow = '';
+                    if (currentUserId && myRankIdx === -1) {
+                        yourRankRow = '<tr><td colspan="3" style="text-align:center;padding:10px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);">You&#39;re not in the top ' + verseScores.length + ' for this verse yet</td></tr>';
+                    }
+                    document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Best WPM</th></tr></thead><tbody>' + rows + yourRankRow + '</tbody></table>';
+
+                } else if (chap) {
+                    document.getElementById('scores-title').innerText = book + ' — Chapter ' + chap;
+                    var chapVerseTotal = (verseCounts[book] && verseCounts[book][chap - 1]) || 0;
+                    var bookIndex = BOOK_INDEX[book];
+                    if (!bookIndex) return;
+                    var result = await supabaseClient
+                        .from('chapter_progress')
+                        .select('user_id, type_counts, read_counts, best_wpms')
+                        .eq('book_index', bookIndex).eq('chapter_num', chap);
+                    if (result.error) throw result.error;
+                    var userData = {};
+                    (result.data || []).forEach(function(r) {
+                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0, minCount: Infinity, readCount: 0, readMinCount: Infinity };
+                        if (r.type_counts) r.type_counts.forEach(function(count, i) {
+                            if (count > 0) {
+                                userData[r.user_id].count++;
+                                if (count < userData[r.user_id].minCount) userData[r.user_id].minCount = count;
+                                var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
+                                if (wpm > 0) { userData[r.user_id].totalWpm += wpm; userData[r.user_id].scoredVerses++; }
+                            }
+                        });
+                        if (r.read_counts) r.read_counts.forEach(function(count) {
+                            if (count > 0) { userData[r.user_id].readCount++; }
+                        });
+                    });
+                    var completers = Object.keys(userData).filter(function(uid) { return userData[uid].count >= chapVerseTotal; });
+                    var myCount = currentUserId && userData[currentUserId] ? userData[currentUserId].count : 0;
+                    showPersonalStat('verses', myCount, chapVerseTotal);
+                    if (completers.length === 0) {
+                        document.getElementById('scores-body').innerHTML = '<div class="empty">Nobody has completed 100% of this chapter yet &#8212; be the first!</div>';
+                        return;
+                    }
+                    completers.sort(function(a, b) {
+                        var avgA = userData[a].scoredVerses > 0 ? userData[a].totalWpm / userData[a].scoredVerses : 0;
+                        var avgB = userData[b].scoredVerses > 0 ? userData[b].totalWpm / userData[b].scoredVerses : 0;
+                        return avgB - avgA;
+                    });
+                    completers = completers.slice(0, 50);
+                    var profResult = await supabaseClient.from('profiles').select('id, username').in('id', completers);
+                    var usernameMap = {};
+                    (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+                    document.getElementById('scores-count').innerText = completers.length + ' completion' + (completers.length !== 1 ? 's' : '');
+                    var rows = completers.map(function(userId, i) {
+                        var rank = i + 1;
+                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                        var username = usernameMap[userId] || 'Anonymous';
+                        var isYou = userId === currentUserId;
+                        var avg = userData[userId].scoredVerses > 0 ? Math.round(userData[userId].totalWpm / userData[userId].scoredVerses) : 0;
+                        var timesCompleted = userData[userId].minCount === Infinity ? 0 : userData[userId].minCount;
+                        var typedBit = timesCompleted > 0 ? ' <span style="font-size:11px;color:var(--text-muted);">&#9000;&#65039;&times;' + timesCompleted + '</span>' : '';
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span>' + typedBit + '</td></tr>';
+                    }).join('');
+                    document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Avg WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+                } else {
+                    document.getElementById('scores-title').innerText = book;
+                    var bookVerseTotal = (verseCounts[book] || []).reduce(function(sum, v) { return sum + v; }, 0);
+                    var bookIndex = BOOK_INDEX[book];
+                    if (!bookIndex) return;
+                    var result = await supabaseClient
+                        .from('chapter_progress')
+                        .select('user_id, type_counts, read_counts, best_wpms')
+                        .eq('book_index', bookIndex);
+                    if (result.error) throw result.error;
+                    var userData = {};
+                    (result.data || []).forEach(function(r) {
+                        if (!userData[r.user_id]) userData[r.user_id] = { count: 0, totalWpm: 0, scoredVerses: 0, minCount: Infinity, readCount: 0 };
+                        if (r.type_counts) r.type_counts.forEach(function(count, i) {
+                            if (count > 0) {
+                                userData[r.user_id].count++;
+                                if (count < userData[r.user_id].minCount) userData[r.user_id].minCount = count;
+                                var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
+                                if (wpm > 0) { userData[r.user_id].totalWpm += wpm; userData[r.user_id].scoredVerses++; }
+                            }
+                        });
+                        if (r.read_counts) r.read_counts.forEach(function(count) {
+                            if (count > 0) userData[r.user_id].readCount++;
+                        });
+                    });
+                    var completers = Object.keys(userData).filter(function(uid) { return userData[uid].count >= bookVerseTotal; });
+                    var myCount = currentUserId && userData[currentUserId] ? userData[currentUserId].count : 0;
+                    showPersonalStat('verses', myCount, bookVerseTotal);
+                    if (completers.length === 0) {
+                        document.getElementById('scores-body').innerHTML = '<div class="empty">Nobody has completed 100% of ' + book + ' yet &#8212; be the first!</div>';
+                        return;
+                    }
+                    completers.sort(function(a, b) {
+                        var avgA = userData[a].scoredVerses > 0 ? userData[a].totalWpm / userData[a].scoredVerses : 0;
+                        var avgB = userData[b].scoredVerses > 0 ? userData[b].totalWpm / userData[b].scoredVerses : 0;
+                        return avgB - avgA;
+                    });
+                    completers = completers.slice(0, 50);
+                    var profResult = await supabaseClient.from('profiles').select('id, username').in('id', completers);
+                    var usernameMap = {};
+                    (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+                    document.getElementById('scores-count').innerText = completers.length + ' completion' + (completers.length !== 1 ? 's' : '');
+                    var rows = completers.map(function(userId, i) {
+                        var rank = i + 1;
+                        var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                        var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                        var username = usernameMap[userId] || 'Anonymous';
+                        var isYou = userId === currentUserId;
+                        var avg = userData[userId].scoredVerses > 0 ? Math.round(userData[userId].totalWpm / userData[userId].scoredVerses) : 0;
+                        var bkTypedBit = (userData[userId].minCount !== Infinity && userData[userId].minCount > 0) ? ' <span style="font-size:11px;color:var(--text-muted);">&#9000;&#65039;&times;' + userData[userId].minCount + '</span>' : '';
+                        return '<tr><td class="rank ' + rankClass + '">' + medal + '</td><td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td><td class="score-cell">' + avg + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">avg WPM</span>' + bkTypedBit + '</td></tr>';
+                    }).join('');
+                    document.getElementById('scores-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Avg WPM</th></tr></thead><tbody>' + rows + '</tbody></table>';
+                }
+            } catch(err) {
+                console.error('Scores leaderboard error:', err);
+                document.getElementById('scores-body').innerHTML = '<div class="empty">Error loading scores.</div>';
+            }
+        }
+
+        // ===== BIBLE COMPLETION TAB =====
+        async function loadBibleCompletionLeaderboard() {
+            document.getElementById('bible-lb-body').innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                var result = await supabaseClient
+                    .from('chapter_progress')
+                    .select('user_id, type_counts, best_wpms');
+
+                if (result.error) throw result.error;
+
+                var userData = {};
+                (result.data || []).forEach(function(r) {
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0, totalTyped: 0, totalWpm: 0, scoredVerses: 0, bestWpm: 0, verseCounts: [] };
+                    if (r.type_counts) {
+                        r.type_counts.forEach(function(count, i) {
+                            userData[r.user_id].verseCounts.push(count);
+                            if (count > 0) {
+                                userData[r.user_id].verseCount++;
+                                userData[r.user_id].totalTyped += count;
+                                var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
+                                if (wpm > 0) {
+                                    userData[r.user_id].totalWpm += wpm;
+                                    userData[r.user_id].scoredVerses++;
+                                    if (wpm > userData[r.user_id].bestWpm) userData[r.user_id].bestWpm = wpm;
+                                }
+                            }
+                        });
+                    }
+                });
+                // Calculate laps: min type_count across ALL 31102 verses (missing = 0)
+                Object.keys(userData).forEach(function(uid) {
+                    var u = userData[uid];
+                    var allCounts = u.verseCounts;
+                    // Pad to full Bible length so untyped verses count as 0
+                    while (allCounts.length < TOTAL_VERSES_BIBLE) allCounts.push(0);
+                    u.laps = Math.min.apply(null, allCounts);
+                });
+
+                if (Object.keys(userData).length === 0) {
+                    document.getElementById('bible-lb-count').innerText = '';
+                    document.getElementById('bible-lb-body').innerHTML = '<div class="empty">No completions yet &#8212; be the first!</div>';
+                    return;
+                }
+
+                // Sort: full Bible completers pinned to top (with crown), then by verse count
+                var sorted = Object.keys(userData).sort(function(a, b) {
+                    var aFull = userData[a].verseCount >= TOTAL_VERSES_BIBLE;
+                    var bFull = userData[b].verseCount >= TOTAL_VERSES_BIBLE;
+                    if (aFull && !bFull) return -1;
+                    if (!aFull && bFull) return 1;
+                    return userData[b].verseCount - userData[a].verseCount;
+                }).slice(0, 50);
+
+                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', sorted);
+                var usernameMap = {};
+                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+
+                document.getElementById('bible-lb-count').innerText = sorted.length + ' player' + (sorted.length !== 1 ? 's' : '');
+
+                var rows = sorted.map(function(userId, i) {
+                    var rank = i + 1;
+                    var u = userData[userId];
+                    var username = usernameMap[userId] || 'Anonymous';
+                    var isYou = userId === currentUserId;
+                    var verseCount = u.verseCount;
+                    var pct = (verseCount / TOTAL_VERSES_BIBLE) * 100;
+                    var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
+                    var barWidth = Math.max((verseCount / TOTAL_VERSES_BIBLE) * 100, 0.5);
+                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                    var isFull = verseCount >= TOTAL_VERSES_BIBLE;
+                    // Full Bible completers get a crown; others get standard medals
+                    var medal = isFull ? '&#128081;' : (rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank);
+                    var avgWpm = u.scoredVerses > 0 ? Math.round(u.totalWpm / u.scoredVerses) : 0;
+                    var bestWpm = u.bestWpm || 0;
+                    var laps = u.laps || 0;
+                    var avgCell = avgWpm > 0
+                        ? '<span class="wpm-val">' + avgWpm + '</span> <span class="wpm-label">WPM</span>'
+                        : '<span class="wpm-label">—</span>';
+                    var bestCell = bestWpm > 0
+                        ? '<span class="wpm-val">' + bestWpm + '</span> <span class="wpm-label">WPM</span>'
+                        : '<span class="wpm-label">—</span>';
+                    var lapsCell = laps > 0
+                        ? '<span style="color:#ffd700;font-weight:800;">&#128081;</span> <span class="wpm-val">&times;' + laps + '</span>'
+                        : '<span class="wpm-label">—</span>';
+                    var totalTypedCell = '<span class="wpm-val">' + (u.totalTyped || 0).toLocaleString() + '</span>';
+                    return '<tr>' +
+                        '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                        '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                        '<td style="text-align:right;">' +
+                            '<span style="font-weight:800;color:var(--accent);">' + displayPct + '</span>' +
+                            '<span style="color:var(--text-muted);font-size:11px;"> (' + verseCount.toLocaleString() + ')</span>' +
+                            '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%"></div></div>' +
+                        '</td>' +
+                        '<td class="wpm-cell hide-mobile">' + totalTypedCell + '</td>' +
+                        '<td class="wpm-cell hide-mobile">' + lapsCell + '</td>' +
+                        '<td class="wpm-cell hide-mobile">' + avgCell + '</td>' +
+                        '<td class="wpm-cell hide-mobile">' + bestCell + '</td>' +
+                    '</tr>';
+                }).join('');
+
+                document.getElementById('bible-lb-body').innerHTML =
+                    '<table class="lb-table">' +
+                        '<thead><tr>' +
+                            '<th>#</th>' +
+                            '<th>Player</th>' +
+                            '<th style="text-align:right;">Completion</th>' +
+                            '<th class="hide-mobile" style="text-align:right;">Total Typed</th>' +
+                            '<th class="hide-mobile" style="text-align:right;">Laps</th>' +
+                            '<th class="hide-mobile" style="text-align:right;">Avg WPM</th>' +
+                            '<th class="hide-mobile" style="text-align:right;">Best WPM</th>' +
+                        '</tr></thead>' +
+                        '<tbody>' + rows + '</tbody>' +
+                    '</table>';
+
+            } catch(err) {
+                console.error('Bible completion error:', err);
+                document.getElementById('bible-lb-body').innerHTML = '<div class="empty">Error loading leaderboard.</div>';
+            }
+        }
+
+        // ===== PERSONAL STATS TAB =====
+        async function loadPersonalStats() {
+            if (!currentUserId) {
+                document.getElementById('personal-logged-out').style.display = 'block';
+                document.getElementById('personal-content').style.display = 'none';
+                return;
+            }
+            document.getElementById('personal-logged-out').style.display = 'none';
+            document.getElementById('personal-content').style.display = 'block';
+
+            try {
+                var result = await supabaseClient
+                    .from('chapter_progress')
+                    .select('book_index, chapter_num, type_counts, read_counts, best_wpms, last_activity')
+                    .eq('user_id', currentUserId);
+
+                if (result.error) throw result.error;
+                var rows = result.data || [];
+
+                var typedVerseCount = 0, totalWpm = 0, scoredVerses = 0, bestWpm = 0;
+                var typedKeys = {}, readKeys = {};
+                var graphPoints = [];
+                var fastestWpm = 0, fastestRef = '';
+                var slowestWpm = Infinity, slowestRef = '';
+                var bestTypedCount = 0, bestTypedRef = '—';
+                var bestReadCount = 0, bestReadRef = '—';
+
+                rows.forEach(function(r) {
+                    var bookName = BOOK_NAMES[r.book_index] || '?';
+                    if (r.type_counts) {
+                        var chapWpmSum = 0, chapWpmCount = 0;
+                        r.type_counts.forEach(function(count, i) {
+                            if (count > 0) {
+                                typedVerseCount++;
+                                typedKeys[r.book_index + '|' + r.chapter_num + '|' + i] = true;
+                                var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
+                                if (wpm > 0) {
+                                    totalWpm += wpm; scoredVerses++;
+                                    chapWpmSum += wpm; chapWpmCount++;
+                                    if (wpm > bestWpm) bestWpm = wpm;
+                                    var ref = bookName + ' ' + r.chapter_num + ':' + (i + 1);
+                                    if (wpm > fastestWpm) { fastestWpm = wpm; fastestRef = ref; }
+                                    if (wpm < slowestWpm) { slowestWpm = wpm; slowestRef = ref; }
+                                }
+                                if (count > bestTypedCount) {
+                                    bestTypedCount = count;
+                                    bestTypedRef = bookName + ' ' + r.chapter_num + ':' + (i + 1) + ' ×' + count;
+                                }
+                            }
+                        });
+                        if (chapWpmCount > 0 && r.last_activity) {
+                            graphPoints.push({ date: r.last_activity, wpm: Math.round(chapWpmSum / chapWpmCount) });
+                        }
+                    }
+                    if (r.read_counts) {
+                        r.read_counts.forEach(function(count, i) {
+                            if (count > 0) {
+                                readKeys[r.book_index + '|' + r.chapter_num + '|' + i] = true;
+                                if (count > bestReadCount) {
+                                    bestReadCount = count;
+                                    bestReadRef = bookName + ' ' + r.chapter_num + ':' + (i + 1) + ' ×' + count;
+                                }
+                            }
+                        });
+                    }
+                });
+
+                var avgWpm = scoredVerses > 0 ? Math.round(totalWpm / scoredVerses) : 0;
+                var pct = (typedVerseCount / TOTAL_VERSES_BIBLE) * 100;
+                var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
+
+                var booksCompleted = books.filter(function(book) {
+                    var chapters = verseCounts[book]; if (!chapters) return false;
+                    var bi = BOOK_INDEX[book];
+                    for (var c = 0; c < chapters.length; c++)
+                        for (var v = 0; v < chapters[c]; v++)
+                            if (!typedKeys[bi + '|' + (c+1) + '|' + v]) return false;
+                    return true;
+                }).length;
+
+                var chaptersCompleted = 0;
+                books.forEach(function(book) {
+                    var chapters = verseCounts[book]; if (!chapters) return;
+                    var bi = BOOK_INDEX[book];
+                    for (var c = 0; c < chapters.length; c++) {
+                        var allDone = true;
+                        for (var v = 0; v < chapters[c]; v++) { if (!typedKeys[bi + '|' + (c+1) + '|' + v]) { allDone = false; break; } }
+                        if (allDone) chaptersCompleted++;
+                    }
+                });
+
+                document.getElementById('stat-completion').innerText = displayPct;
+                document.getElementById('stat-verses').innerText = typedVerseCount.toLocaleString();
+                document.getElementById('stat-books').innerText = booksCompleted + ' / 66';
+                document.getElementById('stat-chapters').innerText = chaptersCompleted + ' / 1189';
+                document.getElementById('stat-avg').innerText = avgWpm;
+                document.getElementById('stat-best').innerText = bestWpm;
+                document.getElementById('stat-fastest-wpm').innerText = fastestWpm > 0 ? fastestWpm + ' WPM' : '—';
+                document.getElementById('stat-fastest-ref').innerText = fastestRef;
+                document.getElementById('stat-slowest-wpm').innerText = (slowestWpm < Infinity && slowestWpm > 0) ? slowestWpm + ' WPM' : '—';
+                document.getElementById('stat-slowest-ref').innerText = slowestRef;
+                document.getElementById('stat-most-typed').innerText = bestTypedCount > 0 ? bestTypedRef : '—';
+
+                var readVerseCount = Object.keys(readKeys).length;
+                var readPct = (readVerseCount / TOTAL_VERSES_BIBLE) * 100;
+                var readDisplayPct = readPct < 0.1 ? readPct.toFixed(3) + '%' : readPct < 1 ? readPct.toFixed(2) + '%' : Math.round(readPct) + '%';
+
+                var booksFullyRead = books.filter(function(book) {
+                    var chapters = verseCounts[book]; if (!chapters) return false;
+                    var bi = BOOK_INDEX[book];
+                    for (var c = 0; c < chapters.length; c++)
+                        for (var v = 0; v < chapters[c]; v++)
+                            if (!readKeys[bi + '|' + (c+1) + '|' + v]) return false;
+                    return true;
+                }).length;
+
+                document.getElementById('stat-read-pct').innerText = readDisplayPct;
+                document.getElementById('stat-read-books').innerText = booksFullyRead + ' / 66';
+                document.getElementById('stat-most-read').innerText = bestReadCount > 0 ? bestReadRef : '—';
+
+                allVerseData = graphPoints;
+                setGraphRange(currentGraphRange);
+
+            } catch(err) {
+                console.error('Personal stats error:', err);
+            }
+        }
+
+        var allVerseData = [];
+        var currentGraphRange = 'week';
+
+        function setGraphRange(range) {
+            currentGraphRange = range;
+            ['week','month','year','all'].forEach(function(r) {
+                var btn = document.getElementById('graph-btn-' + r);
+                if (btn) btn.className = 'graph-range-btn' + (r === range ? ' active-range' : '');
+            });
+            renderWpmGraph(allVerseData, range);
+        }
+
+        function renderWpmGraph(data, range) {
+            var canvas = document.getElementById('wpm-graph');
+            var emptyEl = document.getElementById('wpm-graph-empty');
+            if (!canvas) return;
+
+            var now = new Date();
+            var cutoff = new Date();
+            if (range === 'week')  cutoff.setDate(now.getDate() - 7);
+            if (range === 'month') cutoff.setDate(now.getDate() - 30);
+            if (range === 'year')  cutoff.setFullYear(now.getFullYear() - 1);
+            if (range === 'all')   cutoff = new Date(0);
+
+            var filtered = data.filter(function(r) { return new Date(r.date) >= cutoff; });
+
+            if (filtered.length === 0) {
+                canvas.style.display = 'none';
+                emptyEl.style.display = 'block';
+                return;
+            }
+            canvas.style.display = 'block';
+            emptyEl.style.display = 'none';
+
+            // Group by day — avg wpm per day
+            var dayMap = {};
+            filtered.forEach(function(r) {
+                var d = new Date(r.date);
+                var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+                if (!dayMap[key]) dayMap[key] = { sum: 0, count: 0 };
+                dayMap[key].sum += r.wpm;
+                dayMap[key].count++;
+            });
+            var days = Object.keys(dayMap).sort();
+            var points = days.map(function(d) { return Math.round(dayMap[d].sum / dayMap[d].count); });
+
+            // Canvas setup
+            var dpr = window.devicePixelRatio || 1;
+            var w = canvas.parentElement.clientWidth - 32;
+            var h = 180;
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+            var ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            var padL = 42, padR = 12, padT = 16, padB = 36;
+            var gw = w - padL - padR;
+            var gh = h - padT - padB;
+
+            var maxWpm = Math.max.apply(null, points);
+            var minWpm = Math.min.apply(null, points);
+            var wpmRange = maxWpm - minWpm || 1;
+
+            // Get CSS vars
+            var style = getComputedStyle(document.body);
+            var accentColor = style.getPropertyValue('--accent').trim();
+            var mutedColor = style.getPropertyValue('--text-muted').trim();
+            var borderColor = style.getPropertyValue('--border').trim();
+
+            // Grid lines
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 0.5;
+            [0, 0.25, 0.5, 0.75, 1].forEach(function(t) {
+                var y = padT + gh * (1 - t);
+                ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + gw, y); ctx.stroke();
+                var label = Math.round(minWpm + wpmRange * t);
+                ctx.fillStyle = mutedColor;
+                ctx.font = '10px system-ui';
+                ctx.textAlign = 'right';
+                ctx.fillText(label, padL - 6, y + 4);
+            });
+
+            // Line + fill
+            var n = points.length;
+            var xStep = n > 1 ? gw / (n - 1) : gw;
+
+            function px(i) { return padL + (n > 1 ? i * xStep : gw / 2); }
+            function py(v) { return padT + gh * (1 - (v - minWpm) / wpmRange); }
+            var isLight = document.body.classList.contains('light-mode');
+            var fillColor = isLight ? 'rgba(184,134,11,0.10)' : 'rgba(88,166,255,0.10)';
+            ctx.beginPath();
+            ctx.moveTo(px(0), py(points[0]));
+            for (var i = 1; i < n; i++) ctx.lineTo(px(i), py(points[i]));
+            ctx.lineTo(px(n-1), padT + gh);
+            ctx.lineTo(px(0), padT + gh);
+            ctx.closePath();
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+
+            // Line
+            ctx.beginPath();
+            ctx.moveTo(px(0), py(points[0]));
+            for (var i = 1; i < n; i++) ctx.lineTo(px(i), py(points[i]));
+            ctx.strokeStyle = accentColor;
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            // Dots
+            for (var i = 0; i < n; i++) {
+                ctx.beginPath();
+                ctx.arc(px(i), py(points[i]), n > 30 ? 0 : 3, 0, Math.PI * 2);
+                ctx.fillStyle = accentColor;
+                ctx.fill();
+            }
+
+            // X axis labels (show up to 7 evenly spaced)
+            ctx.fillStyle = mutedColor;
+            ctx.font = '10px system-ui';
+            ctx.textAlign = 'center';
+            var labelStep = Math.ceil(n / 7);
+            for (var i = 0; i < n; i += labelStep) {
+                var parts = days[i].split('-');
+                var label = parts[1] + '/' + parts[2];
+                ctx.fillText(label, px(i), padT + gh + 18);
+            }
+        }
+        async function loadReadLeaderboard() {
+            document.getElementById('read-lb-body').innerHTML = '<div class="loading">Loading...</div>';
+            try {
+                var result = await supabaseClient
+                    .from('chapter_progress')
+                    .select('user_id, read_counts');
+
+                var userData = {};
+                (result.data || []).forEach(function(r) {
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0 };
+                    if (r.read_counts) r.read_counts.forEach(function(count) {
+                        if (count > 0) userData[r.user_id].verseCount++;
+                    });
+                });
+
+                if (Object.keys(userData).length === 0) {
+                    document.getElementById('read-lb-count').innerText = '';
+                    document.getElementById('read-lb-body').innerHTML = '<div class="empty">No reading data yet — be the first!</div>';
+                    return;
+                }
+
+                var sorted = Object.keys(userData).sort(function(a, b) {
+                    return userData[b].verseCount - userData[a].verseCount;
+                }).slice(0, 50);
+
+                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', sorted);
+                var usernameMap = {};
+                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+
+                document.getElementById('read-lb-count').innerText = sorted.length + ' reader' + (sorted.length !== 1 ? 's' : '');
+
+                var rows = sorted.map(function(userId, i) {
+                    var rank = i + 1;
+                    var u = userData[userId];
+                    var username = usernameMap[userId] || 'Anonymous';
+                    var isYou = userId === currentUserId;
+                    var pct = (u.verseCount / TOTAL_VERSES_BIBLE) * 100;
+                    var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
+                    var barWidth = Math.max(pct, 0.5);
+                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                    var isFull = u.verseCount >= TOTAL_VERSES_BIBLE;
+                    var medal = isFull ? '&#128081;' : (rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank);
+                    return '<tr>' +
+                        '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                        '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                        '<td style="text-align:right;">' +
+                            '<span style="font-weight:800;color:var(--accent);">' + displayPct + '</span>' +
+                            '<span style="color:var(--text-muted);font-size:11px;"> (' + u.verseCount.toLocaleString() + ')</span>' +
+                            '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%;"></div></div>' +
+                        '</td>' +
+                    '</tr>';
+                }).join('');
+
+                document.getElementById('read-lb-body').innerHTML =
+                    '<table class="lb-table">' +
+                        '<thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Bible Read</th></tr></thead>' +
+                        '<tbody>' + rows + '</tbody>' +
+                    '</table>';
+
+            } catch(err) {
+                console.error('Read leaderboard error:', err);
+                document.getElementById('read-lb-body').innerHTML = '<div class="empty">Error loading leaderboard.</div>';
+            }
+        }
+
+        async function loadReadScores(book, chap) {
+            var label = chap ? book + ' — Chapter ' + chap : book;
+            document.getElementById('scores-title').innerText = label;
+
+            try {
+                var bookIndex = BOOK_INDEX[book];
+                if (!bookIndex) return;
+                var query = supabaseClient
+                    .from('chapter_progress')
+                    .select('user_id, chapter_num, read_counts')
+                    .eq('book_index', bookIndex);
+                if (chap) query = query.eq('chapter_num', chap);
+                var result = await query;
+
+                var userData = {};
+                (result.data || []).forEach(function(r) {
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0, minReadCount: Infinity };
+                    if (r.read_counts) r.read_counts.forEach(function(count) {
+                        if (count > 0) {
+                            userData[r.user_id].verseCount++;
+                            if (count < userData[r.user_id].minReadCount) userData[r.user_id].minReadCount = count;
+                        }
+                    });
+                });
+
+                // Calculate total verses for book/chapter
+                var total = 0;
+                if (chap) {
+                    total = (verseCounts[book] && verseCounts[book][chap - 1]) || 0;
+                } else {
+                    total = (verseCounts[book] || []).reduce(function(s, v) { return s + v; }, 0);
+                }
+
+                // Show user's own progress
+                var myCount = currentUserId && userData[currentUserId] ? userData[currentUserId].verseCount : 0;
+                showPersonalStat('verses read', myCount, total);
+
+                if (Object.keys(userData).length === 0) {
+                    document.getElementById('scores-body').innerHTML = '<div class="empty">Nobody has read ' + label + ' yet — be the first!</div>';
+                    return;
+                }
+
+                // Sort by verse count descending
+                var sorted = Object.keys(userData).sort(function(a, b) {
+                    return userData[b].verseCount - userData[a].verseCount;
+                }).slice(0, 50);
+
+                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', sorted);
+                var usernameMap = {};
+                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+
+                document.getElementById('scores-count').innerText = sorted.length + ' reader' + (sorted.length !== 1 ? 's' : '');
+
+                var rows = sorted.map(function(userId, i) {
+                    var rank = i + 1;
+                    var u = userData[userId];
+                    var username = usernameMap[userId] || 'Anonymous';
+                    var isYou = userId === currentUserId;
+                    var pct = total > 0 ? (u.verseCount / total) * 100 : 0;
+                    var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
+                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                    var isFull = u.verseCount >= total && total > 0;
+                    var medal = isFull ? '&#128081;' : (rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank);
+                    var barWidth = Math.max(pct, 0.5);
+                    var readLapBit = (isFull && u.minReadCount !== Infinity && u.minReadCount > 1) ? ' <span style="font-size:11px;color:var(--text-muted);">&#128214;&times;' + u.minReadCount + '</span>' : '';
+                    return '<tr>' +
+                        '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                        '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                        '<td style="text-align:right;">' +
+                            '<span style="font-weight:800;color:var(--accent);">' + displayPct + '</span>' +
+                            '<span style="color:var(--text-muted);font-size:11px;"> (' + u.verseCount + '/' + total + ')</span>' +
+                            readLapBit +
+                            '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%;"></div></div>' +
+                        '</td>' +
+                    '</tr>';
+                }).join('');
+
+                document.getElementById('scores-body').innerHTML =
+                    '<table class="lb-table">' +
+                        '<thead><tr><th>#</th><th>Player</th><th style="text-align:right;">' + (chap ? 'Chapter' : 'Book') + ' Read</th></tr></thead>' +
+                        '<tbody>' + rows + '</tbody>' +
+                    '</table>';
+
+            } catch(err) {
+                console.error('Read scores error:', err);
+                document.getElementById('scores-body').innerHTML = '<div class="empty">Error loading data.</div>';
+            }
+        }
+
+
+        // ===== DEDICATION TAB =====
+        var dedicationMode = 'typed';
+        var dedicationData = null;
+
+        function setDedicationMode(mode) {
+            dedicationMode = mode;
+            var typedBtn = document.getElementById('ded-typed-btn');
+            var readBtn = document.getElementById('ded-read-btn');
+            typedBtn.style.background = mode === 'typed' ? 'rgba(88,166,255,0.12)' : 'transparent';
+            typedBtn.style.borderColor = mode === 'typed' ? 'var(--accent)' : 'var(--border)';
+            typedBtn.style.color = mode === 'typed' ? 'var(--accent)' : 'var(--text-muted)';
+            readBtn.style.background = mode === 'read' ? 'rgba(88,166,255,0.12)' : 'transparent';
+            readBtn.style.borderColor = mode === 'read' ? 'var(--accent)' : 'var(--border)';
+            readBtn.style.color = mode === 'read' ? 'var(--accent)' : 'var(--text-muted)';
+            if (dedicationData) renderDedication();
+        }
+
+        function renderDedication() {
+            var d = dedicationData;
+            var isTyped = dedicationMode === 'typed';
+
+            // Titles
+            document.getElementById('laps-title').innerHTML = isTyped
+                ? '&#128081; Bible Laps &mdash; Typed'
+                : '&#128081; Bible Laps &mdash; Read';
+            document.getElementById('hotlist-title').innerHTML = isTyped
+                ? '&#128293; Most Typed Verses &mdash; All Time'
+                : '&#128214; Most Read Verses &mdash; All Time';
+
+            // Stat line
+            var totalCount = isTyped ? d.totalTyped : d.totalRead;
+            document.getElementById('hotlist-stat').innerText = totalCount.toLocaleString() + ' verse ' + (isTyped ? 'typings' : 'readings') + ' on TypeScripture';
+
+            // ── Laps ──
+            var lapField = isTyped ? 'typeLaps' : 'readLaps';
+            var lappers = d.allUserIds.filter(function(uid) { return (d.userData[uid][lapField] || 0) >= 1; });
+            lappers.sort(function(a, b) { return (d.userData[b][lapField] || 0) - (d.userData[a][lapField] || 0); });
+
+            if (lappers.length === 0) {
+                document.getElementById('laps-lb-count').innerText = '';
+                document.getElementById('laps-lb-body').innerHTML = '<div class="empty">Nobody has ' + (isTyped ? 'typed' : 'read') + ' through the full Bible yet — be the first! &#128081;</div>';
+            } else {
+                document.getElementById('laps-lb-count').innerText = lappers.length + ' player' + (lappers.length !== 1 ? 's' : '');
+                var rows = lappers.map(function(uid, i) {
+                    var rank = i + 1;
+                    var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                    var medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+                    var username = d.usernameMap[uid] || 'Anonymous';
+                    var isYou = uid === currentUserId;
+                    var laps = d.userData[uid][lapField] || 0;
+                    return '<tr>' +
+                        '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                        '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
+                        '<td style="text-align:right;"><span style="color:#ffd700;font-size:16px;">&#128081;</span> <span class="wpm-val">&times;' + laps + '</span> <span class="wpm-label">lap' + (laps !== 1 ? 's' : '') + '</span></td>' +
+                    '</tr>';
+                }).join('');
+                document.getElementById('laps-lb-body').innerHTML = '<table class="lb-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Full Laps</th></tr></thead><tbody>' + rows + '</tbody></table>';
+            }
+
+            // ── Hotlist ──
+            var verses = isTyped ? d.topTyped : d.topRead;
+            if (!verses || verses.length === 0) {
+                document.getElementById('hotlist-body').innerHTML = '<div class="empty">No data yet.</div>';
+                return;
+            }
+            var medals = ['&#129351;','&#129352;','&#129353;'];
+            var hotRows = verses.map(function(v, i) {
+                var rank = i + 1;
+                var rankClass = rank <= 3 ? 'rank-' + rank : '';
+                var medal = rank <= 3 ? medals[rank - 1] : rank;
+                return '<tr>' +
+                    '<td class="rank ' + rankClass + '">' + medal + '</td>' +
+                    '<td style="font-weight:600;color:var(--text-main);">' + v.ref + '</td>' +
+                    '<td style="text-align:right;"><span class="wpm-val">' + v.total.toLocaleString() + '</span> <span class="wpm-label">times</span></td>' +
+                '</tr>';
+            });
+            document.getElementById('hotlist-body').innerHTML =
+                '<table class="lb-table"><thead><tr><th>#</th><th>Verse</th><th style="text-align:right;">Global Count</th></tr></thead><tbody>' + hotRows.join('') + '</tbody></table>';
+        }
+
+        async function loadDedicationLeaderboard() {
+            document.getElementById('laps-lb-body').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('hotlist-body').innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                var result = await supabaseClient
+                    .from('chapter_progress')
+                    .select('user_id, book_index, chapter_num, type_counts, read_counts');
+
+                if (result.error) throw result.error;
+
+                var userData = {};
+                var verseMap = {};
+                var totalTyped = 0, totalRead = 0;
+
+                (result.data || []).forEach(function(r) {
+                    var bookName = BOOK_NAMES[r.book_index] || '?';
+                    if (!userData[r.user_id]) userData[r.user_id] = { typeAllCounts: [], readAllCounts: [] };
+
+                    if (r.type_counts) {
+                        r.type_counts.forEach(function(count, i) {
+                            userData[r.user_id].typeAllCounts.push(count);
+                            if (count > 0) {
+                                totalTyped += count;
+                                var key = r.book_index + '|' + r.chapter_num + '|' + i;
+                                if (!verseMap[key]) verseMap[key] = { ref: bookName + ' ' + r.chapter_num + ':' + (i + 1), typedTotal: 0, readTotal: 0 };
+                                verseMap[key].typedTotal += count;
+                            }
+                        });
+                    }
+                    if (r.read_counts) {
+                        r.read_counts.forEach(function(count, i) {
+                            userData[r.user_id].readAllCounts.push(count);
+                            if (count > 0) {
+                                totalRead += count;
+                                var key = r.book_index + '|' + r.chapter_num + '|' + i;
+                                if (!verseMap[key]) verseMap[key] = { ref: bookName + ' ' + r.chapter_num + ':' + (i + 1), typedTotal: 0, readTotal: 0 };
+                                verseMap[key].readTotal += count;
+                            }
+                        });
+                    }
+                });
+
+                // Calculate typed and read laps separately
+                Object.keys(userData).forEach(function(uid) {
+                    var u = userData[uid];
+                    var tc = u.typeAllCounts.slice();
+                    var rc = u.readAllCounts.slice();
+                    while (tc.length < TOTAL_VERSES_BIBLE) tc.push(0);
+                    while (rc.length < TOTAL_VERSES_BIBLE) rc.push(0);
+                    u.typeLaps = Math.min.apply(null, tc);
+                    u.readLaps = Math.min.apply(null, rc);
+                });
+
+                // Top 10 hotlists
+                var allVerses = Object.values(verseMap);
+                var topTyped = allVerses.slice().sort(function(a, b) { return b.typedTotal - a.typedTotal; }).slice(0, 10).map(function(v) { return { ref: v.ref, total: v.typedTotal }; });
+                var topRead  = allVerses.slice().sort(function(a, b) { return b.readTotal  - a.readTotal;  }).slice(0, 10).map(function(v) { return { ref: v.ref, total: v.readTotal  }; });
+
+                // Fetch usernames
+                var allUserIds = Object.keys(userData);
+                var profResult = await supabaseClient.from('profiles').select('id, username').in('id', allUserIds);
+                var usernameMap = {};
+                (profResult.data || []).forEach(function(p) { usernameMap[p.id] = p.username; });
+
+                dedicationData = { userData: userData, usernameMap: usernameMap, allUserIds: allUserIds, topTyped: topTyped, topRead: topRead, totalTyped: totalTyped, totalRead: totalRead };
+
+                renderDedication();
+
+            } catch(err) {
+                console.error('Dedication leaderboard error:', err);
+                document.getElementById('laps-lb-body').innerHTML = '<div class="empty">Error loading data.</div>';
+                document.getElementById('hotlist-body').innerHTML = '<div class="empty">Error loading data.</div>';
+            }
+        }
+        async function searchPlayer() {
+            var username = document.getElementById('search-input').value.trim();
+            var resultEl = document.getElementById('search-result');
+            if (!username) return;
+            resultEl.innerHTML = '<div class="loading">Searching...</div>';
+
+            var profResult = await supabaseClient.from('profiles').select('id, username').ilike('username', username).limit(1);
+            if (profResult.error || !profResult.data || profResult.data.length === 0) {
+                resultEl.innerHTML = '<div class="empty">No player found with that username.</div>';
+                return;
+            }
+            var profile = profResult.data[0];
+            var uid = profile.id;
+
+            var result = await supabaseClient.from('chapter_progress').select('book_index, chapter_num, type_counts, best_wpms').eq('user_id', uid);
+            if (result.error) { resultEl.innerHTML = '<div class="empty">Error loading stats.</div>'; return; }
+
+            var rows = result.data || [];
+            var typedVerseCount = 0, totalWpm = 0, scoredVerses = 0, bestWpm = 0, typedKeys = {};
+            rows.forEach(function(r) {
+                if (r.type_counts) r.type_counts.forEach(function(count, i) {
+                    if (count > 0) {
+                        typedVerseCount++;
+                        typedKeys[r.book_index + '|' + r.chapter_num + '|' + i] = true;
+                        var wpm = r.best_wpms && r.best_wpms[i] ? r.best_wpms[i] : 0;
+                        if (wpm > 0) { totalWpm += wpm; scoredVerses++; if (wpm > bestWpm) bestWpm = wpm; }
+                    }
+                });
+            });
+            var avgWpm = scoredVerses > 0 ? Math.round(totalWpm / scoredVerses) : 0;
+            var pct = (typedVerseCount / TOTAL_VERSES_BIBLE) * 100;
+            var displayPct = pct < 0.1 ? pct.toFixed(3) + '%' : pct < 1 ? pct.toFixed(2) + '%' : Math.round(pct) + '%';
+
+            var booksCompleted = books.filter(function(book) {
+                var chapters = verseCounts[book]; if (!chapters) return false;
+                var bi = BOOK_INDEX[book];
+                for (var c = 0; c < chapters.length; c++) for (var v = 0; v < chapters[c]; v++) if (!typedKeys[bi + '|' + (c+1) + '|' + v]) return false;
+                return true;
+            }).length;
+            var chaptersCompleted = 0;
+            books.forEach(function(book) {
+                var chapters = verseCounts[book]; if (!chapters) return;
+                var bi = BOOK_INDEX[book];
+                for (var c = 0; c < chapters.length; c++) {
+                    var allDone = true;
+                    for (var v = 0; v < chapters[c]; v++) { if (!typedKeys[bi + '|' + (c+1) + '|' + v]) { allDone = false; break; } }
+                    if (allDone) chaptersCompleted++;
+                }
+            });
+
+            var isYou = uid === currentUserId;
+            resultEl.innerHTML =
+                '<div style="padding:16px 20px;border-bottom:1px solid var(--border);">' +
+                    '<span style="font-size:16px;font-weight:800;color:var(--accent);">' + profile.username + '</span>' +
+                    (isYou ? ' <span style="font-size:11px;color:var(--text-muted);">(you)</span>' : '') +
+                '</div>' +
+                '<div class="stats-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);">' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + displayPct + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Bible Completion</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + typedVerseCount.toLocaleString() + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Verses Typed</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + booksCompleted + ' / 66</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Books Complete</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + chaptersCompleted + ' / 1189</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Chapters Complete</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + avgWpm + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Avg WPM</div></div>' +
+                    '<div class="stat-card" style="background:var(--panel-bg);padding:20px;text-align:center;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + bestWpm + '</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">Best WPM</div></div>' +
+                '</div>';
+        }
+
+        document.getElementById('search-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchPlayer(); });
+
+        window.addEventListener('resize', function() {
+            if (allVerseData.length > 0) renderWpmGraph(allVerseData, currentGraphRange);
+        });
+
+        init().then(function() { loadReadLeaderboard(); });
+    </script>
+    <script>
+        (function(){if(localStorage.getItem('tsTheme')!=='dark'){document.documentElement.classList.add('light-mode');}})();
+        document.addEventListener('DOMContentLoaded',function(){
+            if(localStorage.getItem('tsTheme')!=='dark'){document.body.classList.add('light-mode');}
+            var nav=document.querySelector('.nav-links');
+            if(nav){var b=document.createElement('button');b.id='theme-toggle-btn';b.title='Toggle theme';
+            b.textContent=document.body.classList.contains('light-mode')?'☀️ Theme':'🌙 Theme';
+            b.onclick=function(){var l=document.body.classList.toggle('light-mode');
+            localStorage.setItem('tsTheme',l?'light':'dark');b.textContent=l?'☀️ Theme':'🌙 Theme';
+            var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=l?'light':'dark';};
+            nav.appendChild(b);}
+        });
+    </script>
+</body>
+</html>

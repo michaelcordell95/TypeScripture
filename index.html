@@ -1,0 +1,2954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+    <meta name="color-scheme" content="light">
+    <script>
+        (function() {
+            var saved = localStorage.getItem('tsTheme');
+            if (saved === 'light') {
+                document.documentElement.classList.add('light-mode');
+            } else if (saved === 'dark') {
+                // explicit dark, do nothing
+            } else {
+                // No preference saved — default light on mobile, dark on desktop
+                var isMobile = window.innerWidth <= 600 || /iPhone|iPad|Android/i.test(navigator.userAgent);
+                if (isMobile) document.documentElement.classList.add('light-mode');
+            }
+            document.addEventListener('DOMContentLoaded', function() {
+                var saved = localStorage.getItem('tsTheme');
+                var isMobile = window.innerWidth <= 600 || /iPhone|iPad|Android/i.test(navigator.userAgent);
+                var isLight = saved === 'light' || (!saved && isMobile);
+                if (isLight) document.body.classList.add('light-mode');
+                var btn = document.getElementById('theme-toggle-btn');
+                if (btn) btn.textContent = isLight ? '☀️ Theme' : '🌙 Theme';
+                var m = document.querySelector('meta[name="color-scheme"]');
+                if (m) m.content = isLight ? 'light' : 'dark';
+            });
+        })();
+    </script>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Droid+Sans+Mono&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192-maskable.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512-maskable.png">
+    <link rel="shortcut icon" href="/icon-192-maskable.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TypeScripture">
+    <link rel="apple-touch-icon" href="/icon-192-maskable.png">
+    <title>TypeScripture</title>
+    <meta name="description" content="Type through the Bible verse by verse. Track your progress, improve your speed, and memorize Scripture with TypeScripture.">
+    <!-- Supabase Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preload" href="/bible.js" as="script">
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --panel-bg: #161b22;
+            --accent: #58a6ff;
+            --text-main: #c9d1d9;
+            --text-muted: #484f58;
+            --text-bright: #ffffff;
+            --error: #f85149;
+            --correct: #f0f6fc;
+            --progress-bg: #21262d;
+            --border: #30363d;
+            --border-inner: #21262d;
+        }
+        body.light-mode {
+            --bg-dark: #f2e8d5;
+            --panel-bg: #faf3e0;
+            --accent: #b8860b;
+            --text-main: #1a1208;
+            --text-muted: #8a7560;
+            --text-bright: #0a0600;
+            --error: #8b1a1a;
+            --correct: #0a0600;
+            --progress-bg: #d9c9a8;
+            --border: #c8a96e;
+            --border-inner: #efe5cc;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+        }
+        body.light-mode #display {
+            font-family: 'Droid Sans Mono', 'Courier New', monospace !important;
+            border-color: #c8a96e !important;
+            box-shadow: 0 2px 16px rgba(139,107,40,0.13), inset 0 0 40px rgba(210,185,140,0.10) !important;
+        }
+        body.light-mode #nav-header {
+            border-color: #c8a96e !important;
+            box-shadow: 0 2px 8px rgba(139,107,40,0.10) !important;
+        }
+        body.light-mode .stat-box {
+            border-color: #c8a96e !important;
+        }
+        body.light-mode select, body.light-mode input[type="text"] {
+            background: #faf3e0 !important;
+            color: #1a1208 !important;
+            border-color: #c8a96e !important;
+        }
+        body.light-mode .logo-text { color: #1a1208; }
+        body.light-mode .logo-text span { color: #b8860b; }
+        *, *::before, *::after { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            margin: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .brand-container { display: flex; align-items: center; gap: 15px; margin-top: 1vh; margin-bottom: 1vh; }
+        .logo-icon { width: 58px; height: 58px; border: 3px solid var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 26px; color: var(--text-bright); background: rgba(88, 166, 255, 0.1); box-shadow: 0 0 15px rgba(88, 166, 255, 0.2); }
+        .logo-text { font-size: clamp(30px, 5vw, 44px); font-weight: 800; color: var(--accent); letter-spacing: -1.5px; }
+        .logo-text span { color: var(--text-bright); }
+        #auth-container { margin-bottom: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; align-items: center; }
+        #auth-container { margin-bottom: 0; }
+        #google-login-btn { display: flex; align-items: center; gap: 6px; background: rgba(88,166,255,0.12); color: var(--accent); font-weight: 600; border: 1px solid var(--accent); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        #google-login-btn:hover { background: rgba(88,166,255,0.22); color: var(--text-bright); }
+        #google-login-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+        #logout-btn { background: transparent; color: var(--text-muted); display: none; border: 1px solid #30363d; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        #logout-btn:hover { border-color: var(--error); color: var(--error); }
+        #user-email { color: var(--text-muted); align-self: center; font-size: 12px; }
+        #bible-progress-container { width: 90%; max-width: 900px; background: var(--progress-bg); height: 8px; border-radius: 10px; margin-bottom: 5px; border: 1px solid #30363d; }
+        #bible-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2ea043, var(--accent)); transition: width 0.5s ease-out; }
+        #progress-text { font-size: 11px; color: var(--text-muted); margin-bottom: 1vh; font-weight: bold; min-height: 16px; }
+        #nav-header { background: var(--panel-bg); padding: 10px 16px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 1.5vh; display: flex; flex-direction: column; gap: 8px; align-items: center; min-height: 62px; box-sizing: border-box; }
+        .nav-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; }
+        .nav-divider { width: 1px; height: 28px; background: #30363d; margin: 0 4px; flex-shrink: 0; }
+        .nav-group { display: flex; align-items: center; gap: 8px; }
+        .settings-group { display: none; }
+        /* Focus mode */
+        body.focus-mode #streak-banner,
+        body.focus-mode #streak-banner,
+        body.focus-mode .brand-container,
+        body.focus-mode #stats-bar,
+        body.focus-mode #bible-progress-container,
+        body.focus-mode #progress-text,
+        body.focus-mode #read-progress-container,
+        body.focus-mode #read-progress-text,
+        body.focus-mode #last-verse-box,
+        body.focus-mode #streak-banner,
+        body.focus-mode #accuracy-warning { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+        body.focus-mode #display { border-color: transparent; box-shadow: none; background: var(--bg-dark); transition: all 0.4s ease; }
+        body.focus-mode #nav-header { opacity: 0.15; transition: opacity 0.3s ease; }
+        body.focus-mode #nav-header:hover { opacity: 1; }
+        #read-mode-btn { background: rgba(88,166,255,0.08); border: 1.5px solid var(--accent); color: var(--accent); opacity: 0.6; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 700; transition: all 0.2s; }
+        #read-mode-btn:hover { opacity: 1; background: rgba(88,166,255,0.15); }
+        .toggle-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-muted); user-select: none; }
+        .toggle-label input[type=checkbox] { display: none; }
+        .toggle-track { width: 32px; height: 18px; background: var(--progress-bg); border-radius: 9px; position: relative; transition: background 0.2s; flex-shrink: 0; }
+        .toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: var(--text-muted); border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+        .toggle-label input:checked + .toggle-track { background: rgba(88,166,255,0.25); }
+        body.light-mode .toggle-label input:checked + .toggle-track { background: rgba(184,134,11,0.25); }
+        .toggle-label input:checked + .toggle-track::after { transform: translateX(14px); background: var(--accent); }
+        /* Search box in nav */
+        .nav-search-wrap { display: flex; align-items: center; gap: 0; background: var(--panel-bg); border: 1px solid var(--progress-bg); border-radius: 6px; overflow: hidden; transition: border-color 0.2s; }
+        .nav-search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+        .nav-search-wrap input { background: transparent; border: none; color: var(--text-main); padding: 5px 8px; font-size: 12px; font-family: inherit; outline: none; width: 110px; min-width: 0; }
+        .nav-search-wrap input::placeholder { color: var(--text-muted); font-style: italic; }
+        @media (max-width: 600px) { .nav-search-wrap input { width: 70px; } .nav-search-wrap input::placeholder { font-size: 11px; } }
+        .nav-search-wrap button { background: transparent; border: none; border-left: 1px solid var(--progress-bg); color: var(--text-muted); padding: 5px 8px; cursor: pointer; font-size: 13px; transition: color 0.2s; }
+        .nav-search-wrap button:hover { color: var(--accent); }
+        .hidden { display: none !important; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+        select, button { background: var(--border-inner); border: 1px solid var(--border); color: var(--text-main); padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+        select { min-width: 80px; min-height: 38px; }
+        #stats-bar { display: flex; gap: 12px; margin-top: 8px; margin-bottom: 1.5vh; justify-content: center; width: 92%; max-width: 1100px; box-sizing: border-box; }
+        #read-ref-box {
+            background: transparent;
+            border: 1.5px solid rgba(88,166,255,0.3);
+            border-radius: 20px;
+            padding: 4px 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        #read-ref-box .ref-sub { font-size: 13px; color: var(--accent); font-weight: 600; letter-spacing: 0.3px; }
+        .stat-box { text-align: center; background: var(--panel-bg); padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; min-width: 75px; min-height: 56px; height: auto; flex: 1 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
+        .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); display: block; white-space: nowrap; line-height: 1.2; }
+        .stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        #display { -webkit-overflow-scrolling: touch; -webkit-user-select: none; user-select: none; width: 92%; max-width: 1100px; height: 45vh; font-size: clamp(20px, 3vh, 36px); font-family: 'Droid Sans Mono', 'Courier New', monospace; line-height: 1.6; text-align: left; padding: 35px; background: var(--panel-bg); border-radius: 16px; border: 1px solid #30363d; overflow-y: auto; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+        span { color: var(--text-muted); white-space: pre-wrap; word-wrap: break-word; }
+        .current-char { border-left: 3px solid var(--accent); background: rgba(88, 166, 255, 0.1); }
+        body.typing-focused .current-char { animation: blink 1s infinite; }
+        @keyframes blink { 50% { border-color: transparent; } }
+        .correct { color: var(--correct) !important; }
+        .incorrect { color: var(--error) !important; background: rgba(248, 81, 73, 0.1); text-decoration: underline; }
+        #hidden-input { position: fixed; bottom: 0; left: 0; width: 1px; height: 1px; font-size: 16px; -webkit-text-size-adjust: 100%; border: none; background: transparent; color: transparent; caret-color: transparent; z-index: 50; opacity: 0; pointer-events: none; }
+        #display::-webkit-scrollbar { width: 8px; }
+        #display::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
+
+        /* Skeleton loading screen */
+        .skeleton-line {
+            background: linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+            margin-bottom: 14px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        #skeleton-screen { padding: 10px 0; }
+        .complete-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 18px; text-align: center; }
+        .complete-screen .emoji { font-size: 2.5em; }
+        .complete-screen h2 { color: var(--accent); font-size: 1.4em; font-weight: 800; letter-spacing: -0.5px; margin: 0; }
+        .complete-screen .avg { color: var(--text-main); font-size: 1em; }
+        .complete-screen .avg strong { color: var(--accent); font-size: 1.2em; }
+        #reset-btn, #next-verse-btn { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 16px; line-height: 1; }
+        #reset-btn:hover, #next-verse-btn:hover { border-color: var(--accent); color: var(--accent); }
+        #bookmark-btn, #bookmark-btn-read, #bookmark-btn-read-top, #listen-btn, #blb-btn, #place-btn, #place-btn-read { background: transparent; border: 1px solid #30363d; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+        #bookmark-btn:hover, #bookmark-btn-read:hover, #bookmark-btn-read-top:hover { border-color: #f0b429; color: #f0b429; }
+        #listen-btn:hover, #blb-btn:hover { border-color: var(--accent); color: var(--accent); }
+        #bookmark-btn.bookmarked, #bookmark-btn-read.bookmarked, #bookmark-btn-read-top.bookmarked { border-color: #f0b429 !important; color: #f0b429 !important; background: rgba(240,180,41,0.18) !important; box-shadow: 0 0 8px rgba(240,180,41,0.4) !important; }
+        #place-btn.placed { border-color: #e05a2b !important; color: #e05a2b !important; background: rgba(224,90,43,0.18) !important; box-shadow: 0 0 6px rgba(224,90,43,0.3) !important; }
+        #voice-btn.listening { border-color: var(--error) !important; color: var(--error) !important; animation: pulse-mic 1s infinite; }
+        @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
+        .syn-dim    { color: #484f58 !important; }
+        .syn-prep   { color: #f97583 !important; }
+        .syn-name   { color: #f0f6fc !important; }
+        .syn-god    { color: #ffd700 !important; font-weight: 600; }
+        .syn-logic  { color: #d2a8ff !important; }
+        .syn-speech { color: #ffa657 !important; }
+        .read-nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .read-nav-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .nav-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .nav-btn-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+        .speed-word { position: relative; display: inline; }
+        .speed-word.active-word::after { content: ''; position: absolute; bottom: -3px; left: 0; width: 100%; height: 3px; background: var(--accent); border-radius: 2px; box-shadow: 0 0 8px rgba(88,166,255,0.6); }
+        .speed-word.past-word { color: var(--text-muted) !important; font-weight: normal !important; }
+        #speed-toggle-btn { background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.2s; font-family:inherit; }
+        #speed-toggle-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,0.1); }
+        .next-btn { padding: 12px 32px; font-size: 1em; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
+        .next-btn:hover { opacity: 0.85; }
+        #last-verse-box {
+            font-size: 12px;
+            color: var(--text-main);
+            background: var(--panel-bg);
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 5px 14px;
+            margin-bottom: 1vh;
+            min-height: 0;
+            display: none;
+        }
+        #last-verse-box span { color: var(--accent); font-weight: 700; }
+        #last-verse-box .new-best { color: #2ea043; font-weight: 700; }
+        #accuracy-warning {
+            font-size: 13px;
+            color: var(--error);
+            font-weight: bold;
+            min-height: 18px;
+            margin-bottom: 4px;
+            letter-spacing: 0.3px;
+            transition: opacity 0.3s;
+        }
+        #username-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1000; align-items: center; justify-content: center; }
+        #username-modal.active { display: flex; }
+        #username-modal-box { background: var(--panel-bg); border: 1px solid #30363d; border-radius: 16px; padding: 36px 40px; max-width: 380px; width: 90%; display: flex; flex-direction: column; gap: 14px; text-align: center; }
+        #username-modal-box h2 { color: var(--accent); margin: 0; font-size: 1.3em; }
+        #username-modal-box p { color: var(--text-muted); margin: 0; font-size: 13px; }
+        #username-input { padding: 10px 14px; border-radius: 8px; border: 1px solid #30363d; background: #21262d; color: var(--text-main); font-size: 15px; text-align: center; width: 100%; box-sizing: border-box; }
+        #username-input::placeholder { color: var(--text-muted); }
+        #username-error { color: var(--error); font-size: 12px; min-height: 16px; }
+        #save-username-btn { background: var(--accent); color: var(--bg-dark); font-weight: bold; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 15px; }
+
+
+
+        #verse-search-input:focus { outline: none; border-color: var(--accent); }
+        #verse-search-input::placeholder { color: var(--text-muted); font-style: italic; }
+
+        /* BLB tap banner for iOS */
+        #blb-tap-banner {
+            display: none; position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+            background: #1c2128; border: 1px solid var(--accent); border-radius: 10px;
+            padding: 10px 20px; z-index: 200; text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        #blb-tap-banner a { color: var(--accent); font-weight: 700; font-size: 14px; text-decoration: none; }
+        #blb-tap-banner .blb-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+        /* ═══════════════════════════════
+           MOBILE RESPONSIVE STYLES
+           ═══════════════════════════════ */
+        :root { color-scheme: dark; }
+
+        select option { background: var(--panel-bg); color: var(--text-main); }
+        /* Hide install button on desktop - only relevant on mobile */
+        @media (min-width: 601px) { #install-btn { display: none !important; } }
+
+        @media (max-width: 600px) {
+            body { padding: 8px; overflow-y: auto; }
+
+            /* Header: stack items, remove absolute positioning */
+            .brand-container {
+                position: static !important;
+                width: 96% !important;
+                flex-wrap: wrap;
+                gap: 8px;
+                justify-content: center;
+            }
+            .brand-container > a {
+                position: static !important;
+                font-size: 11px;
+                order: -1;
+                align-self: flex-start;
+            }
+            #auth-container {
+                position: static !important;
+                margin: 0 !important;
+                align-self: flex-end;
+            }
+
+            /* Nav: stack selects */
+            #nav-header { width: 96%; padding: 8px; gap: 6px; min-height: unset; }
+            .nav-row { gap: 6px; justify-content: center; }
+            .nav-divider { display: none; }
+            .nav-group { flex-wrap: nowrap; justify-content: center; }
+            select { font-size: 13px; max-width: 90px; }
+            #select-group { width: 100%; justify-content: center; }
+            #select-group select { flex: 1; max-width: none; min-width: 0; }
+            #btn-group { justify-content: center; flex-wrap: nowrap; }
+            /* Keep type/read mode groups on one line */
+            #type-mode-group, #read-mode-group { flex-wrap: nowrap; gap: 6px; justify-content: center; }
+            .nav-row { flex-wrap: wrap; }
+            #read-mode-btn { flex-shrink: 0; }
+            /* Shrink buttons and toggles a bit on mobile */
+            #type-mode-group button, #read-mode-group button { padding: 6px 11px; font-size: 13px; }
+            .toggle-label { font-size: 11px; gap: 4px; }
+            .toggle-track { width: 30px; height: 17px; }
+            .toggle-track::after { width: 11px; height: 11px; top: 3px; left: 3px; }
+            .toggle-label input:checked + .toggle-track::after { transform: translateX(13px); }
+            /* Search box narrower on mobile */
+            .nav-search-wrap input { width: 80px; }
+
+            /* Stats — stick to top so keyboard can't push them off screen */
+            #stats-bar {
+                width: 96%;
+                gap: 6px;
+                position: sticky;
+                top: 4px;
+                z-index: 10;
+                background: var(--bg-dark);
+                padding: 4px 0;
+                margin-top: 4px;
+                margin-bottom: 6px;
+            }
+            #type-stats, #read-stats { width: 100%; }
+            .stat-box { min-width: 0; flex: 1 0 0; padding: 6px 4px; min-height: 56px; height: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; }
+            .stat-value { font-size: 16px; white-space: nowrap; }
+            .stat-value { font-size: 16px; }
+            .stat-label { font-size: 9px; }
+
+            .brand-container { margin-top: 4px; margin-bottom: 4px; }
+            #nav-header { margin-bottom: 6px; padding: 8px 12px; }
+            #bible-progress-container { width: 96%; margin-bottom: 2px; }
+            #progress-text { margin-bottom: 4px; }
+            #streak-banner { margin-bottom: 4px; }
+            #verse-ref-label { margin-bottom: 4px; }
+
+            /* Last verse box also sticky */
+            #last-verse-box {
+                position: sticky;
+                top: 72px;
+                z-index: 10;
+                background: var(--panel-bg);
+            }
+
+            /* Display */
+            #display {
+                width: 96%;
+                height: clamp(200px, 52vh, 520px);
+                font-size: clamp(18px, 5.5vw, 26px);
+                padding: 14px;
+            }
+
+            #bible-progress-container { width: 96%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="brand-container" style="width:90%; max-width:900px; justify-content:center; flex-direction:column; align-items:center; gap:8px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+           <span style="font-size:52px; line-height:1; color:var(--accent);">✝</span>
+            <div class="logo-text">Type<span>Scripture</span></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <a href="/leaderboard.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text-main)'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">🏆 Leaderboard</a>
+            <a href="/bookmarks.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='#f0b429';this.style.color='#f0b429'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">⭐ Bookmarks</a>
+            <a href="/search.html" style="color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px;" onmouseover="this.style.borderColor='#58a6ff';this.style.color='#58a6ff'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">🔍 Search</a>
+            <button onclick="showTour()" title="How to use TypeScripture" style="color:var(--text-muted); font-size:12px; border:1px solid #30363d; padding:5px 10px; border-radius:6px; background:transparent; cursor:pointer;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text-main)'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">❓ Help</button>
+            <button id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light/dark mode" style="color:var(--text-muted); font-size:12px; border:1px solid #30363d; padding:5px 10px; border-radius:6px; background:transparent; cursor:pointer;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text-main)'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">☀️ Theme</button>
+            <button id="install-btn" onclick="installApp()" style="display:none; color:var(--text-muted); font-size:12px; text-decoration:none; border:1px solid #30363d; padding:5px 10px; border-radius:6px; background:transparent; cursor:pointer;" onmouseover="this.style.borderColor='#2ea043';this.style.color='#2ea043'" onmouseout="this.style.borderColor='#30363d';this.style.color='var(--text-muted)'">📲 Install App</button>
+            <div id="auth-container" style="margin:0; display:flex; gap:8px; align-items:center;">
+                <button id="google-login-btn" onclick="handleGoogleLogin()">
+                    <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                    Sign in
+                </button>
+                <button id="logout-btn" onclick="handleLogout()">Logout</button>
+                <span id="user-email"></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="username-modal">
+        <div id="username-modal-box">
+            <h2>Choose a Username</h2>
+            <p>This is how you'll appear on leaderboards. No email shown.</p>
+            <input type="text" id="username-input" placeholder="e.g. ScriptureSpeed42" maxlength="20" autocomplete="off">
+            <div id="username-error"></div>
+            <button id="save-username-btn" onclick="saveUsername()">Save Username</button>
+        </div>
+    </div>
+
+
+    <!-- Daily Streak -->
+    <div id="streak-banner" style="display:none; font-size:12px; color:var(--text-muted); margin-bottom:6px;"></div>
+
+    <div id="bible-progress-container"><div id="bible-progress-fill"></div></div>
+    <div id="progress-text">Bible Typed: 0%</div>
+    <div id="read-progress-container" style="display:none; width:90%; max-width:900px; background:var(--progress-bg); height:8px; border-radius:10px; margin-bottom:5px; border:1px solid #30363d;"><div id="read-progress-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#2ea043,var(--accent)); transition:width 0.5s ease-out;"></div></div>
+    <div id="read-progress-text" style="display:none; font-size:11px; color:var(--text-muted); margin-bottom:1vh; font-weight:bold;">Bible Read: 0%</div>
+    <div id="nav-header">
+        <div class="nav-row">
+            <!-- Search: input + voice grouped together -->
+            <div class="nav-search-wrap" id="search-btn-wrap">
+                <input id="verse-search-input" type="text"
+                    autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                    onkeydown="if(event.key==='Enter'){doVerseSearch();event.preventDefault();}"
+                    placeholder="e.g. Jn 3:16">
+                <button onclick="doVerseSearch()" title="Search" aria-label="Search verse">🔍</button>
+                <span id="voice-btn-wrap" style="display:contents;"><button id="voice-btn" onclick="startVoiceSearch()" title="Voice search" aria-label="Voice search" style="border-left:1px solid #30363d;">🎙️</button></span>
+            </div>
+
+            <div class="nav-divider"></div>
+
+            <!-- Book / Chapter / Verse -->
+            <div class="nav-group" id="select-group">
+                <label for="book-select" class="sr-only">Book</label>
+                <select id="book-select" onchange="updateChapters(true)" aria-label="Book"></select>
+                <label for="chapter-select" class="sr-only">Chapter</label>
+                <select id="chapter-select" onchange="updateVerses(true)" aria-label="Chapter"></select>
+                <label for="verse-select" class="sr-only">Verse</label>
+                <select id="verse-select" onchange="fetchVerses()" aria-label="Verse"></select>
+            </div>
+
+            <div class="nav-divider"></div>
+
+            <!-- TYPE MODE group (hidden in read mode) -->
+            <div id="type-mode-group" style="display:flex; align-items:center; gap:8px;">
+                <label class="toggle-label">
+                    <input type="checkbox" id="easy-mode" onchange="localStorage.setItem('tsEasyMode', this.checked); fetchVerses()">
+                    <span class="toggle-track"></span>
+                    EASY
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="repeat-mode">
+                    <span class="toggle-track"></span>
+                    REPEAT
+                </label>
+                <div class="nav-divider"></div>
+                <div class="nav-group" id="btn-group">
+                    <div class="nav-btn-wrap" id="reset-btn-wrap">
+                        <button id="reset-btn" onclick="verseStreak=0; loadVerse();" title="Restart verse" aria-label="Restart verse">🔄</button>
+                        <span class="nav-btn-label">Restart</span>
+                    </div>
+                    <div class="nav-btn-wrap" id="next-verse-btn-wrap">
+                        <button id="next-verse-btn" onclick="goToNextVerse()" title="Next verse" aria-label="Next verse">👉</button>
+                        <span class="nav-btn-label">Next</span>
+                    </div>
+                    <div class="nav-btn-wrap">
+                        <button id="bookmark-btn" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
+                        <span class="nav-btn-label">Bookmark</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- READ MODE group (hidden in type mode) -->
+            <div id="read-mode-group" style="display:none; align-items:center; gap:8px;">
+                <label class="toggle-label">
+                    <input type="checkbox" id="syntax-mode" onchange="onSyntaxToggle()">
+                    <span class="toggle-track"></span>
+                    SYNTAX
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="focus-mode-toggle" onchange="toggleFocusMode()">
+                    <span class="toggle-track"></span>
+                    FOCUS
+                </label>
+                <div class="nav-divider"></div>
+                <div class="nav-group">
+                    <div class="nav-btn-wrap" id="listen-btn-wrap">
+                        <button id="listen-btn" onclick="toggleListen()" title="Listen to verse" aria-label="Listen to verse">🔊</button>
+                        <span class="nav-btn-label">Listen</span>
+                    </div>
+                    <div class="nav-btn-wrap" id="blb-btn-wrap">
+                        <button id="blb-btn" onclick="openBLB()" title="Open in Blue Letter Bible" aria-label="Open in Blue Letter Bible">📖</button>
+                        <span class="nav-btn-label">BLB</span>
+                    </div>
+                    <div class="nav-btn-wrap">
+                        <button id="bookmark-btn-read-top" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
+                        <span class="nav-btn-label">Bookmark</span>
+                    </div>
+                </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- Read/Type Mode button — always visible -->
+            <div class="nav-btn-wrap" style="flex-shrink:0;">
+                <button id="read-mode-btn" onclick="toggleReadMode()" title="Toggle Read Mode" aria-label="Toggle Read Mode">⌨️ Type</button>
+                <span class="nav-btn-label">Current Mode</span>
+            </div>
+        </div>
+
+        <!-- Hidden for JS compatibility -->
+        <div class="settings-group" id="typing-settings" style="display:none;"></div>
+        <div id="easy-repeat-group" style="display:none;"></div>
+        <div id="syntax-btn-wrap" style="display:none;"></div>
+    </div>
+    <div id="stats-bar">
+        <!-- Type mode stats -->
+        <div id="type-stats" style="display:flex; gap:8px; align-items:stretch; width:100%">
+            <div class="stat-box" style="min-width:0;flex:1;">
+                <span class="stat-value" id="wpm">0</span>
+                <span class="stat-label">WPM</span>
+            </div>
+            <div class="stat-box" style="min-width:0;flex:1;">
+                <span class="stat-value" id="verse-best-display"><span style="font-size:11px;">👤</span> <span id="verse-best-val">0</span></span>
+                <span class="stat-label">My Best</span>
+            </div>
+            <div class="stat-box" style="min-width:0;flex:1;">
+                <span class="stat-value" id="global-best-display"><span style="font-size:11px;">🏆</span> <span id="global-best-val">—</span></span>
+                <span class="stat-label" style="white-space:nowrap;font-size:8px;">World Record</span>
+                <span id="global-best-user" style="font-size:8px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block;margin-top:2px;"></span>
+            </div>
+            <div class="stat-box" style="min-width:0;flex:1;">
+                <span class="stat-value"><span id="accuracy">100</span>%</span>
+                <span class="stat-label">ACC</span>
+            </div>
+            <div class="stat-box" style="min-width:0;flex:1;">
+                <span class="stat-value" id="progress">0/0</span>
+                <span class="stat-label">Verse</span>
+            </div>
+        </div>
+        <!-- Read mode stats -->
+        <div id="read-stats" style="display:none; gap:8px; width:100%;">
+            <div class="stat-box" style="min-width:0;flex:1;"><span class="stat-value" id="read-verse">—</span><span class="stat-label">Verse</span></div>
+            <div class="stat-box" style="min-width:0;flex:1;"><span class="stat-value" id="read-chapter">—</span><span class="stat-label">Chapter</span></div>
+            <div class="stat-box" style="min-width:0;flex:1;"><span class="stat-value" id="read-ch-time">—</span><span class="stat-label">Ch. Left</span></div>
+            <div class="stat-box" style="min-width:0;flex:1;"><span class="stat-value" id="read-bk-time">—</span><span class="stat-label">Bk. Left</span></div>
+        </div>
+    </div>
+    <div id="last-verse-box"></div>
+    <div id="read-ref-box" style="display:none;"></div>
+
+    <div id="accuracy-warning"></div>
+    <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
+        <span id="verse-ref-text" style="color:var(--accent);"></span>
+        <span style="color:var(--text-muted);font-size:11px;">KJV</span>
+        <button id="place-btn" onclick="toggleSavePlace()" title="Save your place" aria-label="Save your place" style="background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">📍</button>
+    </div>
+    <div id="display"><div id="skeleton-screen">
+        <div class="skeleton-line" style="height:28px; width:95%;"></div>
+        <div class="skeleton-line" style="height:28px; width:88%;"></div>
+        <div class="skeleton-line" style="height:28px; width:92%;"></div>
+        <div class="skeleton-line" style="height:28px; width:75%;"></div>
+        <div class="skeleton-line" style="height:28px; width:85%;"></div>
+        <div class="skeleton-line" style="height:28px; width:60%;"></div>
+    </div></div>
+    <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:10px 20px; justify-content:center; align-items:center; flex-direction:column; gap:8px; z-index:100;">
+        <!-- WPM slider — always visible -->
+        <div style="display:flex; align-items:center; gap:10px; width:100%; max-width:500px;">
+            <span style="font-size:11px; color:var(--text-muted); font-weight:600; white-space:nowrap;">⚡ <span id="wpm-display">300</span> WPM</span>
+            <input type="range" id="speed-wpm-input" min="50" max="1000" value="300"
+                style="flex:1; accent-color:var(--accent); cursor:pointer; height:4px;"
+                oninput="document.getElementById('wpm-display').textContent=this.value; updateReadStats();"
+                onchange="updateReadStats();">
+            <button id="speed-toggle-btn" onclick="toggleSpeedReading()" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; transition:all 0.2s;">▶ Start</button>
+            <button id="speed-tts-btn" onclick="toggleSpeedTts()" title="Sync voice to speed reader" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:6px; padding:4px 8px; cursor:pointer; font-size:14px; transition:all 0.2s;">🔇</button>
+        </div>
+        <!-- Nav buttons -->
+        <div style="display:flex; align-items:center; gap:16px;">
+            <div class="read-nav-btn-wrap">
+                <button id="bookmark-btn-read" onclick="toggleBookmark()" aria-label="Bookmark this verse" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:28px; width:62px; height:62px; cursor:pointer; transition:all 0.15s;">⭐</button>
+                <span class="read-nav-label">Bookmark</span>
+            </div>
+            <div class="read-nav-btn-wrap">
+                <button id="read-share-btn" onclick="shareVerse()" aria-label="Copy verse to share" style="background:transparent; border:1px solid #30363d; color:var(--text-muted); border-radius:12px; font-size:28px; width:62px; height:62px; cursor:pointer; transition:all 0.15s;">📋</button>
+                <span class="read-nav-label">Copy</span>
+            </div>
+            <div class="read-nav-btn-wrap">
+                <button id="read-prev-btn" onclick="goToPrevVerse()" aria-label="Previous verse" style="background:transparent; border:1px solid var(--accent); color:var(--accent); border-radius:12px; font-size:28px; width:62px; height:62px; cursor:pointer; transition:all 0.15s;">&#9664;</button>
+                <span class="read-nav-label">Prev</span>
+            </div>
+            <div class="read-nav-btn-wrap">
+                <button id="read-next-btn" onclick="goToNextVerse()" aria-label="Next verse" style="background:transparent; border:1px solid var(--accent); color:var(--accent); border-radius:12px; font-size:28px; width:62px; height:62px; cursor:pointer; transition:all 0.15s;">&#9654;</button>
+                <span class="read-nav-label">Next</span>
+            </div>
+        </div>
+    </div>
+    <input type="text" id="hidden-input" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none" autocomplete="off" inputmode="text" enterkeyhint="next">
+
+    <script src="/bible.js"></script>
+    <script>
+        // ===== SUPABASE SETUP =====
+        const SUPABASE_URL = "https://ddubjpmuomforwickzyb.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdWJqcG11b21mb3J3aWNrenliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTI0ODMsImV4cCI6MjA4ODE2ODQ4M30.wOiDepkS64pRFEpul_sKJ9MIVIVTWzg8BZ1fMTOK3_U";
+        
+        // Guard: if Supabase CDN failed to load, app still works (no login/sync)
+        let supabaseClient = null;
+        let currentUserId = null;
+        let verseStreak = 0;
+        let isLoggedIn = false;
+        try {
+            const { createClient } = supabase;
+            supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+                auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' }
+            });
+        } catch(e) {
+            console.warn('Supabase not available — running in offline mode:', e.message);
+        }
+
+        // ===== AUTHENTICATION FUNCTIONS =====
+        async function handleGoogleLogin() {
+            if (!supabaseClient) { alert('Auth not available. Please refresh the page.'); return; }
+            try {
+                const { error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: { redirectTo: 'https://typescripture.com' }
+                });
+                if (error) throw error;
+            } catch (err) {
+                console.error('Google login error:', err);
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function handleLogout() {
+            try {
+                if (supabaseClient) await supabaseClient.auth.signOut();
+                currentUserId = null;
+                isLoggedIn = false;
+                document.getElementById('google-login-btn').style.display = 'flex';
+                document.getElementById('logout-btn').style.display = 'none';
+                document.getElementById('user-email').innerText = '';
+                currentUsername = null;
+                // Clear cached progress so next user starts clean
+                localStorage.removeItem('typeScriptureProgressSet');
+                localStorage.removeItem('typeScriptureUserId');
+                completedSet = new Set();
+                readCompletedSet = new Set();
+                updateBibleProgress();
+                updateReadProgress();
+                updateBooks();
+            } catch (err) {
+                console.error('Logout error:', err);
+                alert('Error logging out: ' + err.message);
+            }
+        }
+
+        // Check authentication on page load
+        let currentBookmark = false;
+
+        // ===== OFFLINE BOOKMARK CACHE =====
+        // localStorage keys:
+        //   tsBookmarks_{userId}        → Set of "book|chap|verse" strings (full cache)
+        //   tsBookmarksPending_{userId} → Array of {action:'add'|'remove', book, chap, verse}
+
+        function bmCacheKey() { return 'tsBookmarks_' + currentUserId; }
+        function bmPendingKey() { return 'tsBookmarksPending_' + currentUserId; }
+
+        function getCachedBookmarks() {
+            try { return new Set(JSON.parse(localStorage.getItem(bmCacheKey())) || []); }
+            catch(e) { return new Set(); }
+        }
+        function saveCachedBookmarks(set) {
+            localStorage.setItem(bmCacheKey(), JSON.stringify(Array.from(set)));
+        }
+        function getPendingQueue() {
+            try { return JSON.parse(localStorage.getItem(bmPendingKey())) || []; }
+            catch(e) { return []; }
+        }
+        function savePendingQueue(queue) {
+            localStorage.setItem(bmPendingKey(), JSON.stringify(queue));
+        }
+        function bmKey(book, chap, verse) { return book + '|' + chap + '|' + verse; }
+
+        // Sync pending queue to Supabase when online
+        async function flushPendingBookmarks() {
+            if (!currentUserId || !supabaseClient || !navigator.onLine) return;
+            const queue = getPendingQueue();
+            if (queue.length === 0) return;
+            console.log('Flushing', queue.length, 'pending bookmark changes...');
+            const remaining = [];
+            for (const item of queue) {
+                try {
+                    if (item.action === 'add') {
+                        await supabaseClient.from('bookmarks').insert({
+                            user_id: currentUserId, book_name: item.book,
+                            chapter_num: item.chap, verse_num: item.verse
+                        });
+                    } else {
+                        await supabaseClient.from('bookmarks').delete()
+                            .eq('user_id', currentUserId).eq('book_name', item.book)
+                            .eq('chapter_num', item.chap).eq('verse_num', item.verse);
+                    }
+                    console.log('✓ Synced bookmark:', item.action, item.book, item.chap + ':' + item.verse);
+                } catch(e) {
+                    console.warn('Failed to sync bookmark, keeping in queue:', e);
+                    remaining.push(item);
+                }
+            }
+            savePendingQueue(remaining);
+        }
+
+        // Refresh local cache from Supabase (called on login and when online)
+        async function refreshBookmarkCache() {
+            if (!currentUserId || !supabaseClient || !navigator.onLine) return;
+            try {
+                const { data } = await supabaseClient.from('bookmarks')
+                    .select('book_name, chapter_num, verse_num')
+                    .eq('user_id', currentUserId);
+                if (data) {
+                    const set = new Set(data.map(b => bmKey(b.book_name, b.chapter_num, b.verse_num)));
+                    saveCachedBookmarks(set);
+                }
+            } catch(e) { console.warn('Could not refresh bookmark cache:', e); }
+        }
+
+        // ===== SAVE PLACE =====
+        function updatePlaceBtns() {
+            const saved = getSavedPlace();
+            const bookName = bookSel.value.replace(' ✅', '');
+            const chapNum = parseInt(chapSel.value);
+            const verseNum = currentIndex + 1;
+            const isHere = saved && saved.book === bookName && saved.ch === chapNum && saved.v === verseNum;
+            const btn = document.getElementById('place-btn');
+            if (btn) {
+                btn.classList.toggle('placed', isHere);
+                btn.title = isHere ? 'Clear saved place' : saved ? 'Go to saved place — ' + saved.book + ' ' + saved.ch + ':' + saved.v : 'Save your place here';
+            }
+        }
+
+        function getSavedPlace() {
+            try { return JSON.parse(localStorage.getItem('tsMyPlace')); } catch(e) { return null; }
+        }
+
+        function toggleSavePlace() {
+            const bookName = bookSel.value.replace(' ✅', '');
+            const chapNum = parseInt(chapSel.value);
+            const verseNum = currentIndex + 1;
+            const saved = getSavedPlace();
+            const isHere = saved && saved.book === bookName && saved.ch === chapNum && saved.v === verseNum;
+
+            if (isHere) {
+                // Already here — go back to where we were, or clear
+                localStorage.removeItem('tsMyPlace');
+                updatePlaceBtns();
+            } else if (saved) {
+                // Go to saved place
+                bookSel.value = saved.book;
+                updateChapters();
+                chapSel.value = saved.ch;
+                updateVerses();
+                verseSel.value = saved.v - 1;
+                fetchVerses();
+            } else {
+                // Save current place
+                localStorage.setItem('tsMyPlace', JSON.stringify({ book: bookName, ch: chapNum, v: verseNum }));
+                updatePlaceBtns();
+            }
+        }
+
+        async function loadBookmarkState() {
+            if (!currentUserId || !supabaseClient) {
+                document.getElementById('bookmark-btn').classList.remove('bookmarked');
+                currentBookmark = false;
+                return;
+            }
+            const bookName = document.getElementById('book-select').value.replace(' ✅', '');
+            const chapNum = parseInt(document.getElementById('chapter-select').value);
+            const verseNum = parseInt(document.getElementById('verse-select').value) + 1;
+            if (!bookName || !chapNum || !verseNum) return;
+
+            // Always check local cache first (instant, works offline)
+            const cached = getCachedBookmarks();
+            currentBookmark = cached.has(bmKey(bookName, chapNum, verseNum));
+
+            // If online, verify against DB in background
+            if (navigator.onLine) {
+                try {
+                    const { data } = await supabaseClient.from('bookmarks').select('id')
+                        .eq('user_id', currentUserId).eq('book_name', bookName)
+                        .eq('chapter_num', chapNum).eq('verse_num', verseNum).maybeSingle();
+                    const dbState = !!data;
+                    if (dbState !== currentBookmark) {
+                        // DB is source of truth — update cache
+                        currentBookmark = dbState;
+                        const updated = getCachedBookmarks();
+                        if (dbState) updated.add(bmKey(bookName, chapNum, verseNum));
+                        else updated.delete(bmKey(bookName, chapNum, verseNum));
+                        saveCachedBookmarks(updated);
+                    }
+                } catch(e) { /* offline or error — trust cache */ }
+            }
+
+            const btn = document.getElementById('bookmark-btn');
+            btn.classList.toggle('bookmarked', currentBookmark);
+            btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
+            const btnRead = document.getElementById('bookmark-btn-read');
+            if (btnRead) { btnRead.classList.toggle('bookmarked', currentBookmark); btnRead.title = btn.title; }
+            const btnReadTop = document.getElementById('bookmark-btn-read-top');
+            if (btnReadTop) { btnReadTop.classList.toggle('bookmarked', currentBookmark); btnReadTop.title = btn.title; }
+            syncReadBookmark();
+        }
+
+        async function toggleBookmark() {
+            if (!currentUserId) { alert('Sign in to bookmark verses!'); return; }
+            const bookName = document.getElementById('book-select').value.replace(' ✅', '');
+            const chapNum = parseInt(document.getElementById('chapter-select').value);
+            const verseNum = parseInt(document.getElementById('verse-select').value) + 1;
+            if (!bookName || !chapNum || !verseNum) return;
+
+            // Optimistic update — update UI and cache immediately
+            currentBookmark = !currentBookmark;
+            const cached = getCachedBookmarks();
+            if (currentBookmark) cached.add(bmKey(bookName, chapNum, verseNum));
+            else cached.delete(bmKey(bookName, chapNum, verseNum));
+            saveCachedBookmarks(cached);
+
+            const btn = document.getElementById('bookmark-btn');
+            btn.classList.toggle('bookmarked', currentBookmark);
+            btn.title = currentBookmark ? 'Remove bookmark' : 'Bookmark this verse';
+            const btnRead = document.getElementById('bookmark-btn-read');
+            if (btnRead) { btnRead.classList.toggle('bookmarked', currentBookmark); btnRead.title = btn.title; }
+            const btnReadTop = document.getElementById('bookmark-btn-read-top');
+            if (btnReadTop) { btnReadTop.classList.toggle('bookmarked', currentBookmark); btnReadTop.title = btn.title; }
+            syncReadBookmark();
+
+            // Try to sync to Supabase
+            if (navigator.onLine) {
+                try {
+                    if (!currentBookmark) {
+                        await supabaseClient.from('bookmarks').delete()
+                            .eq('user_id', currentUserId).eq('book_name', bookName)
+                            .eq('chapter_num', chapNum).eq('verse_num', verseNum);
+                    } else {
+                        await supabaseClient.from('bookmarks').insert({
+                            user_id: currentUserId, book_name: bookName,
+                            chapter_num: chapNum, verse_num: verseNum
+                        });
+                    }
+                } catch(e) {
+                    // Network failed — add to pending queue
+                    console.warn('Bookmark sync failed, queuing for later:', e);
+                    const queue = getPendingQueue();
+                    queue.push({ action: currentBookmark ? 'add' : 'remove', book: bookName, chap: chapNum, verse: verseNum });
+                    savePendingQueue(queue);
+                }
+            } else {
+                // Offline — add to pending queue
+                const queue = getPendingQueue();
+                // Remove any existing opposite action for same verse
+                const filtered = queue.filter(q => !(q.book === bookName && q.chap === chapNum && q.verse === verseNum));
+                filtered.push({ action: currentBookmark ? 'add' : 'remove', book: bookName, chap: chapNum, verse: verseNum });
+                savePendingQueue(filtered);
+            }
+        }
+
+        async function checkAuth() {
+            if (!supabaseClient) return;
+
+            // Handle PKCE magic link redirect (?code= in URL)
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('code')) {
+                const { error } = await supabaseClient.auth.exchangeCodeForSession(window.location.href);
+                if (!error) {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    console.error('Code exchange error:', error);
+                }
+            }
+
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                currentUserId = session.user.id;
+                isLoggedIn = true;
+                document.getElementById('google-login-btn').style.display = 'none';
+                document.getElementById('logout-btn').style.display = 'block';
+                await loadUserProgress();
+                await checkAndPromptUsername(session.user.id);
+                syncStreakToSupabase();
+                console.log('✓ User logged in:', session.user.email);
+            } else {
+                console.log('ℹ No user session');
+            }
+        }
+
+        // (checkAuth and onAuthStateChange moved to bottom, after all variables/functions are declared)
+
+        // ===== USERNAME FUNCTIONS =====
+        let currentUsername = null;
+
+        async function fetchUsername(userId) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('username')
+                    .eq('id', userId)
+                    .maybeSingle();
+                if (error) throw error;
+                return data?.username || null;
+            } catch (err) {
+                console.error('Error fetching username:', err);
+                return null;
+            }
+        }
+
+        async function saveUsername() {
+            const input = document.getElementById('username-input').value.trim();
+            const errorEl = document.getElementById('username-error');
+            errorEl.innerText = '';
+            if (!input) { errorEl.innerText = 'Please enter a username.'; return; }
+            if (input.length < 3) { errorEl.innerText = 'At least 3 characters required.'; return; }
+            if (!/^[a-zA-Z0-9_]+$/.test(input)) { errorEl.innerText = 'Letters, numbers, and underscores only.'; return; }
+            try {
+                const { error } = await supabaseClient
+                    .from('profiles')
+                    .insert({ id: currentUserId, username: input });
+                if (error) {
+                    if (error.code === '23505') { errorEl.innerText = 'That username is taken — try another.'; }
+                    else throw error;
+                    return;
+                }
+                currentUsername = input;
+                document.getElementById('username-modal').classList.remove('active');
+                document.getElementById('user-email').innerText = '✓ ' + currentUsername;
+            } catch (err) {
+                console.error('Error saving username:', err);
+                errorEl.innerText = 'Something went wrong. Try again.';
+            }
+        }
+
+        async function checkAndPromptUsername(userId) {
+            // Don't show username modal when offline — can't save anyway
+            if (!navigator.onLine) return;
+            const username = await fetchUsername(userId);
+            if (username) {
+                currentUsername = username;
+                document.getElementById('user-email').innerText = '✓ ' + currentUsername;
+            } else {
+                document.getElementById('username-modal').classList.add('active');
+            }
+        }
+
+
+
+        // Load user progress from Supabase
+        async function loadUserProgress() {
+            if (!currentUserId) return;
+            await flushPendingProgress();
+            await flushPendingBookmarks();
+            await refreshBookmarkCache();
+
+            try {
+                console.log('Loading progress for user:', currentUserId);
+                // Single query loads ALL progress (typed + read + best WPMs) from new table
+                const { data, error } = await supabaseClient
+                    .from('chapter_progress')
+                    .select('book_index, chapter_num, read_counts, type_counts, best_wpms')
+                    .eq('user_id', currentUserId);
+
+                if (error) throw error;
+
+                completedSet = new Set();
+                readCompletedSet = new Set();
+
+                if (data && KJV_EMBEDDED) {
+                    console.log('Loaded', data.length, 'chapter rows from Supabase');
+                    data.forEach(row => {
+                        const bookName = BOOK_NAMES[row.book_index];
+                        if (!bookName) return;
+                        // type_counts: index 0 = verse 1, value > 0 means typed at least once
+                        if (row.type_counts) {
+                            row.type_counts.forEach((count, i) => {
+                                if (count > 0) {
+                                    completedSet.add(`KJV_${bookName}_${row.chapter_num}_${i + 1}`);
+                                }
+                            });
+                        }
+                        // read_counts: same pattern
+                        if (row.read_counts) {
+                            row.read_counts.forEach((count, i) => {
+                                if (count > 0) {
+                                    readCompletedSet.add(getReadKey(bookName, row.chapter_num, i + 1));
+                                }
+                            });
+                        }
+                    });
+                    // Cache for offline use
+                    localStorage.setItem('typeScriptureProgressSet', JSON.stringify(Array.from(completedSet)));
+                    localStorage.setItem('typeScriptureUserId', currentUserId);
+                    saveReadProgress();
+                }
+
+                updateBooks();
+                updateBibleProgress();
+                updateReadProgress();
+            } catch (err) {
+                console.error('Error loading progress from Supabase:', err);
+                // Fall back to localStorage
+                completedSet = new Set(JSON.parse(localStorage.getItem('typeScriptureProgressSet')) || []);
+                loadReadProgressLocal();
+                updateBooks();
+                updateBibleProgress();
+                updateReadProgress();
+            }
+        }
+
+        // ===== OFFLINE PROGRESS QUEUE =====
+        function progressPendingKey() { return 'tsProgressPending_' + currentUserId; }
+        function getProgressQueue() {
+            try { return JSON.parse(localStorage.getItem(progressPendingKey())) || []; }
+            catch(e) { return []; }
+        }
+        function saveProgressQueue(queue) {
+            localStorage.setItem(progressPendingKey(), JSON.stringify(queue));
+        }
+
+        async function flushPendingProgress() {
+            if (!currentUserId || !supabaseClient || !navigator.onLine) return;
+            const queue = getProgressQueue();
+            if (queue.length === 0) return;
+            console.log('Flushing', queue.length, 'pending progress saves...');
+            const remaining = [];
+            for (const item of queue) {
+                try {
+                    const bookIndex = BOOK_INDEX[item.book];
+                    if (!bookIndex) { console.warn('Unknown book in queue:', item.book); continue; }
+                    const verseIdx = item.verse - 1; // convert to 0-based array index
+
+                    // Fetch current row so we can do an incremental update
+                    const { data: existing } = await supabaseClient
+                        .from('chapter_progress')
+                        .select('type_counts, best_wpms')
+                        .eq('user_id', currentUserId)
+                        .eq('book_index', bookIndex)
+                        .eq('chapter_num', item.chap)
+                        .maybeSingle();
+
+                    const typeCounts = existing?.type_counts ? [...existing.type_counts] : [];
+                    const bestWpms = existing?.best_wpms ? [...existing.best_wpms] : [];
+
+                    // Ensure arrays are long enough
+                    while (typeCounts.length <= verseIdx) typeCounts.push(0);
+                    while (bestWpms.length <= verseIdx) bestWpms.push(0);
+
+                    typeCounts[verseIdx] = (typeCounts[verseIdx] || 0) + 1;
+                    if (item.wpm > (bestWpms[verseIdx] || 0)) bestWpms[verseIdx] = item.wpm;
+
+                    const { error } = await supabaseClient.from('chapter_progress').upsert({
+                        user_id: currentUserId,
+                        book_index: bookIndex,
+                        chapter_num: item.chap,
+                        type_counts: typeCounts,
+                        best_wpms: bestWpms,
+                        last_activity: item.completedAt
+                    }, { onConflict: 'user_id,book_index,chapter_num' });
+                    if (error) throw error;
+                    console.log('✓ Synced progress:', item.book, item.chap + ':' + item.verse, 'WPM:', item.wpm);
+                } catch(e) {
+                    console.warn('Failed to sync progress, keeping in queue:', e);
+                    remaining.push(item);
+                }
+            }
+            saveProgressQueue(remaining);
+        }
+
+        // Save typed verse to chapter_progress
+        async function saveVerseToDatabase(bookName, chapNum, verseNum, wpm) {
+            if (!currentUserId) {
+                console.log('Not logged in - skipping Supabase save (using localStorage only)');
+                return;
+            }
+
+            const bookIndex = BOOK_INDEX[bookName];
+            if (!bookIndex) { console.warn('saveVerseToDatabase: unknown book', bookName); return; }
+            const verseIdx = verseNum - 1; // 0-based array index
+            const now = new Date().toISOString();
+
+            if (!navigator.onLine) {
+                // Queue for later sync
+                const queue = getProgressQueue();
+                const idx = queue.findIndex(q => q.book === bookName && q.chap === chapNum && q.verse === verseNum);
+                const entry = { book: bookName, chap: chapNum, verse: verseNum, wpm, completedAt: now };
+                if (idx >= 0) { if (wpm > queue[idx].wpm) queue[idx] = entry; }
+                else queue.push(entry);
+                saveProgressQueue(queue);
+                console.log('📶 Offline — queued progress save for', bookName, chapNum + ':' + verseNum);
+                return;
+            }
+
+            try {
+                // Fetch current row to do incremental update
+                const { data: existing } = await supabaseClient
+                    .from('chapter_progress')
+                    .select('type_counts, best_wpms')
+                    .eq('user_id', currentUserId)
+                    .eq('book_index', bookIndex)
+                    .eq('chapter_num', chapNum)
+                    .maybeSingle();
+
+                const typeCounts = existing?.type_counts ? [...existing.type_counts] : [];
+                const bestWpms = existing?.best_wpms ? [...existing.best_wpms] : [];
+
+                while (typeCounts.length <= verseIdx) typeCounts.push(0);
+                while (bestWpms.length <= verseIdx) bestWpms.push(0);
+
+                typeCounts[verseIdx] = (typeCounts[verseIdx] || 0) + 1;
+                if (wpm > (bestWpms[verseIdx] || 0)) bestWpms[verseIdx] = wpm;
+
+                const { error } = await supabaseClient.from('chapter_progress').upsert({
+                    user_id: currentUserId,
+                    book_index: bookIndex,
+                    chapter_num: chapNum,
+                    type_counts: typeCounts,
+                    best_wpms: bestWpms,
+                    last_activity: now
+                }, { onConflict: 'user_id,book_index,chapter_num' });
+
+                if (error) throw error;
+                console.log('✓ Saved to Supabase:', bookName, chapNum + ':' + verseNum, '- WPM:', wpm);
+            } catch (err) {
+                console.error('❌ Error saving verse to database, queuing:', err);
+                const queue = getProgressQueue();
+                const idx = queue.findIndex(q => q.book === bookName && q.chap === chapNum && q.verse === verseNum);
+                const entry = { book: bookName, chap: chapNum, verse: verseNum, wpm, completedAt: now };
+                if (idx >= 0) { if (wpm > queue[idx].wpm) queue[idx] = entry; }
+                else queue.push(entry);
+                saveProgressQueue(queue);
+            }
+        }
+
+        // Get best WPM from chapter_progress array
+        async function getBestWpmFromDatabase(bookName, chapNum, verseNum) {
+            if (!currentUserId) return 0;
+
+            const queued = getProgressQueue().find(q => q.book === bookName && q.chap === chapNum && q.verse === verseNum);
+            if (!navigator.onLine) return queued?.wpm || 0;
+
+            try {
+                const bookIndex = BOOK_INDEX[bookName];
+                if (!bookIndex) return queued?.wpm || 0;
+
+                const { data, error } = await supabaseClient
+                    .from('chapter_progress')
+                    .select('best_wpms')
+                    .eq('user_id', currentUserId)
+                    .eq('book_index', bookIndex)
+                    .eq('chapter_num', chapNum)
+                    .maybeSingle();
+
+                if (error) throw error;
+                const verseIdx = verseNum - 1;
+                const dbWpm = data?.best_wpms?.[verseIdx] || 0;
+                return Math.max(dbWpm, queued?.wpm || 0);
+            } catch (err) {
+                return queued?.wpm || 0;
+            }
+        }
+
+        // ===== ORIGINAL CODE =====
+        const books = ["Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","Judges","Ruth","1 Samuel","2 Samuel","1 Kings","2 Kings","1 Chronicles","2 Chronicles","Ezra","Nehemiah","Esther","Job","Psalms","Proverbs","Ecclesiastes","Song of Solomon","Isaiah","Jeremiah","Lamentations","Ezekiel","Daniel","Hosea","Joel","Amos","Obadiah","Jonah","Micah","Nahum","Habakkuk","Zephaniah","Haggai","Zechariah","Malachi","Matthew","Mark","Luke","John","Acts","Romans","1 Corinthians","2 Corinthians","Galatians","Ephesians","Philippians","Colossians","1 Thessalonians","2 Thessalonians","1 Timothy","2 Timothy","Titus","Philemon","Hebrews","James","1 Peter","2 Peter","1 John","2 John","3 John","Jude","Revelation"];
+        const chapCounts = [50,40,27,36,34,24,21,4,31,24,22,25,29,36,10,13,10,42,150,31,12,8,66,52,5,48,12,14,3,9,1,4,7,3,3,3,2,14,4,28,16,24,21,28,16,16,13,6,6,4,4,5,3,6,4,3,1,13,5,5,3,5,1,1,1,22];
+        const TOTAL_VERSES_BIBLE = 31102;
+
+        // Book name <-> index lookup (1-based, matching chapter_progress.book_index in DB)
+        const BOOK_INDEX = {
+            "Genesis":1,"Exodus":2,"Leviticus":3,"Numbers":4,"Deuteronomy":5,
+            "Joshua":6,"Judges":7,"Ruth":8,"1 Samuel":9,"2 Samuel":10,
+            "1 Kings":11,"2 Kings":12,"1 Chronicles":13,"2 Chronicles":14,
+            "Ezra":15,"Nehemiah":16,"Esther":17,"Job":18,"Psalms":19,"Proverbs":20,
+            "Ecclesiastes":21,"Song of Solomon":22,"Isaiah":23,"Jeremiah":24,
+            "Lamentations":25,"Ezekiel":26,"Daniel":27,"Hosea":28,"Joel":29,
+            "Amos":30,"Obadiah":31,"Jonah":32,"Micah":33,"Nahum":34,
+            "Habakkuk":35,"Zephaniah":36,"Haggai":37,"Zechariah":38,"Malachi":39,
+            "Matthew":40,"Mark":41,"Luke":42,"John":43,"Acts":44,"Romans":45,
+            "1 Corinthians":46,"2 Corinthians":47,"Galatians":48,"Ephesians":49,
+            "Philippians":50,"Colossians":51,"1 Thessalonians":52,"2 Thessalonians":53,
+            "1 Timothy":54,"2 Timothy":55,"Titus":56,"Philemon":57,"Hebrews":58,
+            "James":59,"1 Peter":60,"2 Peter":61,"1 John":62,"2 John":63,
+            "3 John":64,"Jude":65,"Revelation":66
+        };
+        // Reverse lookup: book_index (1-66) -> book name. Index 0 is null (1-based).
+        const BOOK_NAMES = [null, ...Object.keys(BOOK_INDEX)];
+
+// Bible data loaded from bible.js
+        let completedSet = new Set(); // will be populated after auth check
+        let readCompletedSet = new Set(); // read verses
+        let currentVerses = [], currentIndex = 0, activeVerseText = "";
+        let verseStartTime = null, verseWpms = [];
+
+        const bookSel = document.getElementById('book-select');
+        const chapSel = document.getElementById('chapter-select');
+        const verseSel = document.getElementById('verse-select');
+        const displayEl = document.getElementById('display');
+        const inputEl = document.getElementById('hidden-input');
+        const warningEl = document.getElementById('accuracy-warning');
+
+        function updateBibleProgress() {
+            const progress = (completedSet.size / TOTAL_VERSES_BIBLE) * 100;
+            const minVisible = completedSet.size > 0 ? Math.max(progress, 0.3) : 0;
+            document.getElementById('bible-progress-fill').style.width = minVisible + '%';
+            const display = progress < 0.1 ? progress.toFixed(3) : progress < 1 ? progress.toFixed(2) : Math.round(progress);
+            document.getElementById('progress-text').innerText = `Bible Typed: ${completedSet.size} / ${TOTAL_VERSES_BIBLE} verses (${display}%)`;
+        }
+
+        function isVerseDone(bookName, chapNum, verseNum) {
+            return completedSet.has(`KJV_${bookName}_${chapNum}_${verseNum}`) ||
+                   readCompletedSet.has(getReadKey(bookName, chapNum, verseNum));
+        }
+
+        function isBookTyped(bookName) {
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            if (!bookEntry) return false;
+            for (const chap of bookEntry.chapters)
+                for (const v of chap.verses)
+                    if (!completedSet.has(`KJV_${bookName}_${chap.chapter}_${v.verse}`)) return false;
+            return bookEntry.chapters.length > 0;
+        }
+
+        function isBookComplete(bookName) {
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            if (!bookEntry) return false;
+            for (const chap of bookEntry.chapters)
+                for (const v of chap.verses)
+                    if (!isVerseDone(bookName, chap.chapter, v.verse)) return false;
+            return bookEntry.chapters.length > 0;
+        }
+
+        function isChapterTyped(bookName, chapNum) {
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            if (!bookEntry) return false;
+            const chap = bookEntry.chapters.find(c => c.chapter === chapNum);
+            if (!chap || chap.verses.length === 0) return false;
+            return chap.verses.every(v => completedSet.has(`KJV_${bookName}_${chapNum}_${v.verse}`));
+        }
+
+        function isChapterComplete(bookName, chapNum) {
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            if (!bookEntry) return false;
+            const chap = bookEntry.chapters.find(c => c.chapter === chapNum);
+            if (!chap || chap.verses.length === 0) return false;
+            return chap.verses.every(v => isVerseDone(bookName, chapNum, v.verse));
+        }
+
+        function updateBooks() {
+            const savedBook = bookSel.value; // preserve current selection
+            bookSel.innerHTML = '';
+            books.forEach(book => {
+                let opt = document.createElement('option');
+                opt.value = book;
+                opt.innerText = book + (isBookTyped(book) ? " ✅" : isBookComplete(book) ? " 📖" : "");
+                bookSel.appendChild(opt);
+            });
+            if (savedBook) bookSel.value = savedBook; // restore selection
+            updateChapters();
+        }
+
+        function updateChapters(autoLoad = false) {
+            const savedChap = chapSel.value; // preserve current selection
+            chapSel.innerHTML = '';
+            const bookName = bookSel.value.replace(" ✅", "");
+            const chapCount = chapCounts[books.indexOf(bookName)] || 1;
+            for (let i = 1; i <= chapCount; i++) {
+                let opt = document.createElement('option');
+                opt.value = i;
+                opt.innerText = `Chapter ${i}` + (isChapterTyped(bookName, i) ? " ✅" : isChapterComplete(bookName, i) ? " 📖" : "");
+                chapSel.appendChild(opt);
+            }
+            if (savedChap && parseInt(savedChap) <= chapCount) chapSel.value = savedChap; // restore selection
+            updateVerses(autoLoad);
+        }
+
+        function updateVerses(autoLoad = false) {
+            const currentVerseIdx = verseSel.value; // save BEFORE clearing
+            verseSel.innerHTML = '';
+            const bookName = bookSel.value.replace(" ✅", "");
+            const chapNum = parseInt(chapSel.value);
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            if (bookEntry) {
+                const chapterObj = bookEntry.chapters.find(c => c.chapter === chapNum);
+                if (chapterObj) {
+                    chapterObj.verses.forEach((v, i) => {
+                        const verseKey = `KJV_${bookName}_${chapNum}_${v.verse}`;
+                        const readKey = getReadKey(bookName, chapNum, v.verse);
+                        const isTyped = completedSet.has(verseKey);
+                        const isRead = !isTyped && readCompletedSet && readCompletedSet.has(readKey);
+                        let opt = document.createElement('option');
+                        opt.value = i;
+                        opt.innerText = `Verse ${v.verse}${isTyped ? " ✅" : isRead ? " 📖" : ""}`;
+                        verseSel.appendChild(opt);
+                    });
+                }
+            }
+            if(currentVerseIdx && verseSel.options[currentVerseIdx]) verseSel.value = currentVerseIdx;
+            if (autoLoad) fetchVerses();
+            updateReadRefBox();
+        }
+
+        let readModeActive = false;
+
+        // ===== VERSE OF THE DAY =====
+        const VOTD_VERSES = [
+            { ref: 'John 3:16', book: 'John', ch: 3, v: 16 },
+            { ref: 'Romans 8:28', book: 'Romans', ch: 8, v: 28 },
+            { ref: 'Philippians 4:13', book: 'Philippians', ch: 4, v: 13 },
+            { ref: 'Psalm 23:1', book: 'Psalms', ch: 23, v: 1 },
+            { ref: 'Proverbs 3:5', book: 'Proverbs', ch: 3, v: 5 },
+            { ref: 'Isaiah 40:31', book: 'Isaiah', ch: 40, v: 31 },
+            { ref: 'Jeremiah 29:11', book: 'Jeremiah', ch: 29, v: 11 },
+            { ref: 'Matthew 6:33', book: 'Matthew', ch: 6, v: 33 },
+            { ref: 'Romans 12:2', book: 'Romans', ch: 12, v: 2 },
+            { ref: 'Galatians 5:22', book: 'Galatians', ch: 5, v: 22 },
+            { ref: '2 Timothy 3:16', book: '2 Timothy', ch: 3, v: 16 },
+            { ref: 'Hebrews 11:1', book: 'Hebrews', ch: 11, v: 1 },
+            { ref: 'James 1:2', book: 'James', ch: 1, v: 2 },
+            { ref: '1 John 4:19', book: '1 John', ch: 4, v: 19 },
+            { ref: 'Psalm 119:105', book: 'Psalms', ch: 119, v: 105 },
+            { ref: 'Matthew 5:16', book: 'Matthew', ch: 5, v: 16 },
+            { ref: 'Romans 5:8', book: 'Romans', ch: 5, v: 8 },
+            { ref: 'Ephesians 2:8', book: 'Ephesians', ch: 2, v: 8 },
+            { ref: 'Psalm 46:1', book: 'Psalms', ch: 46, v: 1 },
+            { ref: '1 Corinthians 13:4', book: '1 Corinthians', ch: 13, v: 4 },
+            { ref: 'Joshua 1:9', book: 'Joshua', ch: 1, v: 9 },
+            { ref: 'Proverbs 22:6', book: 'Proverbs', ch: 22, v: 6 },
+            { ref: 'Matthew 28:19', book: 'Matthew', ch: 28, v: 19 },
+            { ref: 'John 14:6', book: 'John', ch: 14, v: 6 },
+            { ref: 'Romans 3:23', book: 'Romans', ch: 3, v: 23 },
+            { ref: 'Psalm 37:4', book: 'Psalms', ch: 37, v: 4 },
+            { ref: 'Isaiah 41:10', book: 'Isaiah', ch: 41, v: 10 },
+            { ref: 'John 15:13', book: 'John', ch: 15, v: 13 },
+            { ref: 'Colossians 3:23', book: 'Colossians', ch: 3, v: 23 },
+            { ref: '2 Corinthians 5:17', book: '2 Corinthians', ch: 5, v: 17 },
+            { ref: 'Micah 6:8', book: 'Micah', ch: 6, v: 8 },
+            { ref: 'Psalm 1:1', book: 'Psalms', ch: 1, v: 1 },
+            { ref: 'Acts 1:8', book: 'Acts', ch: 1, v: 8 },
+            { ref: 'Revelation 21:4', book: 'Revelation', ch: 21, v: 4 },
+            { ref: '1 Peter 5:7', book: '1 Peter', ch: 5, v: 7 },
+            { ref: 'Psalm 27:1', book: 'Psalms', ch: 27, v: 1 },
+            { ref: 'John 11:25', book: 'John', ch: 11, v: 25 },
+        ];
+        let votdVerse = null;
+
+        function initVotd() {
+            if (typeof KJV_EMBEDDED === 'undefined') return;
+            votdVerse = VOTD_VERSES[Math.floor(Math.random() * VOTD_VERSES.length)];
+            try {
+                const bookIdx = books.indexOf(votdVerse.book);
+                if (bookIdx === -1) return;
+                bookSel.value = votdVerse.book;
+                updateChapters();
+                chapSel.value = votdVerse.ch;
+                updateVerses();
+                verseSel.value = votdVerse.v - 1;
+            } catch(e) {}
+        }
+
+        // ===== DAILY STREAK =====
+        function initStreak() {
+            const today = new Date().toDateString();
+            const lastActive = localStorage.getItem('tsLastActive');
+            let streak = parseInt(localStorage.getItem('tsDailyStreak') || '0');
+
+            // If streak was already earned today, nothing changes
+            // If last active was yesterday and streak > 0, it's still valid (will extend on completion)
+            // If gap > 1 day, reset streak to 0 (will become 1 on first completion today)
+            if (lastActive !== today && lastActive !== new Date(Date.now() - 86400000).toDateString()) {
+                if (lastActive) { // only reset if they had a streak before
+                    streak = 0;
+                    localStorage.setItem('tsDailyStreak', 0);
+                }
+            }
+
+            updateStreakBanner(streak, lastActive === today);
+        }
+
+        function syncStreakToSupabase() {
+            // Streaks now live in localStorage only — no DB sync needed
+        }
+
+        function markStreakActivity() {
+            const today = new Date().toDateString();
+            const lastActive = localStorage.getItem('tsLastActive');
+            if (lastActive === today) return;
+
+            let streak = parseInt(localStorage.getItem('tsDailyStreak') || '0');
+            let longest = parseInt(localStorage.getItem('tsLongestStreak') || '0');
+            const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+            if (lastActive === yesterday) {
+                streak++;
+            } else {
+                streak = 1;
+            }
+
+            if (streak > longest) longest = streak;
+
+            localStorage.setItem('tsDailyStreak', streak);
+            localStorage.setItem('tsLongestStreak', longest);
+            localStorage.setItem('tsLastActive', today);
+            updateStreakBanner(streak, true);
+        }
+
+        function updateStreakBanner(streak, earnedToday) {
+            const el = document.getElementById('streak-banner');
+            if (!el) return;
+            if (streak >= 2) {
+                el.innerHTML = `🔥 <strong style="color:var(--accent);">${streak}-day streak</strong> — keep it up!`;
+            } else if (streak === 1 && earnedToday) {
+                el.innerHTML = `🔥 <strong style="color:var(--accent);">Streak started!</strong> Come back tomorrow to keep it going.`;
+            } else {
+                el.innerHTML = `Start your streak — type or read a verse today!`;
+            }
+            el.style.display = 'block';
+        }
+
+        // ===== KEYBOARD SHORTCUTS =====
+        document.addEventListener('keydown', function(e) {
+            // Only fire when not typing in an input
+            const tag = document.activeElement.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); goToNextVerse(); }
+                if (e.key === 'ArrowLeft') { e.preventDefault(); goToPrevVerse(); }
+                if (e.key === 'r') { e.preventDefault(); toggleReadMode(); }
+            }
+        });
+
+        function toggleTheme() {
+            const isLight = document.body.classList.toggle('light-mode');
+            localStorage.setItem('tsTheme', isLight ? 'light' : 'dark');
+            document.getElementById('theme-toggle-btn').textContent = isLight ? '☀️ Theme' : '🌙 Theme';
+            document.querySelector('meta[name="color-scheme"]').content = isLight ? 'light' : 'dark';
+        }
+
+        function toggleReadMode() {
+            readModeActive = !readModeActive;
+            const isRead = readModeActive;
+
+            // Update button label
+            const btn = document.getElementById('read-mode-btn');
+            btn.textContent = isRead ? '📖 Read' : '⌨️ Type';
+            document.querySelector('#read-mode-btn + .nav-btn-label').textContent = 'Current Mode';
+
+            // Swap progress bars
+            document.getElementById('bible-progress-container').style.display = isRead ? 'none' : '';
+            document.getElementById('progress-text').style.display = isRead ? 'none' : '';
+            document.getElementById('read-progress-container').style.display = isRead ? '' : 'none';
+            document.getElementById('read-progress-text').style.display = isRead ? '' : 'none';
+            updateReadProgress();
+
+            // Stats bar
+            document.getElementById('type-stats').style.display = isRead ? 'none' : 'flex';
+            document.getElementById('read-stats').style.display = isRead ? 'flex' : 'none';
+            if (isRead) updateReadStats();
+            // Hide last verse message in read mode, show ref box instead
+            document.getElementById('last-verse-box').classList.toggle('hidden', isRead);
+            updateReadRefBox();
+            // Turn off easy mode when reading (not helpful for reading)
+            if (isRead) {
+                const em = document.getElementById('easy-mode');
+                em.removeEventListener && em.removeEventListener('change', fetchVerses);
+                em.checked = false;
+                // Don't call fetchVerses — we're in read mode, no need to reload
+            }
+            // Swap type/read mode button groups
+            document.getElementById('type-mode-group').style.display = isRead ? 'none' : 'flex';
+            document.getElementById('read-mode-group').style.display = isRead ? 'flex' : 'none';
+            // Sync both bookmark buttons
+            loadBookmarkState();
+            // Hidden input - disable and hide to prevent it blocking read nav buttons
+            inputEl.disabled = isRead;
+            inputEl.style.height = isRead ? '1px' : '44px';
+            // Read nav bar at bottom
+            const readNav = document.getElementById('read-nav');
+            readNav.style.display = isRead ? 'flex' : 'none';
+
+            // Add bottom padding so display isn't hidden behind nav bar
+            document.getElementById('display').style.marginBottom = isRead ? '140px' : '';
+            document.body.style.paddingBottom = isRead ? '140px' : '';
+            // Stop TTS if leaving read mode
+            if (!isRead && speechSynthesis.speaking) speechSynthesis.cancel();
+            // Exit focus mode if leaving read mode
+            if (!isRead && focusModeActive) {
+                const cb = document.getElementById('focus-mode-toggle');
+                if (cb) cb.checked = false;
+                toggleFocusMode();
+            }
+            // Stop speed reading if turning off read mode
+            if (!isRead && speedReadActive) stopSpeedReading();
+            // Re-render current verse text in appropriate style
+            if (activeVerseText) renderDisplay(isRead ? activeVerseText : '');
+            // Refresh verse markers (📖 vs ✅) without rebuilding book list
+            updateVerses();
+        }
+
+        // ===== READING TRACKER =====
+
+        function getReadKey(book, chap, verse) { return book + '|' + chap + '|' + verse; }
+
+        let verseReadStartTime = null;
+
+        function onVerseLoaded() {
+            verseReadStartTime = Date.now();
+        }
+
+        async function markVerseRead(skipTimeCheck = false) {
+            if (!skipTimeCheck) {
+                const elapsed = verseReadStartTime ? Date.now() - verseReadStartTime : 0;
+                if (elapsed < 400) {
+                    console.log('Skipping read mark - too fast (' + elapsed + 'ms)');
+                    return;
+                }
+            }
+            const bookName = bookSel.value.replace(' ✅', '');
+            const chapNum = parseInt(chapSel.value);
+            const verseNum = parseInt(verseSel.value) + 1;
+            const key = getReadKey(bookName, chapNum, verseNum);
+
+            // Always increment in-memory set (for UI markers)
+            readCompletedSet.add(key);
+            saveReadProgress();
+            updateReadProgress();
+            updateVerses();
+            updateBooks();
+            markStreakActivity();
+
+            if (!currentUserId || !supabaseClient) return;
+
+            try {
+                const bookIndex = BOOK_INDEX[bookName];
+                if (!bookIndex) return;
+                const verseIdx = verseNum - 1;
+
+                // Fetch current row for this chapter
+                const { data: existing } = await supabaseClient
+                    .from('chapter_progress')
+                    .select('read_counts')
+                    .eq('user_id', currentUserId)
+                    .eq('book_index', bookIndex)
+                    .eq('chapter_num', chapNum)
+                    .maybeSingle();
+
+                const readCounts = existing?.read_counts ? [...existing.read_counts] : [];
+                while (readCounts.length <= verseIdx) readCounts.push(0);
+                readCounts[verseIdx] = (readCounts[verseIdx] || 0) + 1;
+
+                await supabaseClient.from('chapter_progress').upsert({
+                    user_id: currentUserId,
+                    book_index: bookIndex,
+                    chapter_num: chapNum,
+                    read_counts: readCounts,
+                    last_activity: new Date().toISOString()
+                }, { onConflict: 'user_id,book_index,chapter_num' });
+            } catch(e) { console.warn('Could not save verse read:', e); }
+        }
+
+        function saveReadProgress() {
+            localStorage.setItem('tsReadProgress', JSON.stringify(Array.from(readCompletedSet)));
+        }
+
+        function loadReadProgressLocal() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('tsReadProgress') || '[]');
+                readCompletedSet = new Set(saved);
+            } catch(e) { readCompletedSet = new Set(); }
+        }
+
+        async function loadReadProgressFromDB() {
+            if (!currentUserId || !supabaseClient) return;
+            try {
+                const { data: chapters, error } = await supabaseClient
+                    .from('chapter_progress')
+                    .select('book_index, chapter_num, read_counts')
+                    .eq('user_id', currentUserId);
+
+                if (error) throw error;
+
+                readCompletedSet = new Set();
+
+                if (chapters && KJV_EMBEDDED) {
+                    chapters.forEach(row => {
+                        const bookName = BOOK_NAMES[row.book_index];
+                        if (!bookName) return;
+                        if (row.read_counts) {
+                            row.read_counts.forEach((count, i) => {
+                                if (count > 0) {
+                                    readCompletedSet.add(getReadKey(bookName, row.chapter_num, i + 1));
+                                }
+                            });
+                        }
+                    });
+                }
+
+                saveReadProgress();
+                updateReadProgress();
+                updateBooks();
+            } catch(e) { console.warn('Could not load read progress:', e); }
+        }
+
+        function updateReadProgress() {
+            const total = TOTAL_VERSES_BIBLE;
+            const read = readCompletedSet.size;
+            const pct = (read / total) * 100;
+            const minVisible = read > 0 ? Math.max(pct, 0.3) : 0;
+            document.getElementById('read-progress-fill').style.width = minVisible + '%';
+            const display = pct < 0.1 ? pct.toFixed(3) : pct < 1 ? pct.toFixed(2) : Math.round(pct);
+            document.getElementById('read-progress-text').innerText = `Bible Read: ${read} / ${total} verses (${display}%)`;
+        }
+
+        function updateReadRefBox(overrideVerseIdx) {
+            // kept for compatibility — read stats now shown in stat boxes
+            updateReadStats(overrideVerseIdx);
+        }
+
+        function updateReadStats(overrideVerseIdx) {
+            if (!readModeActive) return;
+            const bookName = document.getElementById('book-select').value.replace(' ✅', '');
+            const chapNum = parseInt(document.getElementById('chapter-select').value);
+            const rawVal = document.getElementById('verse-select').value;
+            const verseIdx = overrideVerseIdx !== undefined ? overrideVerseIdx : parseInt(rawVal);
+            if (!bookName || isNaN(chapNum) || isNaN(verseIdx)) return;
+
+            const book = (typeof KJV_EMBEDDED !== 'undefined') ? KJV_EMBEDDED.books.find(b => b.name === bookName) : null;
+            const chap = book ? book.chapters.find(c => c.chapter === chapNum) : null;
+            const totalChapVerses = chap ? chap.verses.length : 0;
+            const totalBookChaps = book ? book.chapters.length : 0;
+            const chapIdx = book ? book.chapters.findIndex(c => c.chapter === chapNum) : -1;
+
+            // Verse X of Y (in chapter)
+            document.getElementById('read-verse').textContent = (verseIdx + 1) + '/' + (totalChapVerses || '?');
+
+            // Chapter X of Y (in book)
+            document.getElementById('read-chapter').textContent = (chapIdx + 1) + '/' + (totalBookChaps || '?');
+
+            // Time calculations based on speed-read WPM
+            const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 300;
+
+            function wordsInVerses(verses) {
+                return verses.reduce((sum, v) => sum + v.text.split(/\s+/).length, 0);
+            }
+            function fmtTime(minutes) {
+                if (minutes < 1) return '<1m';
+                if (minutes < 60) return Math.round(minutes) + 'm';
+                const h = Math.floor(minutes / 60), m = Math.round(minutes % 60);
+                return h + 'h' + (m > 0 ? m + 'm' : '');
+            }
+
+            // Ch. Left — words remaining in chapter from current verse
+            if (chap) {
+                const remainingVerses = chap.verses.slice(verseIdx);
+                const chWords = wordsInVerses(remainingVerses);
+                document.getElementById('read-ch-time').textContent = fmtTime(chWords / wpm);
+            } else {
+                document.getElementById('read-ch-time').textContent = '—';
+            }
+
+            // Bk. Left — words remaining in book from current chapter onwards
+            if (book && chapIdx >= 0) {
+                const remainingChaps = book.chapters.slice(chapIdx);
+                let bkWords = 0;
+                remainingChaps.forEach((c, i) => {
+                    const startVerse = i === 0 ? verseIdx : 0;
+                    bkWords += wordsInVerses(c.verses.slice(startVerse));
+                });
+                document.getElementById('read-bk-time').textContent = fmtTime(bkWords / wpm);
+            } else {
+                document.getElementById('read-bk-time').textContent = '—';
+            }
+        }
+
+        let focusModeActive = false;
+        function toggleFocusMode() {
+            const checkbox = document.getElementById('focus-mode-toggle');
+            focusModeActive = checkbox ? checkbox.checked : !focusModeActive;
+            document.body.classList.toggle('focus-mode', focusModeActive);
+        }
+
+        function syncReadBookmark() { /* bookmark button removed from read nav */ }
+
+        let ttsUtterance = null;
+        function toggleListen() {
+            const btn = document.getElementById('listen-btn');
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+                btn.textContent = '🔊';
+                document.querySelector('#listen-btn-wrap .nav-btn-label').textContent = 'Listen';
+                return;
+            }
+            if (!activeVerseText) return;
+            ttsUtterance = new SpeechSynthesisUtterance(activeVerseText);
+            ttsUtterance.lang = 'en-US';
+            ttsUtterance.rate = 0.9;
+            ttsUtterance.onend = () => {
+                btn.textContent = '🔊';
+                document.querySelector('#listen-btn-wrap .nav-btn-label').textContent = 'Listen';
+            };
+            speechSynthesis.speak(ttsUtterance);
+            btn.textContent = '⏹️';
+            document.querySelector('#listen-btn-wrap .nav-btn-label').textContent = 'Stop';
+        }
+
+        function shareVerse() {
+            if (!activeVerseText) return;
+            const bookName = document.getElementById('book-select').value.replace(' ✅', '');
+            const chapNum = document.getElementById('chapter-select').value;
+            const verseNum = parseInt(document.getElementById('verse-select').value) + 1;
+            const ref = bookName + ' ' + chapNum + ':' + verseNum;
+            const text = ref + ' ' + activeVerseText;
+
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('read-share-btn');
+                btn.innerText = '✅';
+                btn.style.borderColor = '#2ea043';
+                btn.style.color = '#2ea043';
+                setTimeout(() => {
+                    btn.innerText = '📋';
+                    btn.style.borderColor = '#30363d';
+                    btn.style.color = 'var(--text-muted)';
+                }, 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                const btn = document.getElementById('read-share-btn');
+                btn.innerText = '✅';
+                setTimeout(() => { btn.innerText = '📋'; }, 2000);
+            });
+        }
+
+        function goToPrevVerse() {
+            if (speedReadActive) stopSpeedReading();
+            const bookName = bookSel.value.replace(" ✅", "");
+            const bookIdx = books.indexOf(bookName);
+            let chapNum = parseInt(chapSel.value);
+            let verseIdx = parseInt(verseSel.value);
+
+            if (verseIdx > 0) {
+                verseSel.value = verseIdx - 1;
+                fetchVerses();
+                updateReadRefBox(verseIdx - 1);
+            } else if (chapNum > 1) {
+                chapSel.value = chapNum - 1;
+                updateVerses();
+                // Go to last verse of previous chapter
+                verseSel.value = verseSel.options.length - 1;
+                fetchVerses();
+            } else if (bookIdx > 0) {
+                bookSel.value = books[bookIdx - 1];
+                updateChapters();
+                // Go to last chapter
+                chapSel.value = chapSel.options.length - 1;
+                updateVerses();
+                verseSel.value = verseSel.options.length - 1;
+                fetchVerses();
+            }
+        }
+
+        async function fetchVerses() {
+            const bookName = bookSel.value.replace(" ✅", "");
+            const chapNum = parseInt(chapSel.value);
+            const isEasy = !readModeActive && document.getElementById('easy-mode').checked;
+            try {
+                const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+                const chapterObj = bookEntry.chapters.find(c => c.chapter === chapNum);
+                currentVerses = chapterObj.verses.map(v => {
+                    let clean = v.text.replace(/<[^>]*>/g, '').trim()
+                        .replace(/[“”]/g, '"')
+                        .replace(/[‘’ʼ]/g, "'");
+                    return isEasy ? clean.toLowerCase().replace(/[^a-z0-9\s]/gi, '') : clean;
+                });
+                currentIndex = parseInt(verseSel.value) || 0;
+                verseWpms = [];
+                loadVerse();
+            } catch (e) { displayEl.innerText = "Sample Data: Try Genesis 1 or Psalms 117."; }
+        }
+
+        function showChapterComplete() {
+            const avg = verseWpms.length > 0 ? Math.round(verseWpms.reduce((a, b) => a + b, 0) / verseWpms.length) : 0;
+            const best = verseWpms.length > 0 ? Math.max(...verseWpms) : 0;
+            const bookName = bookSel.value.replace(" ✅", "");
+            const chapNum = parseInt(chapSel.value);
+            const totalChaps = chapCounts[books.indexOf(bookName)] || 1;
+            const hasNext = chapNum < totalChaps;
+            const versesTyped = verseWpms.length;
+            markStreakActivity();
+
+            displayEl.innerHTML = `
+                <div class="complete-screen">
+                    <div class="emoji">🎉</div>
+                    <h2>${bookName} ${chapNum} Complete!</h2>
+                    <div style="display:flex; gap:12px; justify-content:center; margin:14px 0; flex-wrap:wrap;">
+                        <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:8px; padding:10px 18px; text-align:center;">
+                            <div style="font-size:22px; font-weight:800; color:var(--accent);">${avg}</div>
+                            <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Avg WPM</div>
+                        </div>
+                        <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:8px; padding:10px 18px; text-align:center;">
+                            <div style="font-size:22px; font-weight:800; color:var(--accent);">${best}</div>
+                            <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Best WPM</div>
+                        </div>
+                        <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:8px; padding:10px 18px; text-align:center;">
+                            <div style="font-size:22px; font-weight:800; color:var(--accent);">${versesTyped}</div>
+                            <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Verses</div>
+                        </div>
+                    </div>
+                    ${hasNext
+                        ? `<button class="next-btn" onclick="goToNextChapter()">Next Chapter →</button>`
+                        : `<div style="color:var(--text-muted);font-size:0.9em;margin-top:8px;">🏁 You've finished ${bookName}!</div>`
+                    }
+                </div>`;
+        }
+
+        function goToNextChapter() {
+            const bookName = bookSel.value.replace(" ✅", "");
+            const currentChap = parseInt(chapSel.value);
+            const totalChaps = chapCounts[books.indexOf(bookName)] || 1;
+            
+            if (currentChap < totalChaps) {
+                chapSel.value = currentChap + 1;
+                updateVerses();
+                fetchVerses();
+            }
+        }
+
+        function goToNextVerse(skipMark = false) {
+            if (readModeActive && !skipMark) markVerseRead();
+            const bookName = bookSel.value.replace(" ✅", "");
+            const bookIdx = books.indexOf(bookName);
+            let chapNum = parseInt(chapSel.value);
+            let verseIdx = parseInt(verseSel.value); // 0-indexed
+
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === bookName);
+            const chapEntry = bookEntry && bookEntry.chapters.find(c => c.chapter === chapNum);
+            const totalVerses = chapEntry ? chapEntry.verses.length : 1;
+            const totalChaps = chapCounts[bookIdx];
+
+            if (verseIdx + 1 < totalVerses) {
+                // Next verse in same chapter
+                verseSel.value = verseIdx + 1;
+                fetchVerses();
+                updateReadRefBox(verseIdx + 1);
+            } else if (chapNum < totalChaps) {
+                // First verse of next chapter
+                chapSel.value = chapNum + 1;
+                updateVerses();
+                verseSel.value = 0;
+                fetchVerses();
+            } else if (bookIdx + 1 < books.length) {
+                // First verse of next book
+                bookSel.value = books[bookIdx + 1];
+                updateChapters();
+                chapSel.value = 1;
+                updateVerses();
+                verseSel.value = 0;
+                fetchVerses();
+            }
+            // If at very end (Revelation 22:21), do nothing
+        }
+
+        function showLastVerse(wpm, accuracy, isNewBest, isWorldRecord) {
+            const box = document.getElementById('last-verse-box');
+            let html = 'Last verse: <span>' + wpm + ' WPM</span> · <span>' + accuracy + '% Acc</span>';
+            if (isWorldRecord) html += ' · <span style="color:#f0b429;font-weight:700;">🏆 World Record!</span>';
+            else if (isNewBest) html += ' · <span class="new-best">New Best!</span>';
+            if (verseStreak > 1) html += ' · <span style="color:#f0b429;font-weight:700;">🔥 ' + verseStreak + ' streak</span>';
+            if (!currentUserId) html += ' · <span style="color:var(--text-muted);font-size:0.85em;">Sign in to save to leaderboard</span>';
+            box.innerHTML = html;
+            box.style.display = 'block';
+        }
+
+        async function loadVerse() {
+            // Hide skeleton on first load
+            const sk = document.getElementById('skeleton-screen');
+            if (sk) sk.style.display = 'none';
+            if (currentIndex >= currentVerses.length) {
+                showChapterComplete();
+                return;
+            }
+            activeVerseText = currentVerses[currentIndex];
+            verseSel.value = currentIndex;
+
+            const bookName = bookSel.value.replace(" ✅", "");
+            const chapNum = parseInt(chapSel.value);
+            const verseNum = currentIndex + 1;
+            const vKey = `best_KJV_${bookName}_${chapNum}_${verseNum}`;
+            
+            // Try database first if logged in, then localStorage
+            // Skip DB call in speed reading mode — no need for best WPM
+            let bestWpm = localStorage.getItem(vKey) || 0;
+            if (currentUserId && !speedReadActive) {
+                const dbWpm = await getBestWpmFromDatabase(bookName, chapNum, verseNum);
+                if (dbWpm > 0) bestWpm = dbWpm;
+            }
+            document.getElementById('verse-best-val').innerText = bestWpm;
+
+            // Fetch global best WPM for this verse across all users
+            const globalEl = document.getElementById('global-best-val');
+            const globalUserEl = document.getElementById('global-best-user');
+            if (globalEl && !speedReadActive && supabaseClient) {
+                globalEl.innerText = '—';
+                if (globalUserEl) globalUserEl.innerText = '';
+                const bookIndex = BOOK_INDEX[bookName];
+                const verseIdx = verseNum - 1;
+                if (bookIndex) {
+                    supabaseClient.from('chapter_progress')
+                        .select('user_id, best_wpms')
+                        .eq('book_index', bookIndex)
+                        .eq('chapter_num', chapNum)
+                        .then(async ({ data }) => {
+                            if (!data) return;
+                            let top = 0, topUserId = null;
+                            data.forEach(row => {
+                                const w = row.best_wpms?.[verseIdx] || 0;
+                                if (w > top) { top = w; topUserId = row.user_id; }
+                            });
+                            globalEl.innerText = top > 0 ? top : '—';
+                            if (topUserId && globalUserEl) {
+                                const { data: profile } = await supabaseClient
+                                    .from('profiles')
+                                    .select('username')
+                                    .eq('id', topUserId)
+                                    .maybeSingle();
+                                globalUserEl.innerText = profile?.username ? '@' + profile.username : '';
+                            }
+                        });
+                }
+            }
+            document.getElementById('progress').innerText = `${currentIndex + 1}/${currentVerses.length}`;
+
+            // Update reference label
+            const refEl = document.getElementById('verse-ref-text');
+            if (refEl) refEl.textContent = bookName + ' ' + chapNum + ':' + verseNum;
+
+            warningEl.innerText = "";
+            renderDisplay("");
+            inputEl.value = "";
+            verseStartTime = null;
+            displayEl.scrollTop = 0;
+            document.getElementById('accuracy').innerText = '100';
+                        if (readModeActive) onVerseLoaded();
+            loadBookmarkState();
+            updatePlaceBtns();
+        }
+
+        // ===== SYNTAX HIGHLIGHTING =====
+        const synDimWords = new Set([
+            'the','a','an','of','and','but','for','in','to','at','by','with','as',
+            'it','is','are','was','were','be','been','being','that','this','which',
+            'he','she','they','his','her','their','him','them','we','our','us','i',
+            'my','me','its','so','or','nor','not','if','then','when','who','whom',
+            'what','there','where','upon','into','out','up','down','from','about',
+            'also','even','shall','will','would','should','may','might','have',
+            'hath','hast','hadst','doth','dost','thy','thou','thee','ye','thine',
+            'thereof','therein','thereunto','hereunto','whereby','wherein','therewith',
+            'said','saith','spake','unto','thus','now','yet'
+        ]);
+
+        const synPrepWords = new Set([
+            'i','me','my','mine','myself',
+            'you','your','yours','yourself','yourselves',
+            'he','him','his','himself',
+            'she','her','hers','herself',
+            'it','its','itself',
+            'we','us','our','ours','ourselves',
+            'they','them','their','theirs','themselves',
+            'who','whom','whose','which','what',
+            'this','that','these','those',
+            'thou','thee','thy','thine','thyself','ye'
+        ]);
+
+        const synGodWords = new Set([
+            'lord','god','jesus','christ','father','son','spirit','holy','almighty',
+            'jehovah','immanuel','emmanuel','messiah','saviour','savior','redeemer',
+            'comforter','counsellor','counselor'
+        ]);
+
+        const synLogicWords = new Set([
+            'therefore','wherefore','nevertheless','notwithstanding','moreover',
+            'furthermore','likewise','indeed','verily','behold','lo','yea','nay',
+            'because','though','although','lest','except','unless','until','while',
+            'after','before','since','again','truly','amen'
+        ]);
+
+        // Biblical proper names and places (major set)
+        const synNames = new Set([
+            'aaron','abel','abigail','abimelech','abraham','absalom','adam','ahab',
+            'ahaz','amaziah','amos','ananias','andrew','anna','annas','apollos',
+            'aquila','asia','assyria','babylon','balaam','balak','barnabas',
+            'bartholomew','bathsheba','benjamin','bethany','bethel','bethlehem',
+            'boaz','caesarea','caiaphas','cain','caleb','capernaum','cornelius',
+            'cyrene','damascus','daniel','david','deborah','delilah','egypt',
+            'eli','elijah','elisha','elizabeth','enoch','ephesus','ephraim',
+            'esau','esther','ethiopia','eve','ezekiel','ezra','felix','festus',
+            'gabriel','galilee','gethsemane','gideon','golgotha','goliath',
+            'gomorrah','habakkuk','hagar','haggai','hannah','herod','hezekiah',
+            'hosea','isaac','isaiah','ishmael','israel','jacob','james','jeremiah',
+            'jericho','jerusalem','jesse','joab','job','joel','john','jonah',
+            'jonathan','jordan','joseph','joshua','judah','judas','laban','lazarus',
+            'leah','levi','lot','luke','lydia','malachi','mark','martha','mary',
+            'matthew','micah','miriam','mordecai','moses','naaman','naomi','nathan',
+            'nathanael','nazareth','nehemiah','nicodemus','nineveh','noah','obadiah',
+            'paul','persia','peter','pharaoh','philemon','philip','philippi',
+            'pilate','priscilla','rachel','rahab','rebekah','rome','ruth','samaria',
+            'samson','samuel','sapphira','sarah','saul','silas','simeon','simon',
+            'sinai','sidon','solomon','stephen','syria','tabitha','thessalonica',
+            'thomas','timothy','titus','tyre','uriah','zacchaeus','zechariah',
+            'zion','zephaniah','zerubbabel','zilpah'
+        ]);
+
+        function syntaxHighlight(text) {
+            // Detect speech segments — after "saying," / "said," / ": " patterns
+            // Mark speech spans by scanning for colon or "saying" triggers
+            const speechRanges = [];
+            const speechTrigger = /(said|saith|saying|spake|answered|replied|declared|proclaimed|commanded|wrote)[^:]*:/gi;
+            let m;
+            while ((m = speechTrigger.exec(text)) !== null) {
+                // Speech starts after the colon, ends at next sentence-ending punctuation
+                const start = m.index + m[0].length;
+                const rest = text.slice(start);
+                const endMatch = rest.search(/[.!?;]/);
+                const end = start + (endMatch >= 0 ? endMatch + 1 : rest.length);
+                speechRanges.push([start, end]);
+            }
+
+            function inSpeech(pos) {
+                return speechRanges.some(([s, e]) => pos >= s && pos < e);
+            }
+
+            // Tokenize preserving whitespace and punctuation attached to words
+            const tokens = text.split(/(\s+)/);
+            let pos = 0;
+            return tokens.map(token => {
+                const tokenStart = pos;
+                pos += token.length;
+                if (!token.trim()) return token; // whitespace
+
+                // Strip punctuation for classification
+                const bare = token.replace(/[^a-zA-Z']/g, '').toLowerCase();
+
+                let cls = '';
+                if (synGodWords.has(bare)) {
+                    cls = 'syn-god';
+                } else if (synNames.has(bare)) {
+                    cls = 'syn-name';
+                } else if (synLogicWords.has(bare)) {
+                    cls = 'syn-logic';
+                } else if (synPrepWords.has(bare)) {
+                    cls = 'syn-prep';
+                } else if (synDimWords.has(bare)) {
+                    cls = 'syn-dim';
+                } else if (inSpeech(tokenStart)) {
+                    cls = 'syn-speech';
+                }
+
+                return cls ? `<span class="${cls}">${token}</span>` : token;
+            }).join('');
+        }
+
+        function onSyntaxToggle() {
+            if (readModeActive && activeVerseText) renderDisplay(activeVerseText);
+        }
+
+        function renderDisplay(typed) {
+            const isRead = readModeActive;
+            if (isRead) {
+                const useSyntax = document.getElementById('syntax-mode')?.checked;
+                if (useSyntax) {
+                    displayEl.innerHTML = syntaxHighlight(activeVerseText);
+                } else {
+                    displayEl.innerHTML = activeVerseText.split('').map(char =>
+                        `<span class="correct">${char}</span>`
+                    ).join('');
+                }
+                return;
+            }
+            displayEl.innerHTML = activeVerseText.split('').map((char, i) => {
+                let className = (i < typed.length) ? (typed[i] === activeVerseText[i] ? "correct" : "incorrect") : (i === typed.length ? "current-char" : "");
+                return `<span class="${className}">${char}</span>`;
+            }).join('');
+
+            const cursor = document.querySelector('.current-char');
+            if (cursor) {
+                const parentRect = displayEl.getBoundingClientRect();
+                const cursorRect = cursor.getBoundingClientRect();
+                if (cursorRect.bottom > parentRect.bottom || cursorRect.top < parentRect.top) {
+                    cursor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        // ===== SPEED READING =====
+        let speedReadActive = false;
+        let speedReadTimer = null;
+        let speedWordIndex = 0;
+        let speedWords = [];
+        let speedControlsVisible = false;
+        let speedTtsEnabled = false; // TTS sync toggle
+
+        function toggleSpeedTts() {
+            speedTtsEnabled = !speedTtsEnabled;
+            const btn = document.getElementById('speed-tts-btn');
+            btn.textContent = speedTtsEnabled ? '🔊' : '🔇';
+            btn.style.borderColor = speedTtsEnabled ? 'var(--accent)' : '#30363d';
+            btn.style.color = speedTtsEnabled ? 'var(--accent)' : 'var(--text-muted)';
+        }
+
+        function toggleSpeedControls() {
+            // Speed controls now always visible as slider — just stop if running
+            if (speedReadActive) stopSpeedReading();
+        }
+
+        function toggleSpeedReading() {
+            if (speedReadActive) {
+                stopSpeedReading();
+            } else {
+                startSpeedReading();
+            }
+        }
+
+        let speedMsPerWord = 200;
+
+        function speedTick() {
+            if (!speedReadActive) return;
+            speedWordIndex++;
+            if (speedWordIndex >= speedWords.length) {
+                markVerseRead();
+                clearInterval(speedReadTimer);
+                goToNextVerse(true);
+                speedWordIndex = 0;
+                speedWords = activeVerseText.split(/\s+/).filter(w => w.trim().length > 0);
+                renderSpeedDisplay(0);
+                speedReadTimer = setInterval(speedTick, speedMsPerWord);
+                // Restart TTS for new verse
+                if (speedTtsEnabled && speechSynthesis) {
+                    speechSynthesis.cancel();
+                    const cleanText = activeVerseText.replace(/[,;:]/g, ' ').replace(/[.!?]/g, ' ').replace(/\s+/g, ' ').trim();
+                    const utt = new SpeechSynthesisUtterance(cleanText);
+                    utt.lang = 'en-US';
+                    const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 300;
+                    const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+                    utt.rate = isMobile ? Math.min(2, Math.max(0.5, wpm / 250)) : Math.min(10, Math.max(0.5, wpm / 150));
+                    speechSynthesis.speak(utt);
+                }
+                return;
+            }
+            renderSpeedDisplay(speedWordIndex);
+            // TTS plays full verse in background at matching rate — no per-word firing
+        }
+
+        function startSpeedReading() {
+            if (!activeVerseText) return;
+            const wpm = parseInt(document.getElementById('speed-wpm-input').value) || 300;
+            localStorage.setItem('tsSpeedWpm', wpm);
+            speedMsPerWord = (60 / wpm) * 1000;
+
+            speedWords = activeVerseText.split(/\s+/).filter(w => w.trim().length > 0);
+            speedWordIndex = 0;
+            speedReadActive = true;
+
+            const btn = document.getElementById('speed-toggle-btn');
+            btn.innerText = '⏸ Pause';
+            btn.classList.add('active');
+
+            renderSpeedDisplay(0);
+            speedReadTimer = setInterval(speedTick, speedMsPerWord);
+
+            // Start TTS for full verse at matched rate if enabled
+            if (speedTtsEnabled && speechSynthesis) {
+                speechSynthesis.cancel();
+                const cleanText = activeVerseText.replace(/[,;:]/g, ' ').replace(/[.!?]/g, ' ').replace(/\s+/g, ' ').trim();
+                const utt = new SpeechSynthesisUtterance(cleanText);
+                utt.lang = 'en-US';
+                // SpeechSynthesis rate: 1 = ~150wpm, scale accordingly
+                const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+                    utt.rate = isMobile ? Math.min(2, Math.max(0.5, wpm / 250)) : Math.min(10, Math.max(0.5, wpm / 150));
+                speechSynthesis.speak(utt);
+            }
+        }
+
+        function stopSpeedReading() {
+            clearInterval(speedReadTimer);
+            speedReadActive = false;
+            speedWordIndex = 0;
+            if (speechSynthesis) speechSynthesis.cancel();
+            const btn = document.getElementById('speed-toggle-btn');
+            btn.innerText = '▶ Start';
+            btn.classList.remove('active');
+            // Re-render verse without pacer
+            if (activeVerseText) renderDisplay(activeVerseText);
+        }
+
+        function renderSpeedDisplay(wordIdx) {
+            const useSyntax = document.getElementById('syntax-mode')?.checked;
+
+            if (useSyntax) {
+                // Syntax mode: build DOM once at start of verse, then only toggle active-word
+                if (wordIdx === 0 || !displayEl.querySelector('.speed-word')) {
+                    let wc = 0;
+                    const html = activeVerseText.split(/(\s+)/).map(token => {
+                        if (!token.trim()) return token;
+                        const bare = token.replace(/[^a-zA-Z']/g, '').toLowerCase();
+                        let cls = 'correct';
+                        if (synGodWords.has(bare)) cls = 'syn-god';
+                        else if (synNames.has(bare)) cls = 'syn-name';
+                        else if (synLogicWords.has(bare)) cls = 'syn-logic';
+                        else if (synPrepWords.has(bare)) cls = 'syn-prep';
+                        else if (synDimWords.has(bare)) cls = 'syn-dim';
+                        return `<span class="speed-word ${cls}" data-wi="${wc++}">${token}</span>`;
+                    }).join('');
+                    displayEl.innerHTML = html;
+                }
+                // Only move the active-word underline — no color changes
+                displayEl.querySelectorAll('.speed-word').forEach(el => {
+                    el.classList.toggle('active-word', parseInt(el.dataset.wi) === wordIdx);
+                });
+            } else {
+                // Normal mode: re-render with past-word dimming
+                let wordCount = 0;
+                const html = activeVerseText.split(/(\s+)/).map(token => {
+                    if (!token.trim()) return token;
+                    const isCurrent = wordCount === wordIdx;
+                    const isPast = wordCount < wordIdx;
+                    wordCount++;
+                    const stateCls = isCurrent ? 'active-word' : isPast ? 'past-word' : '';
+                    return `<span class="speed-word correct ${stateCls}">${token}</span>`;
+                }).join('');
+                displayEl.innerHTML = html;
+            }
+
+            // Scroll current word into view
+            const activeEl = displayEl.querySelector('.active-word');
+            if (activeEl) {
+                const parentRect = displayEl.getBoundingClientRect();
+                const elRect = activeEl.getBoundingClientRect();
+                if (elRect.bottom > parentRect.bottom || elRect.top < parentRect.top) {
+                    activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        // Stop speed reading when navigating manually
+        const _origGoToNextVerse = goToNextVerse;
+        // Stop speed reading if user manually taps prev
+        function stopSpeedIfActive() {
+            if (speedReadActive) stopSpeedReading();
+        }
+
+        // ===== VOICE SEARCH =====
+
+        // ===== VERSE SEARCH BOX =====
+        // Hide voice button on iOS
+        if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) {
+            const vw = document.getElementById('voice-btn-wrap');
+            if (vw) vw.style.display = 'none';
+        }
+
+        function startVoiceSearch() {
+            const btn = document.getElementById('voice-btn');
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Voice search is not supported in this browser. Try Chrome.');
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 3;
+
+            btn.classList.add('listening');
+            btn.innerText = '🔴';
+
+            recognition.onresult = (e) => {
+                btn.classList.remove('listening');
+                btn.innerText = '🎙️';
+                // Try each alternative until one parses
+                for (let i = 0; i < e.results[0].length; i++) {
+                    const transcript = e.results[0][i].transcript.trim();
+                    console.log('Voice transcript:', transcript);
+                    if (parseVoiceVerse(transcript)) return;
+                }
+                showVoiceFeedback('Could not understand. Try: "John 3 16"', true);
+            };
+
+            recognition.onerror = (e) => {
+                btn.classList.remove('listening');
+                btn.innerText = '🎙️';
+                if (e.error !== 'no-speech') showVoiceFeedback('Mic error: ' + e.error, true);
+            };
+
+            recognition.onend = () => {
+                btn.classList.remove('listening');
+                btn.innerText = '🎙️';
+            };
+
+            recognition.start();
+        }
+
+        function parseVoiceVerse(transcript) {
+            // Normalize: lowercase, replace ordinals, common substitutions
+            let t = transcript.toLowerCase()
+                .replace(/\bfirst\b/g, '1').replace(/\bsecond\b/g, '2').replace(/\bthird\b/g, '3')
+                .replace(/\bone\b/g, '1').replace(/\btwo\b/g, '2').replace(/\bthree\b/g, '3')
+                .replace(/\bfour\b/g, '4').replace(/\bfive\b/g, '5').replace(/\bsix\b/g, '6')
+                .replace(/\bseven\b/g, '7').replace(/\beight\b/g, '8').replace(/\bnine\b/g, '9')
+                .replace(/\bten\b/g, '10').replace(/[:.,]/g, ' ').replace(/\s+/g, ' ').trim();
+
+            // iOS omits colon: "John 3:16" becomes "John 316" — split compact 3-4 digit numbers
+            t = t.replace(/(\d{3,4})/g, (match) => {
+                if (match.length === 3) return match[0] + ' ' + match.slice(1);
+                if (match.length === 4) return match.slice(0, 2) + ' ' + match.slice(2);
+                return match;
+            });
+
+            // Book name aliases
+            const aliases = {
+                'song of solomon': 'Song of Solomon', 'song of songs': 'Song of Solomon',
+                'psalms': 'Psalms', 'psalm': 'Psalms',
+                'proverbs': 'Proverbs', 'proverb': 'Proverbs',
+                'revelation': 'Revelation', 'revelations': 'Revelation',
+                'genesis': 'Genesis', 'exodus': 'Exodus', 'leviticus': 'Leviticus',
+                'numbers': 'Numbers', 'deuteronomy': 'Deuteronomy', 'joshua': 'Joshua',
+                'judges': 'Judges', 'ruth': 'Ruth', 'job': 'Job', 'isaiah': 'Isaiah',
+                'jeremiah': 'Jeremiah', 'lamentations': 'Lamentations', 'ezekiel': 'Ezekiel',
+                'daniel': 'Daniel', 'hosea': 'Hosea', 'joel': 'Joel', 'amos': 'Amos',
+                'obadiah': 'Obadiah', 'jonah': 'Jonah', 'micah': 'Micah', 'nahum': 'Nahum',
+                'habakkuk': 'Habakkuk', 'zephaniah': 'Zephaniah', 'haggai': 'Haggai',
+                'zechariah': 'Zechariah', 'malachi': 'Malachi', 'matthew': 'Matthew',
+                'mark': 'Mark', 'luke': 'Luke', 'john': 'John', 'acts': 'Acts',
+                'romans': 'Romans', 'galatians': 'Galatians', 'ephesians': 'Ephesians',
+                'philippians': 'Philippians', 'colossians': 'Colossians', 'titus': 'Titus',
+                'philemon': 'Philemon', 'hebrews': 'Hebrews', 'james': 'James', 'jude': 'Jude',
+                '1 samuel': '1 Samuel', '2 samuel': '2 Samuel', '1 kings': '1 Kings',
+                '2 kings': '2 Kings', '1 chronicles': '1 Chronicles', '2 chronicles': '2 Chronicles',
+                'ezra': 'Ezra', 'nehemiah': 'Nehemiah', 'esther': 'Esther',
+                '1 corinthians': '1 Corinthians', '2 corinthians': '2 Corinthians',
+                '1 thessalonians': '1 Thessalonians', '2 thessalonians': '2 Thessalonians',
+                '1 timothy': '1 Timothy', '2 timothy': '2 Timothy',
+                '1 peter': '1 Peter', '2 peter': '2 Peter',
+                '1 john': '1 John', '2 john': '2 John', '3 john': '3 John',
+                '1 chronicles': '1 Chronicles', '2 chronicles': '2 Chronicles',
+            };
+
+            // Try to match "BookName chapter verse" pattern
+            // e.g. "john 3 16", "1 corinthians 13 4", "song of solomon 1 1"
+            let matchedBook = null, matchedChap = null, matchedVerse = null;
+
+            // Try each book alias (longest first to avoid partial matches)
+            const sortedAliases = Object.keys(aliases).sort((a, b) => b.length - a.length);
+            for (const alias of sortedAliases) {
+                if (t.startsWith(alias)) {
+                    const rest = t.slice(alias.length).trim();
+                    const nums = rest.match(/(\d+)\s+(\d+)/);
+                    if (nums) {
+                        matchedBook = aliases[alias];
+                        matchedChap = parseInt(nums[1]);
+                        matchedVerse = parseInt(nums[2]);
+                        break;
+                    }
+                    // Just chapter, no verse
+                    const chap = rest.match(/^(\d+)$/);
+                    if (chap) {
+                        matchedBook = aliases[alias];
+                        matchedChap = parseInt(chap[1]);
+                        break;
+                    }
+                }
+            }
+
+            // Also try books array directly
+            if (!matchedBook) {
+                for (const book of books) {
+                    const bookLower = book.toLowerCase();
+                    if (t.startsWith(bookLower)) {
+                        const rest = t.slice(bookLower.length).trim();
+                        const nums = rest.match(/(\d+)\s+(\d+)/);
+                        if (nums) {
+                            matchedBook = book;
+                            matchedChap = parseInt(nums[1]);
+                            matchedVerse = parseInt(nums[2]);
+                            break;
+                        }
+                        const chap = rest.match(/^(\d+)$/);
+                        if (chap) {
+                            matchedBook = book;
+                            matchedChap = parseInt(chap[1]);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!matchedBook) return false;
+
+            // Validate chapter
+            const bookIdx = books.indexOf(matchedBook);
+            const totalChaps = chapCounts[bookIdx] || 1;
+            if (matchedChap < 1 || matchedChap > totalChaps) {
+                showVoiceFeedback(matchedBook + ' only has ' + totalChaps + ' chapters', true);
+                return true;
+            }
+
+            // Navigate to book + chapter
+            for (let i = 0; i < bookSel.options.length; i++) {
+                if (bookSel.options[i].value.replace(' ✅','') === matchedBook) {
+                    bookSel.selectedIndex = i; break;
+                }
+            }
+            updateChapters();
+            chapSel.value = matchedChap;
+            updateVerses();
+
+            // Navigate to verse if provided
+            if (matchedVerse) {
+                const totalVerses = verseSel.options.length;
+                if (matchedVerse < 1 || matchedVerse > totalVerses) {
+                    showVoiceFeedback(matchedBook + ' ' + matchedChap + ' only has ' + totalVerses + ' verses', true);
+                    return true;
+                }
+                verseSel.value = matchedVerse - 1;
+            }
+
+            fetchVerses();
+            const ref = matchedBook + ' ' + matchedChap + (matchedVerse ? ':' + matchedVerse : '');
+            showVoiceFeedback('📖 ' + ref, false);
+            return true;
+        }
+
+        function doVerseSearch() {
+            const input = document.getElementById('verse-search-input');
+            const query = input.value.trim();
+            if (!query) return;
+            const ok = parseVoiceVerse(query);
+            if (ok) {
+                input.value = '';
+                input.blur();
+            } else {
+                showVoiceFeedback("Couldn't find that verse. Try: John 3:16 or Ps 23 1", true);
+            }
+        }
+
+        function showVoiceFeedback(msg, isError) {
+            const el = document.getElementById('accuracy-warning');
+            el.style.color = isError ? 'var(--error)' : '#2ea043';
+            el.innerText = msg;
+            setTimeout(() => {
+                el.style.color = 'var(--error)';
+                el.innerText = '';
+            }, 3000);
+        }
+
+        inputEl.addEventListener('focus', () => document.body.classList.add('typing-focused'));
+        inputEl.addEventListener('blur', () => document.body.classList.remove('typing-focused'));
+        inputEl.addEventListener('input', () => {
+            if (!verseStartTime) verseStartTime = new Date();
+            const typed = inputEl.value;
+            renderDisplay(typed);
+
+            const mins = (new Date() - verseStartTime) / 60000;
+            const wpm = Math.round((typed.length / 5) / mins) || 0;
+            document.getElementById('wpm').innerText = wpm;
+
+            const correctChars = typed.split('').filter((ch, i) => ch === activeVerseText[i]).length;
+            const accuracy = typed.length > 0 ? Math.round((correctChars / typed.length) * 100) : 100;
+            document.getElementById('accuracy').innerText = accuracy;
+
+            if (typed.length >= activeVerseText.length && activeVerseText.length > 0) {
+                warningEl.innerText = "";
+                verseWpms.push(wpm);
+                markStreakActivity();
+                markVerseRead(true); // typing a verse counts as reading it
+                const bookName = bookSel.value.replace(" ✅", "");
+                const chapNum = parseInt(chapSel.value);
+                const verseNum = currentIndex + 1;
+                const vKey = `best_KJV_${bookName}_${chapNum}_${verseNum}`;
+                const currentBestWpm = parseInt(document.getElementById('verse-best-val').innerText) || 0;
+                const currentWorldRecord = parseInt(document.getElementById('global-best-val').innerText) || 0;
+
+                // Only save highscore if accuracy is 100%
+                let isNewBest = false;
+                let isWorldRecord = false;
+                if (accuracy === 100) {
+                    const newBestWpm = Math.max(wpm, currentBestWpm);
+                    if (newBestWpm > currentBestWpm) {
+                        isNewBest = true;
+                        saveVerseToDatabase(bookName, chapNum, verseNum, newBestWpm);
+                        localStorage.setItem(vKey, newBestWpm);
+                        document.getElementById("verse-best-val").innerText = newBestWpm;
+                    }
+                    if (wpm >= currentWorldRecord && isNewBest) {
+                        isWorldRecord = true;
+                        document.getElementById('global-best-val').innerText = wpm;
+                    }
+                }
+                showLastVerse(wpm, accuracy, isNewBest, isWorldRecord);
+
+                // Only count verse as completed if accuracy >= 50%
+                if (accuracy >= 50) {
+                    verseStreak++;
+                    // Typing a verse counts as reading it too
+                    readCompletedSet.add(getReadKey(bookName, chapNum, verseNum));
+                    saveReadProgress();
+                    updateReadProgress();
+                    completedSet.add(`KJV_${bookName}_${chapNum}_${verseNum}`);
+                    localStorage.setItem('typeScriptureProgressSet', JSON.stringify(Array.from(completedSet)));
+                    if (currentUserId) {
+                        // saveVerseToDatabase handles type_counts + best_wpms in chapter_progress
+                        const existingWpm = parseInt(localStorage.getItem(`best_KJV_${bookName}_${chapNum}_${verseNum}`)) || 0;
+                        saveVerseToDatabase(bookName, chapNum, verseNum, Math.max(wpm, existingWpm));
+                        // Also increment read_counts since typing = reading
+                        markVerseRead(true);
+                    }
+                    updateBibleProgress();
+                    updateBooks();
+                } else {
+                    warningEl.innerText = 'Accuracy too low — verse not counted. Try again!';
+                }
+                if (!document.getElementById('repeat-mode').checked) currentIndex++;
+                setTimeout(loadVerse, 100);
+            }
+        });
+
+        // ===== BLUE LETTER BIBLE INTEGRATION =====
+        const blbBookMap = {
+            "Genesis":"gen","Exodus":"exo","Leviticus":"lev","Numbers":"num","Deuteronomy":"deu",
+            "Joshua":"jos","Judges":"jdg","Ruth":"rth","1 Samuel":"1sa","2 Samuel":"2sa",
+            "1 Kings":"1ki","2 Kings":"2ki","1 Chronicles":"1ch","2 Chronicles":"2ch",
+            "Ezra":"ezr","Nehemiah":"neh","Esther":"est","Job":"job","Psalms":"psa",
+            "Proverbs":"pro","Ecclesiastes":"ecc","Song of Solomon":"sng","Isaiah":"isa",
+            "Jeremiah":"jer","Lamentations":"lam","Ezekiel":"eze","Daniel":"dan",
+            "Hosea":"hos","Joel":"joe","Amos":"amo","Obadiah":"oba","Jonah":"jon",
+            "Micah":"mic","Nahum":"nah","Habakkuk":"hab","Zephaniah":"zep","Haggai":"hag",
+            "Zechariah":"zec","Malachi":"mal","Matthew":"mat","Mark":"mar","Luke":"luk",
+            "John":"jhn","Acts":"act","Romans":"rom","1 Corinthians":"1co","2 Corinthians":"2co",
+            "Galatians":"gal","Ephesians":"eph","Philippians":"phl","Colossians":"col",
+            "1 Thessalonians":"1th","2 Thessalonians":"2th","1 Timothy":"1ti","2 Timothy":"2ti",
+            "Titus":"tit","Philemon":"phm","Hebrews":"heb","James":"jas","1 Peter":"1pe",
+            "2 Peter":"2pe","1 John":"1jo","2 John":"2jo","3 John":"3jo","Jude":"jde",
+            "Revelation":"rev"
+        };
+
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+        function openBLB() {
+            const bookName = bookSel.value.replace(' ✅', '');
+            const chapNum = chapSel.value;
+            const verseNum = parseInt(verseSel.value) + 1;
+            const abbr = blbBookMap[bookName];
+            if (!abbr) return;
+            const url = `https://www.blueletterbible.org/kjv/${abbr}/${chapNum}/${verseNum}/`;
+            if (isIOS) {
+                // iOS blocks window.open in setTimeout — show a tappable banner instead
+                const banner = document.getElementById('blb-tap-banner');
+                const link = document.getElementById('blb-tap-link');
+                link.href = url;
+                banner.style.display = 'block';
+                setTimeout(() => banner.style.display = 'none', 4000);
+            } else {
+                window.open(url, '_blank');
+            }
+        }
+
+        // Long press on display to open BLB (500ms threshold)
+        let longPressTimer = null;
+        let longPressTriggered = false;
+
+        displayEl.addEventListener('touchstart', (e) => {
+            longPressTriggered = false;
+            longPressTimer = setTimeout(() => {
+                longPressTriggered = true;
+                // Visual feedback first
+                displayEl.style.opacity = '0.7';
+                setTimeout(() => displayEl.style.opacity = '1', 200);
+                // iOS requires window.open to be called directly from a user gesture
+                // so we open immediately in the timeout which counts as user-initiated
+                openBLB();
+            }, 500);
+        }, { passive: false });
+
+        displayEl.addEventListener('touchend', (e) => {
+            clearTimeout(longPressTimer);
+            if (longPressTriggered) {
+                e.preventDefault();
+                return;
+            }
+            // Normal tap — focus hidden input to bring up keyboard
+            // iOS requires focus() called synchronously in user event handler
+            if (!inputEl.disabled) {
+                inputEl.style.opacity = '1';
+                inputEl.style.pointerEvents = 'auto';
+                                setTimeout(() => {
+                    inputEl.style.opacity = '0';
+                    inputEl.style.pointerEvents = 'none';
+                }, 100);
+            }
+        });
+
+        displayEl.addEventListener('touchmove', () => {
+            clearTimeout(longPressTimer);
+            longPressTriggered = false;
+        });
+
+        // Desktop: right-click or long mousedown
+        displayEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            openBLB();
+        });
+
+        // Focus on tap anywhere outside nav/buttons
+        document.addEventListener('touchend', (e) => {
+            const tag = e.target.tagName;
+            const isInteractive = ['SELECT', 'BUTTON', 'INPUT', 'A', 'LABEL'].includes(tag);
+            const isNavArea = e.target.closest('#nav-header, #stats-bar, .brand-container, #read-nav');
+            const isDisplay = e.target.closest('#display');
+            if (!isInteractive && !isNavArea && !isDisplay && !inputEl.disabled) {
+                inputEl.style.opacity = '1';
+                inputEl.style.pointerEvents = 'auto';
+                inputEl.focus({ preventScroll: true });
+                setTimeout(() => { inputEl.style.opacity = '0'; inputEl.style.pointerEvents = 'none'; }, 100);
+            }
+        }, { passive: true });
+
+        // Desktop fallback
+        window.addEventListener('click', (e) => {
+            if (!['SELECT', 'BUTTON', 'INPUT', 'A'].includes(e.target.tagName)) {
+                inputEl.focus({ preventScroll: true });
+            }
+        });
+
+        // Arrow keys: navigate verses, Escape = restart current verse
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'SELECT') return;
+            if (e.ctrlKey || e.metaKey) return; // let Ctrl shortcuts handle these
+            if (e.key === 'ArrowLeft') { e.preventDefault(); goToPrevVerse(); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); goToNextVerse(); }
+            if (e.key === 'Escape') { e.preventDefault(); verseStreak = 0; loadVerse(); }
+        });
+
+        // Check for URL params (e.g. from bookmarks page)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlBook = urlParams.get('book');
+        const urlChapter = urlParams.get('chapter');
+        const urlVerse = urlParams.get('verse');
+
+        updateBooks();
+
+        if (urlBook && urlChapter && urlVerse) {
+            // Set book
+            const bookSel2 = document.getElementById('book-select');
+            for (let i = 0; i < bookSel2.options.length; i++) {
+                if (bookSel2.options[i].value.replace(' ✅','') === urlBook) {
+                    bookSel2.selectedIndex = i; break;
+                }
+            }
+            updateChapters();
+            // Set chapter
+            const chapSel2 = document.getElementById('chapter-select');
+            for (let i = 0; i < chapSel2.options.length; i++) {
+                if (chapSel2.options[i].value === urlChapter) {
+                    chapSel2.selectedIndex = i; break;
+                }
+            }
+            updateVerses();
+            // Set verse (verse-select is 0-indexed)
+            const verseSel2 = document.getElementById('verse-select');
+            for (let i = 0; i < verseSel2.options.length; i++) {
+                if (parseInt(verseSel2.options[i].value) === parseInt(urlVerse) - 1) {
+                    verseSel2.selectedIndex = i; break;
+                }
+            }
+            // Clean URL without reloading
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+            initVotd();
+        }
+
+        // Restore easy mode preference
+        const savedEasy = localStorage.getItem('tsEasyMode');
+        if (savedEasy === 'true') document.getElementById('easy-mode').checked = true;
+
+        // Auto-enable Read Mode on mobile before fetching verses
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 600;
+        if (isMobile) toggleReadMode();
+
+        fetchVerses();
+        initStreak();
+
+        // Auth init — runs after all variables and functions are declared
+        checkAuth();
+
+        if (supabaseClient) supabaseClient.auth.onAuthStateChange((event, session) => {
+            // Clean up magic link hash after Supabase reads it
+            if (event === 'SIGNED_IN' && window.location.hash) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            if (session) {
+                currentUserId = session.user.id;
+                isLoggedIn = true;
+                document.getElementById('google-login-btn').style.display = 'none';
+                document.getElementById('logout-btn').style.display = 'block';
+                loadUserProgress();
+                checkAndPromptUsername(session.user.id);
+                console.log('✓ Auth state changed - user logged in:', session.user.email);
+            } else {
+                currentUserId = null;
+                isLoggedIn = false;
+                console.log('ℹ Auth state changed - user logged out');
+            }
+        });
+    </script>
+    <div style="text-align:center; padding: 24px 0 8px; font-size: 12px; position:relative; z-index:60;">
+        <a href="/about.html" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">👤 About &amp; Contact</a>
+    </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+
+        // Flush pending data when back online
+        window.addEventListener('online', () => {
+            flushPendingProgress();
+            flushPendingBookmarks();
+        });
+
+
+        // PWA install prompt
+        let deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            document.getElementById('install-btn').style.display = 'inline-block';
+        });
+
+        async function installApp() {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            if (outcome === 'accepted') {
+                document.getElementById('install-btn').style.display = 'none';
+            }
+            deferredInstallPrompt = null;
+        }
+
+        // Hide install button if already installed
+        window.addEventListener('appinstalled', () => {
+            document.getElementById('install-btn').style.display = 'none';
+            deferredInstallPrompt = null;
+        });
+    </script>
+
+    <div id="blb-tap-banner"><a id="blb-tap-link" href="#" target="_blank">📖 Open in Blue Letter Bible</a><div class="blb-sub">Tap to open · hold again to dismiss</div></div>
+
+    <!-- GUIDED TOUR MODAL -->
+    <div id="tour-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+        <div id="tour-modal" style="background:var(--panel-bg); border:1px solid var(--border); border-radius:16px; width:100%; max-width:420px; overflow:hidden; position:relative;">
+            <button onclick="closeTour()" style="position:absolute; top:12px; right:14px; background:transparent; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; line-height:1; z-index:1;">✕</button>
+            <div id="tour-steps"></div>
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-top:1px solid var(--border-inner);">
+                <button id="tour-back-btn" onclick="tourStep(-1)" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer; font-family:inherit;">← Back</button>
+                <div id="tour-dots" style="display:flex; gap:6px;"></div>
+                <button id="tour-next-btn" onclick="tourStep(1)" style="background:var(--accent); color:#0d1117; border:none; padding:6px 18px; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;">Next →</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const TOUR_STEPS = [
+            {
+                emoji: '✝',
+                title: 'Welcome to TypeScripture',
+                body: 'Type through the Bible verse by verse. Build speed, accuracy, and Scripture memory — all at once. This quick tour shows you the basics.',
+                mock: `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">⌨️ Type verses</div>
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">📖 Read mode</div>
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">🔥 Daily streaks</div>
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">🏆 Leaderboard</div>
+                </div>`
+            },
+            {
+                emoji: '🔍',
+                title: 'Choose your verse',
+                body: 'Use the dropdowns to pick any book, chapter, and verse in the KJV Bible. Or type a reference like "Jn 3:16" in the search box — voice search works too.',
+                mock: `<div style="background:var(--progress-bg);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <span style="flex:1;min-width:80px;background:var(--panel-bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text-muted);">e.g. Jn 3:16</span>
+                    <span style="font-size:14px;">🔍</span><span style="font-size:14px;">🎙️</span>
+                    <span style="background:var(--panel-bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text-muted);">John ▾</span>
+                    <span style="background:var(--panel-bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text-muted);">Ch 3 ▾</span>
+                    <span style="background:var(--panel-bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text-muted);">v.16 ▾</span>
+                </div>`
+            },
+            {
+                emoji: '⌨️',
+                title: 'Start typing',
+                body: 'Click the verse box and start typing. Green = correct, red = mistake. Your WPM and accuracy update live. Complete a verse at 100% accuracy to set a best score.',
+                mock: `<div style="background:var(--progress-bg);border:1px solid var(--accent);border-radius:8px;padding:14px;font-size:14px;line-height:1.8;margin-bottom:8px;">
+                    <span style="color:#2ea043;">For God so loved the </span><span style="border-left:3px solid var(--accent);"> </span><span style="color:var(--text-muted);">world, that he gave his only begotten Son...</span>
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <div style="flex:1;background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+                        <div style="font-size:16px;font-weight:700;color:var(--accent);">42</div><div style="font-size:10px;color:var(--text-muted);">WPM</div>
+                    </div>
+                    <div style="flex:1;background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+                        <div style="font-size:16px;font-weight:700;color:#2ea043;">100%</div><div style="font-size:10px;color:var(--text-muted);">ACC</div>
+                    </div>
+                    <div style="flex:1;background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+                        <div style="font-size:16px;font-weight:700;color:var(--accent);">49</div><div style="font-size:10px;color:var(--text-muted);">BEST</div>
+                    </div>
+                </div>`
+            },
+            {
+                emoji: '📖',
+                title: 'Type or Read mode',
+                body: 'The "Current Mode" button switches between typing and reading. Read mode is great for devotionals — just swipe through verses without typing, with optional text-to-speech.',
+                mock: `<div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;">
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;color:var(--text-muted);">🔊 Listen</div>
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;color:var(--text-muted);">⭐ Bookmark</div>
+                    <div style="background:rgba(88,166,255,0.12);border:1.5px solid var(--accent);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;color:var(--accent);">📖 Read</div>
+                </div>
+                <div style="text-align:center;margin-top:8px;font-size:11px;color:var(--text-muted);">CURRENT MODE</div>`
+            },
+            {
+                emoji: '⚡',
+                title: 'Speed reader',
+                body: 'In read mode, use the WPM slider at the bottom to auto-advance through verses at your chosen speed. Hit ▶ Start and the words highlight as you read. Toggle the 🔊 button to hear it spoken aloud in sync.',
+                mock: `<div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                        <span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">⚡ <span style="color:var(--accent);font-weight:700;">300</span> WPM</span>
+                        <div style="flex:1;height:4px;background:var(--border);border-radius:2px;position:relative;">
+                            <div style="width:40%;height:100%;background:var(--accent);border-radius:2px;"></div>
+                        </div>
+                        <div style="background:var(--panel-bg);border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;">▶ Start</div>
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:3px 8px;font-size:14px;">🔇</div>
+                    </div>
+                    <div style="font-size:14px;line-height:2;color:var(--text-muted);">
+                        For God so <span style="color:var(--text-main);background:rgba(88,166,255,0.15);border-radius:3px;padding:1px 4px;">loved</span> the world, that he gave his only begotten Son...
+                    </div>
+                </div>`
+            },
+            {
+                emoji: '🔥',
+                title: 'Sign in to unlock everything',
+                body: 'Sign in with Google to save your progress across devices, build daily streaks, bookmark verses, and compete on the leaderboard. All your data stays private.',
+                mock: `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center;">
+                        <div style="font-size:18px;font-weight:700;color:#f0b429;">🔥 7</div><div style="font-size:10px;color:var(--text-muted);">Day streak</div>
+                    </div>
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center;">
+                        <div style="font-size:18px;font-weight:700;color:var(--accent);">2%</div><div style="font-size:10px;color:var(--text-muted);">Bible typed</div>
+                    </div>
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center;">
+                        <div style="font-size:18px;font-weight:700;color:#2ea043;">⭐ 12</div><div style="font-size:10px;color:var(--text-muted);">Bookmarks</div>
+                    </div>
+                </div>
+                <div style="text-align:center;margin-top:10px;font-size:12px;color:var(--text-muted);">Tip: press ← → to navigate, Escape to restart a verse</div>`
+            },
+            {
+                emoji: '📲',
+                title: 'Add to your home screen',
+                body: 'TypeScripture works as a full app on iPhone — no App Store needed. Install it for a faster, fullscreen experience.',
+                mock: `<div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:13px;color:var(--text-muted);line-height:2;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text-main);white-space:nowrap;">1. Open in Safari</div>
+                        <div style="color:var(--text-muted);font-size:11px;">Chrome won't work for install</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text-main);white-space:nowrap;">2. Tap Share ↑</div>
+                        <div style="color:var(--text-muted);font-size:11px;">Bottom centre of Safari</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text-main);white-space:nowrap;">3. Add to Home Screen</div>
+                        <div style="color:var(--text-muted);font-size:11px;">Scroll down in the share sheet</div>
+                    </div>
+                </div>`
+            }
+        ];
+
+        let tourCurrentStep = 0;
+
+        function showTour() {
+            tourCurrentStep = 0;
+            renderTourStep();
+            const overlay = document.getElementById('tour-overlay');
+            overlay.style.display = 'flex';
+        }
+
+        function closeTour() {
+            document.getElementById('tour-overlay').style.display = 'none';
+            localStorage.setItem('tsTourSeen', '1');
+        }
+
+        function tourStep(dir) {
+            const next = tourCurrentStep + dir;
+            if (next >= TOUR_STEPS.length) { closeTour(); return; }
+            if (next < 0) return;
+            tourCurrentStep = next;
+            renderTourStep();
+        }
+
+        function renderTourStep() {
+            const step = TOUR_STEPS[tourCurrentStep];
+            const isLast = tourCurrentStep === TOUR_STEPS.length - 1;
+            const isFirst = tourCurrentStep === 0;
+
+            document.getElementById('tour-steps').innerHTML = `
+                <div style="padding:24px 24px 16px; animation:tourFade 0.2s ease;">
+                    <div style="font-size:28px;margin-bottom:10px;">${step.emoji}</div>
+                    <div style="font-size:17px;font-weight:700;color:var(--text-bright);margin-bottom:8px;">${step.title}</div>
+                    <div style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:16px;">${step.body}</div>
+                    <div style="background:var(--bg-dark);border-radius:10px;padding:14px;">${step.mock}</div>
+                </div>`;
+
+            // Dots
+            const dotsEl = document.getElementById('tour-dots');
+            dotsEl.innerHTML = TOUR_STEPS.map((_, i) =>
+                `<div style="width:7px;height:7px;border-radius:50%;background:${i === tourCurrentStep ? 'var(--accent)' : 'var(--border)'};transition:background 0.2s;"></div>`
+            ).join('');
+
+            // Buttons
+            document.getElementById('tour-back-btn').style.visibility = isFirst ? 'hidden' : 'visible';
+            const nextBtn = document.getElementById('tour-next-btn');
+            nextBtn.textContent = isLast ? '✓ Done' : 'Next →';
+        }
+
+        // Auto-show on first visit
+        if (!localStorage.getItem('tsTourSeen')) {
+            setTimeout(showTour, 800);
+        }
+
+        // Close on overlay click
+        document.getElementById('tour-overlay').addEventListener('click', function(e) {
+            if (e.target === this) closeTour();
+        });
+    </script>
+    <style>
+        @keyframes tourFade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    </style>
+</body>
+</html>
