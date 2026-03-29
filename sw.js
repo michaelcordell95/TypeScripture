@@ -1,7 +1,7 @@
 // TypeScripture Service Worker
 // Caches key files for offline use
 
-const CACHE_NAME = 'typescripture-v95';
+const CACHE_NAME = 'typescripture-v1';
 
 const PRECACHE_FILES = [
   '/',
@@ -39,7 +39,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: serve from cache first, fall back to network
+// Fetch: network first for HTML, cache first for static assets
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
@@ -47,21 +47,32 @@ self.addEventListener('fetch', (event) => {
   // Skip Supabase API calls — always need live network
   if (event.request.url.includes('supabase.co')) return;
 
+  const isHTML = event.request.headers.get('accept')?.includes('text/html');
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      // Not in cache — fetch from network and cache it
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200) return response;
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        return response;
-      }).catch(() => {
-        return new Response('Offline — content not available', {
-          status: 503,
-          headers: { 'Content-Type': 'text/plain' }
-        });
-      });
-    })
+    isHTML
+      // Network first for HTML — always get the latest version
+      ? fetch(event.request)
+          .then((response) => {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            return response;
+          })
+          .catch(() => caches.match(event.request))
+      // Cache first for static assets — fast load, fall back to network
+      : caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          return fetch(event.request).then((response) => {
+            if (!response || response.status !== 200) return response;
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            return response;
+          }).catch(() => {
+            return new Response('Offline — content not available', {
+              status: 503,
+              headers: { 'Content-Type': 'text/plain' }
+            });
+          });
+        })
   );
 });
