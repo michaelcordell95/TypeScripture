@@ -344,8 +344,7 @@
     const { createClient } = supabase;
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', persistSession: true, storageKey: 'typescripture-auth' } });
 
-    const GROQ_KEY = "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";
-    const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+    const GROQ_URL = "https://typescripture-groq.michaelcordell95.workers.dev";
 
     const PAGE_SIZE = 20;
     let allResults = [];
@@ -501,7 +500,7 @@
         try {
             const resp = await fetch(GROQ_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_KEY },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model: 'llama-3.3-70b-versatile',
                     temperature: 0.7,
