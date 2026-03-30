@@ -488,19 +488,16 @@
                     <span class="toggle-track"></span>
                     FOCUS
                 </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="refs-mode" onchange="onRefsToggle()">
+                    <span class="toggle-track"></span>
+                    REFS
+                </label>
                 <div class="nav-divider"></div>
                 <div class="nav-group">
                     <div class="nav-btn-wrap" id="listen-btn-wrap">
                         <button id="listen-btn" onclick="toggleListen()" title="Listen to verse" aria-label="Listen to verse">🔊</button>
                         <span class="nav-btn-label">Listen</span>
-                    </div>
-                    <div class="nav-btn-wrap" id="blb-btn-wrap">
-                        <button id="blb-btn" onclick="openBLB()" title="Open in Blue Letter Bible" aria-label="Open in Blue Letter Bible">📖</button>
-                        <span class="nav-btn-label">BLB</span>
-                    </div>
-                    <div class="nav-btn-wrap">
-                        <button id="bookmark-btn-read-top" onclick="toggleBookmark()" title="Bookmark this verse" aria-label="Bookmark this verse">⭐</button>
-                        <span class="nav-btn-label">Bookmark</span>
                     </div>
                 </div>
                 </div>
@@ -580,6 +577,7 @@
         <div class="skeleton-line" style="height:28px; width:85%;"></div>
         <div class="skeleton-line" style="height:28px; width:60%;"></div>
     </div></div>
+    <div id="refs-footnote" style="display:none; width:92%; max-width:1100px; margin-top:10px; padding:10px 14px; background:var(--panel-bg); border:1px solid var(--border); border-radius:8px; font-size:12px; color:var(--text-muted); line-height:1.8;"></div>
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:10px 20px; justify-content:center; align-items:center; flex-direction:column; gap:8px; z-index:100;">
         <!-- WPM slider — always visible -->
         <div style="display:flex; align-items:center; gap:10px; width:100%; max-width:500px;">
@@ -1560,6 +1558,13 @@
             if (!isRead && speedReadActive) stopSpeedReading();
             // Re-render current verse text in appropriate style
             if (activeVerseText) renderDisplay(isRead ? activeVerseText : '');
+            // Hide refs footnote when leaving read mode
+            if (!isRead) {
+                const fn = document.getElementById('refs-footnote');
+                if (fn) fn.style.display = 'none';
+            } else {
+                renderRefsFootnote();
+            }
             // Refresh verse markers (📖 vs ✅) without rebuilding book list
             updateVerses();
         }
@@ -2014,6 +2019,7 @@
                         if (readModeActive) onVerseLoaded();
             loadBookmarkState();
             updatePlaceBtns();
+            renderRefsFootnote();
         }
 
         // ===== SYNTAX HIGHLIGHTING =====
@@ -2160,6 +2166,68 @@
                     cursor.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }
+        }
+
+        // ===== CROSS REFERENCES =====
+        let crossRefs = null;
+        let refsLoaded = false;
+
+        async function loadCrossRefs() {
+            if (crossRefs) return crossRefs;
+            try {
+                const resp = await fetch('/crossrefs.json');
+                crossRefs = await resp.json();
+                refsLoaded = true;
+            } catch(e) {
+                console.error('Failed to load crossrefs:', e);
+                crossRefs = {};
+            }
+            return crossRefs;
+        }
+
+        async function onRefsToggle() {
+            const isOn = document.getElementById('refs-mode').checked;
+            if (isOn) {
+                await loadCrossRefs();
+            }
+            // Re-render to show/hide refs
+            if (readModeActive && activeVerseText) renderDisplay(activeVerseText);
+            renderRefsFootnote();
+        }
+
+        function getCurrentVerseKey() {
+            const bookEl = document.getElementById('book-select');
+            const chapEl = document.getElementById('chapter-select');
+            const verseEl = document.getElementById('verse-select');
+            if (!bookEl || !chapEl || !verseEl) return null;
+            const book = (bookEl.options[bookEl.selectedIndex]?.value || '').replace(' ✅', '').trim();
+            const chapter = chapEl.options[chapEl.selectedIndex]?.value;
+            const verseOpt = verseEl.options[verseEl.selectedIndex]?.value;
+            if (!book || !chapter || verseOpt === undefined) return null;
+            const verseNum = parseInt(verseOpt) + 1;
+            return `${book}.${chapter}.${verseNum}`;
+        }
+
+        function renderRefsFootnote() {
+            const footnoteEl = document.getElementById('refs-footnote');
+            if (!footnoteEl) return;
+            const isOn = document.getElementById('refs-mode')?.checked;
+            if (!isOn || !refsLoaded || !readModeActive) {
+                footnoteEl.style.display = 'none';
+                return;
+            }
+            const key = getCurrentVerseKey();
+            if (!key || !crossRefs[key] || crossRefs[key].length === 0) {
+                footnoteEl.style.display = 'none';
+                return;
+            }
+            const refs = crossRefs[key];
+            const items = refs.map(r => {
+                const url = `/?book=${encodeURIComponent(r.book)}&chapter=${r.chapter}&verse=${r.verse}`;
+                return `<span style="margin-right:12px;">📜 <a href="${url}" style="color:var(--accent);text-decoration:none;font-weight:600;">${r.book} ${r.chapter}:${r.verse}</a></span>`;
+            }).join('');
+            footnoteEl.innerHTML = `<span style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-right:8px;">OT References</span>${items}`;
+            footnoteEl.style.display = 'block';
         }
 
         // ===== SPEED READING =====
