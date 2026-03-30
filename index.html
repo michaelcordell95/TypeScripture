@@ -562,6 +562,7 @@
     </div>
     <div id="last-verse-box"></div>
     <div id="read-ref-box" style="display:none;"></div>
+    <div id="refs-footnote" style="display:none; width:90%; max-width:900px; margin:8px auto 4px; padding:14px 18px; background:var(--panel-bg); border:1.5px solid var(--accent); border-radius:10px; font-size:13px; color:var(--text-muted); line-height:2;"></div>
 
     <div id="accuracy-warning"></div>
     <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
@@ -577,7 +578,6 @@
         <div class="skeleton-line" style="height:28px; width:85%;"></div>
         <div class="skeleton-line" style="height:28px; width:60%;"></div>
     </div></div>
-    <div id="refs-footnote" style="display:none; width:92%; max-width:1100px; margin-top:10px; padding:10px 14px; background:var(--panel-bg); border:1px solid var(--border); border-radius:8px; font-size:12px; color:var(--text-muted); line-height:1.8;"></div>
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:10px 20px; justify-content:center; align-items:center; flex-direction:column; gap:8px; z-index:100;">
         <!-- WPM slider — always visible -->
         <div style="display:flex; align-items:center; gap:10px; width:100%; max-width:500px;">
@@ -2185,6 +2185,18 @@
             return crossRefs;
         }
 
+        function saveBackVerse() {
+            const bookEl = document.getElementById('book-select');
+            const chapEl = document.getElementById('chapter-select');
+            const verseEl = document.getElementById('verse-select');
+            const book = (bookEl?.options[bookEl.selectedIndex]?.value || '').replace(' ✅','').trim();
+            const chapter = chapEl?.options[chapEl.selectedIndex]?.value;
+            const verse = parseInt(verseEl?.options[verseEl.selectedIndex]?.value || 0) + 1;
+            if (book && chapter && verse) {
+                sessionStorage.setItem('refsBackVerse', JSON.stringify({book, chapter, verse}));
+            }
+        }
+
         async function onRefsToggle() {
             const isOn = document.getElementById('refs-mode').checked;
             if (isOn) {
@@ -2222,11 +2234,39 @@
                 return;
             }
             const refs = crossRefs[key];
+
+            // Store current verse so user can come back
+            const saveBackVerse = () => {
+                const bookEl = document.getElementById('book-select');
+                const chapEl = document.getElementById('chapter-select');
+                const verseEl = document.getElementById('verse-select');
+                const book = (bookEl?.options[bookEl.selectedIndex]?.value || '').replace(' ✅','').trim();
+                const chapter = chapEl?.options[chapEl.selectedIndex]?.value;
+                const verse = parseInt(verseEl?.options[verseEl.selectedIndex]?.value || 0) + 1;
+                if (book && chapter && verse) {
+                    sessionStorage.setItem('refsBackVerse', JSON.stringify({book, chapter, verse}));
+                }
+            };
+
             const items = refs.map(r => {
-                const url = `/?book=${encodeURIComponent(r.book)}&chapter=${r.chapter}&verse=${r.verse}`;
-                return `<span style="margin-right:12px;">📜 <a href="${url}" style="color:var(--accent);text-decoration:none;font-weight:600;">${r.book} ${r.chapter}:${r.verse}</a></span>`;
+                const url = `/?book=${encodeURIComponent(r.book)}&chapter=${r.chapter}&verse=${r.verse}&read=1`;
+                return `<a href="${url}" onclick="saveBackVerse()" style="display:inline-block;margin:2px 8px 2px 0;padding:3px 10px;background:rgba(88,166,255,0.08);border:1px solid var(--border);border-radius:6px;color:var(--accent);text-decoration:none;font-weight:600;font-size:13px;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">📜 ${r.book} ${r.chapter}:${r.verse}</a>`;
             }).join('');
-            footnoteEl.innerHTML = `<span style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-right:8px;">OT References</span>${items}`;
+
+            // Check if we have a back verse stored
+            const backData = sessionStorage.getItem('refsBackVerse');
+            let backBtn = '';
+            if (backData) {
+                try {
+                    const b = JSON.parse(backData);
+                    const backUrl = `/?book=${encodeURIComponent(b.book)}&chapter=${b.chapter}&verse=${b.verse}&read=1`;
+                    backBtn = `<a href="${backUrl}" style="display:inline-block;margin:2px 8px 2px 0;padding:3px 10px;background:rgba(46,160,67,0.08);border:1px solid #2ea043;border-radius:6px;color:#2ea043;text-decoration:none;font-weight:600;font-size:13px;" onclick="sessionStorage.removeItem('refsBackVerse')">← Back to ${b.book} ${b.chapter}:${b.verse}</a>`;
+                } catch(e) {}
+            }
+
+            footnoteEl.innerHTML = `
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">📜 Old Testament References</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;">${backBtn}${items}</div>`;
             footnoteEl.style.display = 'block';
         }
 
