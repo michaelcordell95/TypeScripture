@@ -562,7 +562,7 @@
     </div>
     <div id="last-verse-box"></div>
     <div id="read-ref-box" style="display:none;"></div>
-    <div id="refs-footnote" style="width:90%; max-width:900px; margin:8px auto 4px; padding:14px 18px; background:var(--panel-bg); border:1.5px solid var(--accent); border-radius:10px; font-size:13px; color:var(--text-muted); line-height:2; visibility:hidden; min-height:52px; box-sizing:border-box;"></div>
+    <div id="refs-footnote" style="display:none; width:90%; max-width:900px; margin:8px auto 4px; padding:14px 18px; background:var(--panel-bg); border:1.5px solid var(--accent); border-radius:10px; font-size:13px; color:var(--text-muted); line-height:2; min-height:52px; box-sizing:border-box;"></div>
     <!-- Verse preview popover -->
     <div id="refs-popover" style="display:none; position:fixed; z-index:999; background:var(--panel-bg); border:1.5px solid var(--accent); border-radius:10px; padding:14px 16px; max-width:340px; box-shadow:0 8px 32px rgba(0,0,0,0.4); font-size:13px; line-height:1.6;">
         <div id="refs-popover-ref" style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;"></div>
@@ -1568,7 +1568,7 @@
             // Hide refs footnote when leaving read mode
             if (!isRead) {
                 const fn = document.getElementById('refs-footnote');
-                if (fn) { fn.style.visibility = 'hidden'; fn.innerHTML = ''; }
+                if (fn) { fn.style.display = 'none'; fn.innerHTML = ''; }
             } else {
                 renderRefsFootnote();
             }
@@ -2313,7 +2313,7 @@
             if (!footnoteEl) return;
             const isOn = document.getElementById('refs-mode')?.checked;
             if (!isOn || !readModeActive) {
-                footnoteEl.style.visibility = 'hidden';
+                footnoteEl.style.display = 'none';
                 footnoteEl.innerHTML = '';
                 return;
             }
@@ -2333,6 +2333,8 @@
             const hasRefs = refsLoaded && key && crossRefs[key] && crossRefs[key].length > 0;
 
             if (!hasRefs && !backBtn) {
+                // Refs mode is on — reserve the space but show nothing
+                footnoteEl.style.display = 'block';
                 footnoteEl.style.visibility = 'hidden';
                 footnoteEl.innerHTML = '';
                 return;
@@ -2354,6 +2356,7 @@
             const header = hasRefs ? `<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">📜 Old Testament References</div>` : '';
 
             footnoteEl.innerHTML = `${header}<div style="display:flex;flex-wrap:wrap;gap:4px;">${backBtn}${items}</div>`;
+            footnoteEl.style.display = 'block';
             footnoteEl.style.visibility = 'visible';
         }
 
