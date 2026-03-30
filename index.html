@@ -2199,6 +2199,7 @@
 
         async function onRefsToggle() {
             const isOn = document.getElementById('refs-mode').checked;
+            localStorage.setItem('tsRefsMode', isOn ? 'true' : 'false');
             if (isOn) {
                 await loadCrossRefs();
             }
@@ -2228,32 +2229,8 @@
                 footnoteEl.style.display = 'none';
                 return;
             }
-            const key = getCurrentVerseKey();
-            if (!key || !crossRefs[key] || crossRefs[key].length === 0) {
-                footnoteEl.style.display = 'none';
-                return;
-            }
-            const refs = crossRefs[key];
 
-            // Store current verse so user can come back
-            const saveBackVerse = () => {
-                const bookEl = document.getElementById('book-select');
-                const chapEl = document.getElementById('chapter-select');
-                const verseEl = document.getElementById('verse-select');
-                const book = (bookEl?.options[bookEl.selectedIndex]?.value || '').replace(' ✅','').trim();
-                const chapter = chapEl?.options[chapEl.selectedIndex]?.value;
-                const verse = parseInt(verseEl?.options[verseEl.selectedIndex]?.value || 0) + 1;
-                if (book && chapter && verse) {
-                    sessionStorage.setItem('refsBackVerse', JSON.stringify({book, chapter, verse}));
-                }
-            };
-
-            const items = refs.map(r => {
-                const url = `/?book=${encodeURIComponent(r.book)}&chapter=${r.chapter}&verse=${r.verse}&read=1`;
-                return `<a href="${url}" onclick="saveBackVerse()" style="display:inline-block;margin:2px 8px 2px 0;padding:3px 10px;background:rgba(88,166,255,0.08);border:1px solid var(--border);border-radius:6px;color:var(--accent);text-decoration:none;font-weight:600;font-size:13px;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">📜 ${r.book} ${r.chapter}:${r.verse}</a>`;
-            }).join('');
-
-            // Check if we have a back verse stored
+            // Check for back button — show even if no refs on this verse
             const backData = sessionStorage.getItem('refsBackVerse');
             let backBtn = '';
             if (backData) {
@@ -2264,9 +2241,23 @@
                 } catch(e) {}
             }
 
-            footnoteEl.innerHTML = `
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">📜 Old Testament References</div>
-                <div style="display:flex;flex-wrap:wrap;gap:4px;">${backBtn}${items}</div>`;
+            const key = getCurrentVerseKey();
+            const hasRefs = key && crossRefs[key] && crossRefs[key].length > 0;
+
+            if (!hasRefs && !backBtn) {
+                footnoteEl.style.display = 'none';
+                return;
+            }
+            const refs = hasRefs ? crossRefs[key] : [];
+
+            const items = refs.map(r => {
+                const url = `/?book=${encodeURIComponent(r.book)}&chapter=${r.chapter}&verse=${r.verse}&read=1`;
+                return `<a href="${url}" onclick="saveBackVerse()" style="display:inline-block;margin:2px 8px 2px 0;padding:3px 10px;background:rgba(88,166,255,0.08);border:1px solid var(--border);border-radius:6px;color:var(--accent);text-decoration:none;font-weight:600;font-size:13px;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">📜 ${r.book} ${r.chapter}:${r.verse}</a>`;
+            }).join('');
+
+            const header = hasRefs ? `<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">📜 Old Testament References</div>` : '';
+
+            footnoteEl.innerHTML = `${header}<div style="display:flex;flex-wrap:wrap;gap:4px;">${backBtn}${items}</div>`;
             footnoteEl.style.display = 'block';
         }
 
@@ -2860,6 +2851,14 @@
         // Restore easy mode preference
         const savedEasy = localStorage.getItem('tsEasyMode');
         if (savedEasy === 'true') document.getElementById('easy-mode').checked = true;
+
+        // Restore refs mode preference and pre-load crossrefs if it was on
+        const savedRefs = localStorage.getItem('tsRefsMode');
+        if (savedRefs === 'true') {
+            const refsCheckbox = document.getElementById('refs-mode');
+            if (refsCheckbox) refsCheckbox.checked = true;
+            loadCrossRefs(); // pre-load in background
+        }
 
         // Auto-enable Read Mode on mobile or if coming from a Read It link
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 600;
