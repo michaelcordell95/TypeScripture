@@ -2646,9 +2646,10 @@
                     completedSet.add(`KJV_${bookName}_${chapNum}_${verseNum}`);
                     localStorage.setItem('typeScriptureProgressSet', JSON.stringify(Array.from(completedSet)));
                     if (currentUserId) {
-                        // saveVerseToDatabase handles type_counts + best_wpms in chapter_progress
-                        const existingWpm = parseInt(localStorage.getItem(`best_KJV_${bookName}_${chapNum}_${verseNum}`)) || 0;
-                        saveVerseToDatabase(bookName, chapNum, verseNum, Math.max(wpm, existingWpm));
+                        // Only save WPM to database if accuracy was 100%
+                        // Pass 0 otherwise so type_counts increments but best_wpms is unchanged
+                        const wpmToSave = (accuracy === 100) ? Math.max(wpm, parseInt(localStorage.getItem(`best_KJV_${bookName}_${chapNum}_${verseNum}`)) || 0) : 0;
+                        saveVerseToDatabase(bookName, chapNum, verseNum, wpmToSave);
                         // Also increment read_counts since typing = reading
                         markVerseRead(true);
                     }
