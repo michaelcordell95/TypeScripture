@@ -356,6 +356,7 @@
             .brand-container { margin-top: 2px; margin-bottom: 2px; gap: 8px; }
             .logo-text { font-size: clamp(22px, 5vw, 32px); }
             .logo-icon { width: 42px; height: 42px; font-size: 20px; }
+            .brand-container .logo-cross { font-size: 32px !important; line-height: 1; }
             #nav-header { margin-bottom: 4px; padding: 6px 8px; gap: 4px; }
             #bible-progress-container { width: 96%; margin-bottom: 1px; height: 6px; }
             #progress-text { margin-bottom: 2px; font-size: 10px; }
@@ -376,9 +377,9 @@
             /* Display */
             #display {
                 width: 96%;
-                height: clamp(200px, 58vh, 520px);
+                height: clamp(200px, 60vh, 520px);
                 font-size: clamp(18px, 5.5vw, 26px);
-                padding: 12px;
+                padding: 10px 12px;
             }
 
             #bible-progress-container { width: 96%; }
@@ -388,7 +389,7 @@
 <body>
     <div class="brand-container" style="width:90%; max-width:900px; justify-content:center; flex-direction:column; align-items:center; gap:8px;">
         <div style="display:flex; align-items:center; gap:12px;">
-           <span style="font-size:52px; line-height:1; color:var(--accent);">✝</span>
+           <span class="logo-cross" style="font-size:52px; line-height:1; color:var(--accent);">✝</span>
             <div class="logo-text">Type<span>Scripture</span></div>
         </div>
         <div style="display:flex; align-items:center; gap:10px; justify-content:center; flex-wrap:wrap;">
@@ -578,7 +579,7 @@
     </div>
 
     <div id="accuracy-warning"></div>
-    <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
+    <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-top:2px;margin-bottom:2px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
         <span id="verse-ref-text" style="color:var(--accent);"></span>
         <span style="color:var(--text-muted);font-size:11px;">KJV</span>
         <button id="place-btn" onclick="toggleSavePlace()" title="Save your place" aria-label="Save your place" style="background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">📍</button>
