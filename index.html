@@ -2178,6 +2178,8 @@
                 const resp = await fetch('/crossrefs.json');
                 crossRefs = await resp.json();
                 refsLoaded = true;
+                // Re-render now that data is ready
+                renderRefsFootnote();
             } catch(e) {
                 console.error('Failed to load crossrefs:', e);
                 crossRefs = {};
@@ -2225,12 +2227,12 @@
             const footnoteEl = document.getElementById('refs-footnote');
             if (!footnoteEl) return;
             const isOn = document.getElementById('refs-mode')?.checked;
-            if (!isOn || !refsLoaded || !readModeActive) {
+            if (!isOn || !readModeActive) {
                 footnoteEl.style.display = 'none';
                 return;
             }
 
-            // Check for back button — show even if no refs on this verse
+            // Always check for back button — independent of refsLoaded
             const backData = sessionStorage.getItem('refsBackVerse');
             let backBtn = '';
             if (backData) {
@@ -2242,7 +2244,7 @@
             }
 
             const key = getCurrentVerseKey();
-            const hasRefs = key && crossRefs[key] && crossRefs[key].length > 0;
+            const hasRefs = refsLoaded && key && crossRefs[key] && crossRefs[key].length > 0;
 
             if (!hasRefs && !backBtn) {
                 footnoteEl.style.display = 'none';
