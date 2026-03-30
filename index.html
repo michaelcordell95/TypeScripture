@@ -362,7 +362,7 @@
             #progress-text { margin-bottom: 2px; font-size: 10px; }
             #streak-banner { margin-bottom: 2px; font-size: 11px; }
             #verse-ref-label { margin-bottom: 2px; }
-            #stats-bar { margin-top: 2px; margin-bottom: 4px; }
+            #stats-bar { margin-top: 2px; margin-bottom: 2px; }
             .stat-box { padding: 4px 4px; min-height: 46px; }
             .stat-value { font-size: 15px; }
 
@@ -372,6 +372,7 @@
                 top: 72px;
                 z-index: 10;
                 background: var(--panel-bg);
+                min-height: 0;
             }
 
             /* Display */
@@ -578,7 +579,7 @@
         <button onclick="closeRefsPopover()" style="float:right;background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 4px;">✕</button>
     </div>
 
-    <div id="accuracy-warning"></div>
+    <div id="accuracy-warning" style="min-height:0;"></div>
     <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-top:2px;margin-bottom:2px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
         <span id="verse-ref-text" style="color:var(--accent);"></span>
         <span style="color:var(--text-muted);font-size:11px;">KJV</span>
