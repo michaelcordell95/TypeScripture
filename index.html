@@ -562,7 +562,14 @@
     </div>
     <div id="last-verse-box"></div>
     <div id="read-ref-box" style="display:none;"></div>
-    <div id="refs-footnote" style="display:none; width:90%; max-width:900px; margin:8px auto 4px; padding:14px 18px; background:var(--panel-bg); border:1.5px solid var(--accent); border-radius:10px; font-size:13px; color:var(--text-muted); line-height:2;"></div>
+    <div id="refs-footnote" style="width:90%; max-width:900px; margin:8px auto 4px; padding:14px 18px; background:var(--panel-bg); border:1.5px solid var(--accent); border-radius:10px; font-size:13px; color:var(--text-muted); line-height:2; visibility:hidden; min-height:52px; box-sizing:border-box;"></div>
+    <!-- Verse preview popover -->
+    <div id="refs-popover" style="display:none; position:fixed; z-index:999; background:var(--panel-bg); border:1.5px solid var(--accent); border-radius:10px; padding:14px 16px; max-width:340px; box-shadow:0 8px 32px rgba(0,0,0,0.4); font-size:13px; line-height:1.6;">
+        <div id="refs-popover-ref" style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;"></div>
+        <div id="refs-popover-text" style="color:var(--text-main);margin-bottom:10px;"></div>
+        <a id="refs-popover-link" href="#" style="display:inline-block;padding:4px 12px;background:var(--accent);color:#0d1117;border-radius:6px;font-weight:700;font-size:12px;text-decoration:none;">Go to verse →</a>
+        <button onclick="closeRefsPopover()" style="float:right;background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 4px;">✕</button>
+    </div>
 
     <div id="accuracy-warning"></div>
     <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
@@ -1561,7 +1568,7 @@
             // Hide refs footnote when leaving read mode
             if (!isRead) {
                 const fn = document.getElementById('refs-footnote');
-                if (fn) fn.style.display = 'none';
+                if (fn) { fn.style.visibility = 'hidden'; fn.innerHTML = ''; }
             } else {
                 renderRefsFootnote();
             }
@@ -2187,6 +2194,84 @@
             return crossRefs;
         }
 
+        // ===== REFS POPOVER =====
+        let popoverCloseTimer = null;
+        let refTapState = {}; // track mobile tap state per ref
+
+        function getVerseText(book, chapter, verse) {
+            if (typeof KJV_EMBEDDED === 'undefined') return null;
+            const bookEntry = KJV_EMBEDDED.books.find(b => b.name === book);
+            if (!bookEntry) return null;
+            const chapEntry = bookEntry.chapters.find(c => c.chapter === parseInt(chapter));
+            if (!chapEntry) return null;
+            const verseEntry = chapEntry.verses.find(v => v.verse === parseInt(verse));
+            return verseEntry ? verseEntry.text : null;
+        }
+
+        function showRefsPopover(event, book, chapter, verse, url) {
+            clearTimeout(popoverCloseTimer);
+            const popover = document.getElementById('refs-popover');
+            const text = getVerseText(book, chapter, verse);
+            if (!text) return;
+
+            document.getElementById('refs-popover-ref').textContent = `${book} ${chapter}:${verse}`;
+            document.getElementById('refs-popover-text').textContent = text.length > 180 ? text.substring(0, 180) + '…' : text;
+            const link = document.getElementById('refs-popover-link');
+            link.href = url;
+            link.onclick = () => { saveBackVerse(); sessionStorage.setItem('refsBackVerse', sessionStorage.getItem('refsBackVerse')); };
+
+            // Position near the trigger element
+            const rect = event.target.getBoundingClientRect();
+            popover.style.display = 'block';
+            const pw = popover.offsetWidth || 340;
+            let left = rect.left;
+            if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+            if (left < 10) left = 10;
+            let top = rect.bottom + 8;
+            if (top + 160 > window.innerHeight) top = rect.top - 170;
+            popover.style.left = left + 'px';
+            popover.style.top = top + 'px';
+        }
+
+        function schedulePopoverClose() {
+            popoverCloseTimer = setTimeout(closeRefsPopover, 300);
+        }
+
+        function closeRefsPopover() {
+            document.getElementById('refs-popover').style.display = 'none';
+        }
+
+        // Keep popover open when hovering over it
+        document.addEventListener('DOMContentLoaded', function() {
+            const popover = document.getElementById('refs-popover');
+            if (popover) {
+                popover.addEventListener('mouseenter', () => clearTimeout(popoverCloseTimer));
+                popover.addEventListener('mouseleave', schedulePopoverClose);
+            }
+        });
+
+        // Mobile: first tap shows preview, second tap navigates
+        function handleRefClick(event, book, chapter, verse, url) {
+            const isTouchDevice = window.matchMedia('(hover: none)').matches;
+            if (!isTouchDevice) return true; // desktop — let href handle it
+
+            const key = `${book}.${chapter}.${verse}`;
+            if (refTapState[key]) {
+                // Second tap — navigate
+                refTapState = {};
+                closeRefsPopover();
+                return true;
+            }
+            // First tap — show preview
+            event.preventDefault();
+            refTapState = {};
+            refTapState[key] = true;
+            showRefsPopover(event, book, chapter, verse, url);
+            return false;
+        }
+
+        // ===== END REFS POPOVER =====
+
         function saveBackVerse() {
             const bookEl = document.getElementById('book-select');
             const chapEl = document.getElementById('chapter-select');
@@ -2228,7 +2313,8 @@
             if (!footnoteEl) return;
             const isOn = document.getElementById('refs-mode')?.checked;
             if (!isOn || !readModeActive) {
-                footnoteEl.style.display = 'none';
+                footnoteEl.style.visibility = 'hidden';
+                footnoteEl.innerHTML = '';
                 return;
             }
 
@@ -2247,20 +2333,28 @@
             const hasRefs = refsLoaded && key && crossRefs[key] && crossRefs[key].length > 0;
 
             if (!hasRefs && !backBtn) {
-                footnoteEl.style.display = 'none';
+                footnoteEl.style.visibility = 'hidden';
+                footnoteEl.innerHTML = '';
                 return;
             }
             const refs = hasRefs ? crossRefs[key] : [];
 
             const items = refs.map(r => {
                 const url = `/?book=${encodeURIComponent(r.book)}&chapter=${r.chapter}&verse=${r.verse}&read=1`;
-                return `<a href="${url}" onclick="saveBackVerse()" style="display:inline-block;margin:2px 8px 2px 0;padding:3px 10px;background:rgba(88,166,255,0.08);border:1px solid var(--border);border-radius:6px;color:var(--accent);text-decoration:none;font-weight:600;font-size:13px;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">📜 ${r.book} ${r.chapter}:${r.verse}</a>`;
+                const label = `📜 ${r.book} ${r.chapter}:${r.verse}`;
+                return `<a href="${url}"
+                    onclick="saveBackVerse(); return handleRefClick(event, '${r.book}', ${r.chapter}, ${r.verse}, '${url}')"
+                    onmouseenter="showRefsPopover(event, '${r.book}', ${r.chapter}, ${r.verse}, '${url}')"
+                    onmouseleave="schedulePopoverClose()"
+                    style="display:inline-block;margin:2px 8px 2px 0;padding:3px 10px;background:rgba(88,166,255,0.08);border:1px solid var(--border);border-radius:6px;color:var(--accent);text-decoration:none;font-weight:600;font-size:13px;transition:all 0.15s;"
+                    onmouseover="this.style.borderColor='var(--accent)'"
+                    onmouseout="this.style.borderColor='var(--border)'">${label}</a>`;
             }).join('');
 
             const header = hasRefs ? `<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px;font-weight:600;">📜 Old Testament References</div>` : '';
 
             footnoteEl.innerHTML = `${header}<div style="display:flex;flex-wrap:wrap;gap:4px;">${backBtn}${items}</div>`;
-            footnoteEl.style.display = 'block';
+            footnoteEl.style.visibility = 'visible';
         }
 
         // ===== SPEED READING =====
