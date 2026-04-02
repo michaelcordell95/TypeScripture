@@ -234,8 +234,8 @@
         #speed-toggle-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,0.1); }
         .next-btn { padding: 12px 32px; font-size: 1em; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
         .next-btn:hover { opacity: 0.85; }
-        #gospel-mode-btn.gospel-active { background: rgba(255,215,0,0.20) !important; border-color: #d4a017 !important; color: #ffd700 !important; box-shadow: 0 0 10px rgba(212,160,23,0.35); }
-        #gospel-mode-btn:hover { background: rgba(255,215,0,0.18) !important; border-color: #d4a017 !important; color: #ffd700 !important; }
+        #gospel-mode-btn.gospel-active { background: rgba(88,166,255,0.12); border-color: var(--accent); color: var(--accent); opacity: 1; }
+        #gospel-mode-btn:hover { border-color: var(--accent); color: var(--accent); }
         .gospel-btn { padding: 12px 32px; font-size: 1em; border: 2px solid var(--accent); background: transparent; color: var(--accent); border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; font-family: inherit; transition: all 0.2s; }
         .gospel-btn:hover { background: rgba(88,166,255,0.12); }
         .gospel-believe-btn { padding: 14px 36px; font-size: 1.05em; background: linear-gradient(135deg,#b8860b,#ffd700); color: #0a0600; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; margin-top: 10px; font-family: inherit; letter-spacing: 0.5px; transition: opacity 0.2s; }
@@ -523,7 +523,7 @@
 
         <!-- Type / Read / AI row — always centered -->
         <div class="nav-row" style="justify-content:center;">
-            <button id="gospel-mode-btn" onclick="startGospelMode()" title="Gospel Mode: 12 key verses" aria-label="Gospel Mode" style="background:rgba(255,215,0,0.10);border:1.5px solid #b8860b;color:#d4a017;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700;transition:all 0.2s;white-space:nowrap;">✝️ Gospel</button>
+            <button id="gospel-mode-btn" onclick="startGospelMode()" title="Gospel Mode: 12 key verses" aria-label="Gospel Mode">✝️ Gospel</button>
             <button id="type-mode-btn" onclick="setTypeMode()" title="Switch to Type Mode" aria-label="Switch to Type Mode">⌨️ Type</button>
             <button id="read-mode-btn" onclick="setReadMode()" title="Switch to Read Mode" aria-label="Switch to Read Mode">📖 Read</button>
             <!-- AI Search button / input -->
@@ -590,7 +590,7 @@
     <div id="accuracy-warning" style="min-height:0;"></div>
     <div id="verse-ref-label" style="width:92%;max-width:1100px;display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-top:2px;margin-bottom:2px;font-size:12px;font-weight:700;letter-spacing:0.5px;">
         <span id="verse-ref-text" style="color:var(--accent);"></span>
-        <span style="color:var(--text-muted);font-size:11px;">KJV</span>
+        <span id="verse-ref-sub" style="color:var(--text-muted);font-size:11px;">KJV</span>
         <button id="place-btn" onclick="toggleSavePlace()" title="Save your place" aria-label="Save your place" style="background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">📍</button>
     </div>
     <div id="display"><div id="skeleton-screen">
@@ -1848,7 +1848,9 @@
                     if (parseInt(verseSel.options[i].value) === gv.verse - 1) { verseSel.selectedIndex = i; break; }
                 }
                 document.getElementById('progress').innerText = `Gospel ${gospelVerseIndex + 1}/12`;
-                document.getElementById('verse-ref-text').textContent = `✝️ ${gv.book} ${gv.chapter}:${gv.verse}`;
+                document.getElementById('verse-ref-text').textContent = `${gv.book} ${gv.chapter}:${gv.verse}`;
+                const subEl = document.getElementById('verse-ref-sub');
+                if (subEl) subEl.textContent = `Gospel ${gospelVerseIndex + 1}/12`;
                 fetchVerses();
                 window._gospelLoadInProgress = false;
                 return;
@@ -2874,13 +2876,12 @@
 
         function showGospelIntro() {
             // Hide last verse box, progress label for gospel mode
-            document.getElementById('verse-ref-text').textContent = '✝️ Gospel Mode';
+            document.getElementById('verse-ref-text').textContent = 'Gospel Mode';
             document.getElementById('progress').innerText = 'Intro';
 
             // Show intro in display box — wait for Space/Tap
             displayEl.innerHTML = `
                 <div class="complete-screen" style="gap:20px;">
-                    <div style="font-size:2em;">✝️</div>
                     <h2 style="color:var(--accent);font-size:1.2em;font-weight:800;margin:0;letter-spacing:-0.3px;">Gospel Mode</h2>
                     <div style="font-size:0.92em;color:var(--text-main);line-height:1.7;max-width:520px;text-align:center;font-family:'Droid Sans Mono','Courier New',monospace;">${GOSPEL_INTRO_TEXT}</div>
                     <div style="font-size:0.8em;color:var(--text-muted);margin-top:4px;">Press <kbd style="background:var(--progress-bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:inherit;">Space</kbd> or tap to begin</div>
@@ -2922,7 +2923,10 @@
 
             // Update progress indicator
             document.getElementById('progress').innerText = `Gospel ${gospelVerseIndex + 1}/12`;
-            document.getElementById('verse-ref-text').textContent = `✝️ ${gv.book} ${gv.chapter}:${gv.verse}`;
+            document.getElementById('verse-ref-text').textContent = `${gv.book} ${gv.chapter}:${gv.verse}`;
+            // Show gospel progress counter in the ref label row
+            const subEl = document.getElementById('verse-ref-sub');
+            if (subEl) subEl.textContent = `Gospel ${gospelVerseIndex + 1}/12`;
 
             if (readModeActive) {
                 // Read mode: load verse text and show it
@@ -2948,16 +2952,17 @@
             gospelModeActive = false;
             gospelVerseIndex = -1;
             document.getElementById('gospel-mode-btn').classList.remove('gospel-active');
+            const subEl = document.getElementById('verse-ref-sub');
+            if (subEl) subEl.textContent = 'KJV';
         }
 
         function showGospelComplete() {
             exitGospelMode();
-            document.getElementById('verse-ref-text').textContent = '✝️ Gospel Complete';
+            document.getElementById('verse-ref-text').textContent = 'Gospel Complete';
             document.getElementById('progress').innerText = '12/12';
 
             displayEl.innerHTML = `
                 <div class="complete-screen" id="gospel-complete-screen" style="gap:16px;">
-                    <div style="font-size:2em;">✝️</div>
                     <h2 style="color:var(--accent);font-size:1.3em;font-weight:800;margin:0;letter-spacing:-0.5px;">It is Finished.</h2>
                     <div id="gospel-complete-text" style="font-size:0.88em;color:var(--text-main);line-height:1.75;max-width:540px;text-align:center;font-family:'Droid Sans Mono','Courier New',monospace;">
                         You have completed this 12-verse foundation of the Gospel. You've seen the heart of God's promise: that Jesus' cross and resurrection secured once-for-all forgiveness for all who believe.
