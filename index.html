@@ -139,9 +139,9 @@
         body.focus-mode #display { border-color: transparent; box-shadow: none; background: var(--bg-dark); transition: all 0.4s ease; }
         body.focus-mode #nav-header { opacity: 0.15; transition: opacity 0.3s ease; }
         body.focus-mode #nav-header:hover { opacity: 1; }
-        #type-mode-btn, #read-mode-btn { background: transparent; border: 1.5px solid var(--border); color: var(--text-muted); padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 700; transition: all 0.2s; }
-        #type-mode-btn:hover, #read-mode-btn:hover { border-color: var(--accent); color: var(--accent); }
-        #type-mode-btn.active-mode, #read-mode-btn.active-mode { background: rgba(88,166,255,0.12); border-color: var(--accent); color: var(--accent); opacity: 1; }
+        #type-mode-btn, #read-mode-btn, #gospel-mode-btn { background: transparent; border: 1.5px solid var(--border); color: var(--text-muted); padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 700; transition: all 0.2s; }
+        #type-mode-btn:hover, #read-mode-btn:hover, #gospel-mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+        #type-mode-btn.active-mode, #read-mode-btn.active-mode, #gospel-mode-btn.active-mode { background: rgba(88,166,255,0.12); border-color: var(--accent); color: var(--accent); opacity: 1; }
         .toggle-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-muted); user-select: none; }
         .toggle-label input[type=checkbox] { display: none; }
         .toggle-track { width: 32px; height: 18px; background: var(--progress-bg); border-radius: 9px; position: relative; transition: background 0.2s; flex-shrink: 0; }
@@ -327,7 +327,7 @@
             #read-mode-btn { flex-shrink: 0; }
             /* Shrink buttons and toggles a bit on mobile */
             #type-mode-group button, #read-mode-group button { padding: 5px 9px; font-size: 12px; }
-            #type-mode-btn, #read-mode-btn { padding: 6px 12px !important; font-size: 13px !important; }
+            #type-mode-btn, #read-mode-btn, #gospel-mode-btn { padding: 6px 12px !important; font-size: 13px !important; }
             .toggle-label { font-size: 11px; gap: 4px; }
             .toggle-track { width: 30px; height: 17px; }
             .toggle-track::after { width: 11px; height: 11px; top: 3px; left: 3px; }
@@ -446,12 +446,16 @@
             <!-- Book / Chapter / Verse -->
             <div class="nav-group" id="select-group">
                 <label for="book-select" class="sr-only">Book</label>
-                <select id="book-select" onchange="updateChapters(true)" aria-label="Book"></select>
+                <select id="book-select" onchange="onGospelManualNavExit(); updateChapters(true)" aria-label="Book"></select>
                 <label for="chapter-select" class="sr-only">Chapter</label>
-                <select id="chapter-select" onchange="updateVerses(true)" aria-label="Chapter"></select>
+                <select id="chapter-select" onchange="onGospelManualNavExit(); updateVerses(true)" aria-label="Chapter"></select>
                 <label for="verse-select" class="sr-only">Verse</label>
-                <select id="verse-select" onchange="fetchVerses()" aria-label="Verse"></select>
+                <select id="verse-select" onchange="onGospelManualNavExit(); fetchVerses()" aria-label="Verse"></select>
             </div>
+
+            <div class="nav-divider"></div>
+
+            <button type="button" id="gospel-mode-btn" onclick="toggleGospelMode()" title="Step through the Gospel (17 verses)" aria-pressed="false" aria-label="Gospel mode">Gospel</button>
 
             <div class="nav-divider"></div>
 
@@ -1336,6 +1340,84 @@
 
         let readModeActive = false;
 
+        let GOSPEL_REFS = [];
+        let gospelModeActive = false;
+        let gospelIndex = 0;
+        let gospelNavInternal = false;
+
+        function updateGospelButtonUI() {
+            const btn = document.getElementById('gospel-mode-btn');
+            if (!btn) return;
+            btn.classList.toggle('active-mode', gospelModeActive);
+            btn.setAttribute('aria-pressed', gospelModeActive ? 'true' : 'false');
+        }
+
+        async function ensureGospelRefs() {
+            if (GOSPEL_REFS.length) return true;
+            try {
+                const r = await fetch(new URL('gospel.txt', window.location.href));
+                if (!r.ok) throw new Error(String(r.status));
+                const text = await r.text();
+                GOSPEL_REFS = text.split(/\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (line) {
+                    const m = line.match(/^(.+?)\s+(\d+):(\d+)\s+/);
+                    if (!m) return null;
+                    return { book: m[1], ch: parseInt(m[2], 10), v: parseInt(m[3], 10) };
+                }).filter(Boolean);
+                return GOSPEL_REFS.length > 0;
+            } catch (e) {
+                console.error(e);
+                return false;
+            }
+        }
+
+        function exitGospelMode() {
+            if (!gospelModeActive) return;
+            gospelModeActive = false;
+            updateGospelButtonUI();
+        }
+
+        function applyGospelVerse(idx) {
+            if (!GOSPEL_REFS.length || idx < 0 || idx >= GOSPEL_REFS.length || typeof KJV_EMBEDDED === 'undefined') return;
+            gospelNavInternal = true;
+            gospelIndex = idx;
+            const ref = GOSPEL_REFS[idx];
+            bookSel.value = ref.book;
+            updateChapters(false);
+            chapSel.value = String(ref.ch);
+            updateVerses(false);
+            const bookEntry = KJV_EMBEDDED.books.find(function (b) { return b.name === ref.book; });
+            const chapterObj = bookEntry && bookEntry.chapters.find(function (c) { return c.chapter === ref.ch; });
+            var vIdx = 0;
+            if (chapterObj) {
+                const found = chapterObj.verses.findIndex(function (v) { return v.verse === ref.v; });
+                if (found >= 0) vIdx = found;
+            }
+            verseSel.value = String(vIdx);
+            fetchVerses();
+            gospelNavInternal = false;
+            updateGospelButtonUI();
+            updateReadRefBox(vIdx);
+        }
+
+        async function toggleGospelMode() {
+            if (gospelModeActive) {
+                exitGospelMode();
+                return;
+            }
+            const ok = await ensureGospelRefs();
+            if (!ok) {
+                alert('Could not load gospel.txt');
+                return;
+            }
+            gospelModeActive = true;
+            updateGospelButtonUI();
+            applyGospelVerse(0);
+        }
+
+        function onGospelManualNavExit() {
+            if (gospelModeActive && !gospelNavInternal) exitGospelMode();
+        }
+
         // ===== VERSE OF THE DAY =====
         const VOTD_VERSES = [
             { ref: 'John 3:16', book: 'John', ch: 3, v: 16 },
@@ -1824,6 +1906,10 @@
 
         function goToPrevVerse() {
             if (speedReadActive) stopSpeedReading();
+            if (gospelModeActive && GOSPEL_REFS.length) {
+                if (gospelIndex > 0) applyGospelVerse(gospelIndex - 1);
+                return;
+            }
             const bookName = bookSel.value.replace(" ✅", "");
             const bookIdx = books.indexOf(bookName);
             let chapNum = parseInt(chapSel.value);
@@ -1918,6 +2004,10 @@
 
         function goToNextVerse(skipMark = false) {
             if (readModeActive && !skipMark) markVerseRead();
+            if (gospelModeActive && GOSPEL_REFS.length) {
+                if (gospelIndex < GOSPEL_REFS.length - 1) applyGospelVerse(gospelIndex + 1);
+                return;
+            }
             const bookName = bookSel.value.replace(" ✅", "");
             const bookIdx = books.indexOf(bookName);
             let chapNum = parseInt(chapSel.value);
@@ -2019,7 +2109,12 @@
                         });
                 }
             }
-            document.getElementById('progress').innerText = `${currentIndex + 1}/${currentVerses.length}`;
+            const progEl = document.getElementById('progress');
+            if (gospelModeActive && GOSPEL_REFS.length) {
+                progEl.innerText = 'Gospel ' + (gospelIndex + 1) + '/' + GOSPEL_REFS.length;
+            } else {
+                progEl.innerText = `${currentIndex + 1}/${currentVerses.length}`;
+            }
 
             // Update reference label
             const refEl = document.getElementById('verse-ref-text');
@@ -2577,6 +2672,7 @@
         }
 
         function parseVoiceVerse(transcript) {
+            exitGospelMode();
             // Normalize: lowercase, replace ordinals, common substitutions
             let t = transcript.toLowerCase()
                 .replace(/\bfirst\b/g, '1').replace(/\bsecond\b/g, '2').replace(/\bthird\b/g, '3')
@@ -2707,6 +2803,7 @@
         }
 
         function doVerseSearch() {
+            exitGospelMode();
             const input = document.getElementById('verse-search-input');
             const query = input.value.trim();
             if (!query) return;
@@ -2796,8 +2893,20 @@
                 } else {
                     warningEl.innerText = 'Accuracy too low — verse not counted. Try again!';
                 }
-                if (!document.getElementById('repeat-mode').checked) currentIndex++;
-                setTimeout(loadVerse, 100);
+                if (!document.getElementById('repeat-mode').checked) {
+                    if (gospelModeActive && GOSPEL_REFS.length) {
+                        if (gospelIndex < GOSPEL_REFS.length - 1) {
+                            setTimeout(function () { applyGospelVerse(gospelIndex + 1); }, 100);
+                        } else {
+                            setTimeout(loadVerse, 100);
+                        }
+                    } else {
+                        currentIndex++;
+                        setTimeout(loadVerse, 100);
+                    }
+                } else {
+                    setTimeout(loadVerse, 100);
+                }
             }
         });
 
@@ -2841,12 +2950,15 @@
             }
         }
 
-        // Long press on display to open BLB (500ms threshold)
+        // Long press on display to open BLB (500ms threshold); horizontal swipe = prev/next verse
         let longPressTimer = null;
         let longPressTriggered = false;
+        let swipeTouchStart = null;
 
         displayEl.addEventListener('touchstart', (e) => {
             longPressTriggered = false;
+            const t0 = e.changedTouches[0];
+            if (t0) swipeTouchStart = { x: t0.clientX, y: t0.clientY, t: Date.now() };
             longPressTimer = setTimeout(() => {
                 longPressTriggered = true;
                 // Visual feedback first
@@ -2862,8 +2974,24 @@
             clearTimeout(longPressTimer);
             if (longPressTriggered) {
                 e.preventDefault();
+                swipeTouchStart = null;
                 return;
             }
+            let didSwipe = false;
+            if (swipeTouchStart && e.changedTouches[0]) {
+                const t = e.changedTouches[0];
+                const dx = t.clientX - swipeTouchStart.x;
+                const dy = t.clientY - swipeTouchStart.y;
+                const dt = Date.now() - swipeTouchStart.t;
+                if (dt < 550 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+                    didSwipe = true;
+                    e.preventDefault();
+                    if (dx < 0) goToNextVerse();
+                    else goToPrevVerse();
+                }
+            }
+            swipeTouchStart = null;
+            if (didSwipe) return;
             // Normal tap — focus hidden input to bring up keyboard
             // iOS requires focus() called synchronously in user event handler
             if (!inputEl.disabled) {
@@ -2926,6 +3054,7 @@
         updateBooks();
 
         if (urlBook && urlChapter && urlVerse) {
+            exitGospelMode();
             // Set book
             const bookSel2 = document.getElementById('book-select');
             for (let i = 0; i < bookSel2.options.length; i++) {
