@@ -234,6 +234,13 @@
         #speed-toggle-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,0.1); }
         .next-btn { padding: 12px 32px; font-size: 1em; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
         .next-btn:hover { opacity: 0.85; }
+        #gospel-mode-btn.gospel-active { background: rgba(255,215,0,0.20) !important; border-color: #d4a017 !important; color: #ffd700 !important; box-shadow: 0 0 10px rgba(212,160,23,0.35); }
+        #gospel-mode-btn:hover { background: rgba(255,215,0,0.18) !important; border-color: #d4a017 !important; color: #ffd700 !important; }
+        .gospel-btn { padding: 12px 32px; font-size: 1em; border: 2px solid var(--accent); background: transparent; color: var(--accent); border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; font-family: inherit; transition: all 0.2s; }
+        .gospel-btn:hover { background: rgba(88,166,255,0.12); }
+        .gospel-believe-btn { padding: 14px 36px; font-size: 1.05em; background: linear-gradient(135deg,#b8860b,#ffd700); color: #0a0600; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; margin-top: 10px; font-family: inherit; letter-spacing: 0.5px; transition: opacity 0.2s; }
+        .gospel-believe-btn:hover { opacity: 0.88; }
+        @keyframes confetti-fall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1;} 100%{transform:translateY(110vh) rotate(720deg);opacity:0;} }
         #last-verse-box {
             font-size: 12px;
             color: var(--text-main);
@@ -516,6 +523,7 @@
 
         <!-- Type / Read / AI row — always centered -->
         <div class="nav-row" style="justify-content:center;">
+            <button id="gospel-mode-btn" onclick="startGospelMode()" title="Gospel Mode: 12 key verses" aria-label="Gospel Mode" style="background:rgba(255,215,0,0.10);border:1.5px solid #b8860b;color:#d4a017;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700;transition:all 0.2s;white-space:nowrap;">✝️ Gospel</button>
             <button id="type-mode-btn" onclick="setTypeMode()" title="Switch to Type Mode" aria-label="Switch to Type Mode">⌨️ Type</button>
             <button id="read-mode-btn" onclick="setReadMode()" title="Switch to Read Mode" aria-label="Switch to Read Mode">📖 Read</button>
             <!-- AI Search button / input -->
@@ -1824,6 +1832,27 @@
 
         function goToPrevVerse() {
             if (speedReadActive) stopSpeedReading();
+            // Gospel mode: go back to previous gospel verse
+            if (gospelModeActive && gospelVerseIndex > 0) {
+                gospelVerseIndex--;
+                window._gospelLoadInProgress = true;
+                // re-navigate to this verse
+                const gv = GOSPEL_VERSES[gospelVerseIndex];
+                for (let i = 0; i < bookSel.options.length; i++) {
+                    if (bookSel.options[i].value.replace(' ✅','') === gv.book) { bookSel.selectedIndex = i; break; }
+                }
+                updateChapters();
+                chapSel.value = gv.chapter;
+                updateVerses();
+                for (let i = 0; i < verseSel.options.length; i++) {
+                    if (parseInt(verseSel.options[i].value) === gv.verse - 1) { verseSel.selectedIndex = i; break; }
+                }
+                document.getElementById('progress').innerText = `Gospel ${gospelVerseIndex + 1}/12`;
+                document.getElementById('verse-ref-text').textContent = `✝️ ${gv.book} ${gv.chapter}:${gv.verse}`;
+                fetchVerses();
+                window._gospelLoadInProgress = false;
+                return;
+            }
             const bookName = bookSel.value.replace(" ✅", "");
             const bookIdx = books.indexOf(bookName);
             let chapNum = parseInt(chapSel.value);
@@ -1918,6 +1947,12 @@
 
         function goToNextVerse(skipMark = false) {
             if (readModeActive && !skipMark) markVerseRead();
+            // Gospel mode: advance gospel sequence instead of normal nav
+            if (gospelModeActive && gospelVerseIndex >= 0) {
+                gospelVerseIndex++;
+                loadGospelVerse();
+                return;
+            }
             const bookName = bookSel.value.replace(" ✅", "");
             const bookIdx = books.indexOf(bookName);
             let chapNum = parseInt(chapSel.value);
@@ -1963,6 +1998,13 @@
         }
 
         async function loadVerse() {
+            // Gospel mode intercept — when a verse completes (loadVerse called from completion handler),
+            // redirect to advance gospel instead. _gospelLoadInProgress is set true by loadGospelVerse.
+            if (gospelModeActive && gospelVerseIndex >= 0 && !window._gospelLoadInProgress) {
+                gospelVerseIndex++;
+                loadGospelVerse();
+                return;
+            }
             // Hide skeleton on first load
             const sk = document.getElementById('skeleton-screen');
             if (sk) sk.style.display = 'none';
@@ -2801,6 +2843,173 @@
             }
         });
 
+        // ===== GOSPEL MODE =====
+        const GOSPEL_VERSES = [
+            { book: 'John', chapter: 3, verse: 16 },
+            { book: 'Romans', chapter: 6, verse: 23 },
+            { book: 'Romans', chapter: 3, verse: 23 },
+            { book: 'Romans', chapter: 5, verse: 8 },
+            { book: 'Ephesians', chapter: 1, verse: 7 },
+            { book: '2 Corinthians', chapter: 5, verse: 21 },
+            { book: 'John', chapter: 1, verse: 12 },
+            { book: 'Romans', chapter: 10, verse: 9 },
+            { book: 'Romans', chapter: 8, verse: 1 },
+            { book: 'Ephesians', chapter: 1, verse: 13 },
+            { book: 'Romans', chapter: 5, verse: 1 },
+            { book: 'John', chapter: 10, verse: 28 }
+        ];
+        const GOSPEL_INTRO_TEXT = "The Grace of God, Plain and Simple. See how Jesus' cross and resurrection secured once‑for‑all forgiveness. The best news you'll ever hear. Twelve verses to read, type, and remember.";
+
+        let gospelModeActive = false;
+        let gospelVerseIndex = -1; // -1 = intro screen, 0-11 = verses
+
+        function startGospelMode() {
+            gospelModeActive = true;
+            gospelVerseIndex = -1;
+            document.getElementById('gospel-mode-btn').classList.add('gospel-active');
+            // Switch to type mode if not already (gospel works in both but we default type)
+            // Show intro screen in #display
+            showGospelIntro();
+        }
+
+        function showGospelIntro() {
+            // Hide last verse box, progress label for gospel mode
+            document.getElementById('verse-ref-text').textContent = '✝️ Gospel Mode';
+            document.getElementById('progress').innerText = 'Intro';
+
+            // Show intro in display box — wait for Space/Tap
+            displayEl.innerHTML = `
+                <div class="complete-screen" style="gap:20px;">
+                    <div style="font-size:2em;">✝️</div>
+                    <h2 style="color:var(--accent);font-size:1.2em;font-weight:800;margin:0;letter-spacing:-0.3px;">Gospel Mode</h2>
+                    <div style="font-size:0.92em;color:var(--text-main);line-height:1.7;max-width:520px;text-align:center;font-family:'Droid Sans Mono','Courier New',monospace;">${GOSPEL_INTRO_TEXT}</div>
+                    <div style="font-size:0.8em;color:var(--text-muted);margin-top:4px;">Press <kbd style="background:var(--progress-bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:inherit;">Space</kbd> or tap to begin</div>
+                </div>`;
+
+            // Listen for Space key or tap to begin
+            function beginGospel(e) {
+                if (e.type === 'keydown' && e.key !== ' ') return;
+                if (e.type === 'keydown') e.preventDefault();
+                // Remove listeners
+                document.removeEventListener('keydown', beginGospel);
+                displayEl.removeEventListener('click', beginGospel);
+                gospelVerseIndex = 0;
+                loadGospelVerse();
+            }
+            setTimeout(() => {
+                document.addEventListener('keydown', beginGospel);
+                displayEl.addEventListener('click', beginGospel, { once: true });
+            }, 400);
+        }
+
+        function loadGospelVerse() {
+            if (gospelVerseIndex >= GOSPEL_VERSES.length) {
+                showGospelComplete();
+                return;
+            }
+            const gv = GOSPEL_VERSES[gospelVerseIndex];
+            // Navigate selectors
+            for (let i = 0; i < bookSel.options.length; i++) {
+                if (bookSel.options[i].value.replace(' ✅','') === gv.book) { bookSel.selectedIndex = i; break; }
+            }
+            updateChapters();
+            chapSel.value = gv.chapter;
+            updateVerses();
+            // verse-select is 0-indexed
+            for (let i = 0; i < verseSel.options.length; i++) {
+                if (parseInt(verseSel.options[i].value) === gv.verse - 1) { verseSel.selectedIndex = i; break; }
+            }
+
+            // Update progress indicator
+            document.getElementById('progress').innerText = `Gospel ${gospelVerseIndex + 1}/12`;
+            document.getElementById('verse-ref-text').textContent = `✝️ ${gv.book} ${gv.chapter}:${gv.verse}`;
+
+            if (readModeActive) {
+                // Read mode: load verse text and show it
+                window._gospelLoadInProgress = true;
+                fetchVerses();
+                window._gospelLoadInProgress = false;
+            } else {
+                // Type mode: load verse for typing
+                window._gospelLoadInProgress = true;
+                fetchVerses();
+                window._gospelLoadInProgress = false;
+            }
+        }
+
+        function gospelAdvance() {
+            if (!gospelModeActive) return false;
+            gospelVerseIndex++;
+            loadGospelVerse();
+            return true;
+        }
+
+        function exitGospelMode() {
+            gospelModeActive = false;
+            gospelVerseIndex = -1;
+            document.getElementById('gospel-mode-btn').classList.remove('gospel-active');
+        }
+
+        function showGospelComplete() {
+            exitGospelMode();
+            document.getElementById('verse-ref-text').textContent = '✝️ Gospel Complete';
+            document.getElementById('progress').innerText = '12/12';
+
+            displayEl.innerHTML = `
+                <div class="complete-screen" id="gospel-complete-screen" style="gap:16px;">
+                    <div style="font-size:2em;">✝️</div>
+                    <h2 style="color:var(--accent);font-size:1.3em;font-weight:800;margin:0;letter-spacing:-0.5px;">It is Finished.</h2>
+                    <div id="gospel-complete-text" style="font-size:0.88em;color:var(--text-main);line-height:1.75;max-width:540px;text-align:center;font-family:'Droid Sans Mono','Courier New',monospace;">
+                        You have completed this 12-verse foundation of the Gospel. You've seen the heart of God's promise: that Jesus' cross and resurrection secured once-for-all forgiveness for all who believe.
+                    </div>
+                    <div id="gospel-complete-btns" style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:6px;">
+                        <button class="gospel-believe-btn" onclick="gospelBelieve()">[ I Believe ]</button>
+                        <button class="gospel-btn" onclick="startGospelMode()">Restart Gospel Mode</button>
+                    </div>
+                </div>`;
+        }
+
+        function gospelBelieve() {
+            // Fire confetti
+            launchConfetti();
+            // Update text and buttons
+            document.getElementById('gospel-complete-text').innerHTML =
+                `<strong style="color:#ffd700;font-size:1.05em;">Welcome to God&rsquo;s family!</strong><br><br>By believing in Jesus, you are fully forgiven, made righteous, and sealed with the Holy Spirit&mdash;forever. Nothing can separate you from Him.`;
+            document.getElementById('gospel-complete-btns').innerHTML = `
+                <button class="next-btn" onclick="goToJohnOne()">[ Start Learning: Go to John Chapter 1 ]</button>`;
+        }
+
+        function goToJohnOne() {
+            exitGospelMode();
+            for (let i = 0; i < bookSel.options.length; i++) {
+                if (bookSel.options[i].value.replace(' ✅','') === 'John') { bookSel.selectedIndex = i; break; }
+            }
+            updateChapters();
+            chapSel.value = 1;
+            updateVerses();
+            verseSel.value = 0;
+            fetchVerses();
+        }
+
+        function launchConfetti() {
+            const colors = ['#ffd700','#58a6ff','#2ea043','#f85149','#f0b429','#d2a8ff','#ffffff'];
+            const container = document.createElement('div');
+            container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99999;overflow:hidden;';
+            document.body.appendChild(container);
+            for (let i = 0; i < 120; i++) {
+                const el = document.createElement('div');
+                const size = 6 + Math.random() * 10;
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                const left = Math.random() * 100;
+                const delay = Math.random() * 1.2;
+                const dur = 2.5 + Math.random() * 1.5;
+                const shape = Math.random() > 0.5 ? '50%' : '2px';
+                el.style.cssText = `position:absolute;top:-20px;left:${left}%;width:${size}px;height:${size}px;background:${color};border-radius:${shape};animation:confetti-fall ${dur}s ${delay}s ease-in forwards;`;
+                container.appendChild(el);
+            }
+            setTimeout(() => container.remove(), 5000);
+        }
+
         // ===== BLUE LETTER BIBLE INTEGRATION =====
         const blbBookMap = {
             "Genesis":"gen","Exodus":"exo","Leviticus":"lev","Numbers":"num","Deuteronomy":"deu",
@@ -2907,6 +3116,47 @@
                 inputEl.focus({ preventScroll: true });
             }
         });
+
+        // ===== SWIPE NAVIGATION =====
+        // Left swipe = next verse, Right swipe = prev verse
+        // Works on the whole document (not just #display) for easy tablet use
+        let swipeStartX = null;
+        let swipeStartY = null;
+        const SWIPE_THRESHOLD = 60;    // min px horizontal travel
+        const SWIPE_ANGLE_MAX = 0.65;  // max vertical ratio (tan ~33deg) — keeps it horizontal
+
+        document.addEventListener('touchstart', (e) => {
+            // Ignore if touching a button, select, input, or the read-nav bar
+            const tag = e.target.tagName;
+            if (['SELECT','BUTTON','INPUT','A','LABEL'].includes(tag)) return;
+            if (e.target.closest('#read-nav, #nav-header, .brand-container, #stats-bar')) return;
+            if (e.touches.length !== 1) return;
+            swipeStartX = e.touches[0].clientX;
+            swipeStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        document.addEventListener('touchend', (e) => {
+            if (swipeStartX === null) return;
+            const tag = e.target.tagName;
+            if (['SELECT','BUTTON','INPUT','A','LABEL'].includes(tag)) { swipeStartX = null; return; }
+            if (e.target.closest('#read-nav, #nav-header, .brand-container, #stats-bar')) { swipeStartX = null; return; }
+
+            const dx = e.changedTouches[0].clientX - swipeStartX;
+            const dy = e.changedTouches[0].clientY - swipeStartY;
+            swipeStartX = null;
+            swipeStartY = null;
+
+            if (Math.abs(dx) < SWIPE_THRESHOLD) return;
+            if (Math.abs(dy) / Math.abs(dx) > SWIPE_ANGLE_MAX) return; // too vertical
+
+            if (dx < 0) {
+                // Swipe left → next verse
+                goToNextVerse();
+            } else {
+                // Swipe right → prev verse
+                goToPrevVerse();
+            }
+        }, { passive: true });
 
         // Arrow keys: navigate verses, Escape = restart current verse
         window.addEventListener('keydown', (e) => {
