@@ -231,13 +231,12 @@
         .speed-word.active-word::after { content: ''; position: absolute; bottom: -3px; left: 0; width: 100%; height: 3px; background: var(--accent); border-radius: 2px; box-shadow: 0 0 8px rgba(88,166,255,0.6); }
         .speed-word.past-word { color: var(--text-muted) !important; font-weight: normal !important; }
         /* RSVP mode */
-        #rsvp-overlay { display:none; position:absolute; inset:0; background:var(--panel-bg); border-radius:16px; align-items:center; justify-content:center; flex-direction:column; gap:12px; z-index:10; }
-        #rsvp-overlay.active { display:flex; }
-        #rsvp-word { font-family:'Droid Sans Mono','Courier New',monospace; font-size:clamp(32px,6vh,56px); font-weight:700; color:var(--text-bright); letter-spacing:-0.5px; text-align:center; padding:0 20px; animation:rsvpPop 0.08s ease-out; }
-        @keyframes rsvpPop { from { transform:scale(0.88); opacity:0.5; } to { transform:scale(1); opacity:1; } }
-        #rsvp-progress { font-size:11px; color:var(--text-muted); letter-spacing:0.5px; }
         #rsvp-mode-btn { font-size:13px; cursor:pointer; background:transparent; border:none; padding:0 2px; line-height:1; transition:opacity 0.15s; color:inherit; }
         #rsvp-mode-btn:hover { opacity:0.7; }
+        .rsvp-display { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:14px; }
+        .rsvp-display .rsvp-word { font-family:'Droid Sans Mono','Courier New',monospace; font-size:clamp(32px,6vh,56px); font-weight:700; color:var(--text-bright); letter-spacing:-0.5px; text-align:center; padding:0 20px; }
+        @keyframes rsvpPop { from { transform:scale(0.88); opacity:0.4; } to { transform:scale(1); opacity:1; } }
+        .rsvp-display .rsvp-progress { font-size:11px; color:var(--text-muted); letter-spacing:0.5px; }
         #speed-toggle-btn { background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.2s; font-family:inherit; }
         #speed-toggle-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,0.1); }
         .next-btn { padding: 12px 32px; font-size: 1em; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
@@ -601,7 +600,7 @@
         <span id="verse-ref-sub" style="color:var(--text-muted);font-size:11px;">KJV</span>
         <button id="place-btn" onclick="toggleSavePlace()" title="Save your place" aria-label="Save your place" style="background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">📍</button>
     </div>
-    <div id="display"><div id="rsvp-overlay"><div id="rsvp-word">—</div><div id="rsvp-progress">1 / 1</div></div><div id="skeleton-screen">
+    <div id="display"><div id="skeleton-screen">
         <div class="skeleton-line" style="height:28px; width:95%;"></div>
         <div class="skeleton-line" style="height:28px; width:88%;"></div>
         <div class="skeleton-line" style="height:28px; width:92%;"></div>
@@ -2435,15 +2434,13 @@
             rsvpModeActive = !rsvpModeActive;
             const btn = document.getElementById('rsvp-mode-btn');
             btn.textContent = rsvpModeActive ? '🎯' : '⚡';
-            btn.title = rsvpModeActive ? 'RSVP mode — click to switch back' : 'Toggle RSVP mode';
-            // If speed reading is running, re-render immediately in new mode
+            btn.title = rsvpModeActive ? 'RSVP mode active — click to switch back' : 'Toggle RSVP mode';
+            // If speed reader is running, re-render in new mode immediately
             if (speedReadActive) {
                 renderSpeedDisplay(speedWordIndex);
             } else if (activeVerseText) {
-                // Not running — reset verse view
+                // Not running — restore normal verse text if switching off
                 if (!rsvpModeActive) renderDisplay(activeVerseText);
-                const overlay = document.getElementById('rsvp-overlay');
-                if (overlay) overlay.classList.toggle('active', false);
             }
         }
 
@@ -2536,35 +2533,21 @@
             const btn = document.getElementById('speed-toggle-btn');
             btn.innerText = '▶ Start';
             btn.classList.remove('active');
-            // Hide RSVP overlay and restore verse
-            const overlay = document.getElementById('rsvp-overlay');
-            if (overlay) overlay.classList.remove('active');
+            // Re-render verse without pacer
             if (activeVerseText) renderDisplay(activeVerseText);
+            // In RSVP mode the display was replaced — renderDisplay above already restores it
         }
 
         function renderSpeedDisplay(wordIdx) {
-            // ── RSVP mode: show one large word in the overlay ──
+            // ── RSVP mode: replace display contents with one large word ──
             if (rsvpModeActive) {
-                const overlay = document.getElementById('rsvp-overlay');
-                const wordEl  = document.getElementById('rsvp-word');
-                const progEl  = document.getElementById('rsvp-progress');
-                if (overlay && wordEl) {
-                    overlay.classList.add('active');
-                    // Strip punctuation for display but keep the real token
-                    const raw = speedWords[wordIdx] || '';
-                    wordEl.textContent = raw;
-                    // Re-trigger pop animation
-                    wordEl.style.animation = 'none';
-                    wordEl.offsetHeight; // reflow
-                    wordEl.style.animation = '';
-                    if (progEl) progEl.textContent = (wordIdx + 1) + ' / ' + speedWords.length;
-                }
+                const raw = speedWords[wordIdx] || '';
+                displayEl.innerHTML = `<div class="rsvp-display">
+                    <div class="rsvp-word" style="animation:rsvpPop 0.08s ease-out">${raw}</div>
+                    <div class="rsvp-progress">${wordIdx + 1} / ${speedWords.length}</div>
+                </div>`;
                 return;
             }
-            // Hide RSVP overlay if switching away mid-verse
-            const overlay = document.getElementById('rsvp-overlay');
-            if (overlay) overlay.classList.remove('active');
-
             const useSyntax = document.getElementById('syntax-mode')?.checked;
 
             if (useSyntax) {
