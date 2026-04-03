@@ -1699,6 +1699,7 @@
                 const totalVerses = chapEntry ? chapEntry.verses.length : 0;
                 if (chapNum >= totalChaps && verseNum >= totalVerses && isBookComplete(bookName)) {
                     showBookCompleteRead(bookName);
+                    return true; // signal to goToNextVerse to stop navigation
                 }
             }
 
@@ -2317,38 +2318,34 @@
         async function shareCompletion(canvas, bookName, mode) {
             const shareText = buildShareText(bookName, mode, 0, 0);
 
-            // Try Web Share API with image (mobile)
+            // Try Web Share API with image (mobile / modern browsers)
             if (navigator.share && navigator.canShare) {
-                canvas.toBlob(async (blob) => {
+                try {
+                    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
                     const file = new File([blob], 'typescripture-completion.png', { type: 'image/png' });
                     if (navigator.canShare({ files: [file] })) {
-                        try {
-                            await navigator.share({
-                                files: [file],
-                                text: shareText,
-                                url: 'https://typescripture.com'
-                            });
-                            return;
-                        } catch(e) {
-                            if (e.name !== 'AbortError') throw e;
-                            return; // user cancelled — that's fine
-                        }
+                        await navigator.share({ files: [file], text: shareText, url: 'https://typescripture.com' });
+                        return;
                     }
-                    // canShare returned false — fall through to download
-                    triggerDownload(canvas, bookName);
-                }, 'image/png');
-            } else {
-                // Desktop: download the image
-                triggerDownload(canvas, bookName);
+                } catch(e) {
+                    if (e.name === 'AbortError') return; // user cancelled — fine
+                    // fall through to desktop
+                }
             }
-        }
 
-        function triggerDownload(canvas, bookName) {
-            const link = document.createElement('a');
+            // Desktop fallback: show the card image with download button
+            const dataUrl = canvas.toDataURL('image/png');
             const safeName = bookName.replace(/\s+/g, '-').toLowerCase();
-            link.download = `typescripture-${safeName}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+            const filename = `typescripture-${safeName}.png`;
+            displayEl.innerHTML = `
+                <div class="complete-screen" style="gap:14px;">
+                    <div style="font-size:0.82em;color:var(--text-muted);margin-bottom:2px;">Your share card — right-click to copy or save</div>
+                    <img src="${dataUrl}" style="max-width:100%;border-radius:10px;border:1px solid var(--border);box-shadow:0 4px 20px rgba(0,0,0,0.4);" alt="TypeScripture completion card">
+                    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:4px;">
+                        <a href="${dataUrl}" download="${filename}" style="background:rgba(88,166,255,0.12);border:1.5px solid var(--accent);color:var(--accent);padding:8px 22px;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer;">⬇️ Download Image</a>
+                        <button onclick="fetchVerses()" style="padding:8px 22px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;background:transparent;border:1px solid var(--border);color:var(--text-muted);">✕ Close</button>
+                    </div>
+                </div>`;
         }
 
         function goToNextChapter() {
@@ -2365,7 +2362,7 @@
 
         let bookCompleteShown = false; // true while book completion screen is displayed
 
-        function goToNextVerse(skipMark = false) {
+        async function goToNextVerse(skipMark = false) {
             // If book complete screen is showing, next press advances to the next book
             if (bookCompleteShown) {
                 bookCompleteShown = false;
@@ -2381,7 +2378,10 @@
                 }
                 return;
             }
-            if (readModeActive && !skipMark) markVerseRead();
+            if (readModeActive && !skipMark) {
+                const showed = await markVerseRead();
+                if (showed) return; // completion screen is up — stop here
+            }
             // Gospel intro screen (index -1) — Begin button / swipe-left starts verse 1
             if (gospelModeActive && gospelVerseIndex === -1) {
                 if (window._gospelBeginHandler) {
