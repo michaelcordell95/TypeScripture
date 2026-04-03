@@ -233,10 +233,9 @@
         /* RSVP mode */
         #rsvp-mode-btn { font-size:13px; cursor:pointer; background:transparent; border:none; padding:0 2px; line-height:1; transition:opacity 0.15s; color:inherit; }
         #rsvp-mode-btn:hover { opacity:0.7; }
-        .rsvp-display { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:14px; }
+        .rsvp-display { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; }
         .rsvp-display .rsvp-word { font-family:'Droid Sans Mono','Courier New',monospace; font-size:clamp(32px,6vh,56px); font-weight:700; color:var(--text-bright); letter-spacing:-0.5px; text-align:center; padding:0 20px; }
         @keyframes rsvpPop { from { transform:scale(0.88); opacity:0.4; } to { transform:scale(1); opacity:1; } }
-        .rsvp-display .rsvp-progress { font-size:11px; color:var(--text-muted); letter-spacing:0.5px; }
         #speed-toggle-btn { background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.2s; font-family:inherit; }
         #speed-toggle-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,0.1); }
         .next-btn { padding: 12px 32px; font-size: 1em; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
@@ -520,6 +519,10 @@
                     <div class="nav-btn-wrap" id="listen-btn-wrap">
                         <button id="listen-btn" onclick="toggleListen()" title="Listen to verse" aria-label="Listen to verse">🔊</button>
                         <span class="nav-btn-label">Listen</span>
+                    </div>
+                    <div class="nav-btn-wrap" id="blb-btn-wrap">
+                        <button id="blb-btn" onclick="openBLB()" title="Open in Blue Letter Bible" aria-label="Open in Blue Letter Bible">📖</button>
+                        <span class="nav-btn-label">BLB</span>
                     </div>
                 </div>
                 </div>
@@ -1958,6 +1961,16 @@
 
         function goToNextVerse(skipMark = false) {
             if (readModeActive && !skipMark) markVerseRead();
+            // Gospel intro screen (index -1) — Begin button / swipe-left starts verse 1
+            if (gospelModeActive && gospelVerseIndex === -1) {
+                if (window._gospelBeginHandler) {
+                    document.removeEventListener('keydown', window._gospelBeginHandler);
+                    window._gospelBeginHandler = null;
+                }
+                gospelVerseIndex = 0;
+                loadGospelVerse();
+                return;
+            }
             // Gospel mode: advance gospel sequence instead of normal nav
             if (gospelModeActive && gospelVerseIndex >= 0) {
                 gospelVerseIndex++;
@@ -2435,11 +2448,9 @@
             const btn = document.getElementById('rsvp-mode-btn');
             btn.textContent = rsvpModeActive ? '🎯' : '⚡';
             btn.title = rsvpModeActive ? 'RSVP mode active — click to switch back' : 'Toggle RSVP mode';
-            // If speed reader is running, re-render in new mode immediately
             if (speedReadActive) {
                 renderSpeedDisplay(speedWordIndex);
             } else if (activeVerseText) {
-                // Not running — restore normal verse text if switching off
                 if (!rsvpModeActive) renderDisplay(activeVerseText);
             }
         }
@@ -2533,19 +2544,15 @@
             const btn = document.getElementById('speed-toggle-btn');
             btn.innerText = '▶ Start';
             btn.classList.remove('active');
-            // Re-render verse without pacer
+            // Re-render verse without pacer (also clears RSVP view)
             if (activeVerseText) renderDisplay(activeVerseText);
-            // In RSVP mode the display was replaced — renderDisplay above already restores it
         }
 
         function renderSpeedDisplay(wordIdx) {
-            // ── RSVP mode: replace display contents with one large word ──
+            // RSVP mode: one clean word, no counter
             if (rsvpModeActive) {
-                const raw = speedWords[wordIdx] || '';
-                displayEl.innerHTML = `<div class="rsvp-display">
-                    <div class="rsvp-word" style="animation:rsvpPop 0.08s ease-out">${raw}</div>
-                    <div class="rsvp-progress">${wordIdx + 1} / ${speedWords.length}</div>
-                </div>`;
+                const raw = (speedWords[wordIdx] || '').replace(/[.,;:!?\u2018\u2019\u201c\u201d\u2014\u2013-]/g, '');
+                displayEl.innerHTML = '<div class="rsvp-display"><div class="rsvp-word" style="animation:rsvpPop 0.08s ease-out">' + raw + '</div></div>';
                 return;
             }
             const useSyntax = document.getElementById('syntax-mode')?.checked;
@@ -2909,32 +2916,26 @@
         }
 
         function showGospelIntro() {
-            // Hide last verse box, progress label for gospel mode
             document.getElementById('verse-ref-text').textContent = 'Gospel Mode';
             document.getElementById('progress').innerText = 'Intro';
 
-            // Show intro in display box — wait for Space/Tap
             displayEl.innerHTML = `
-                <div class="complete-screen" style="gap:20px;">
+                <div class="complete-screen" style="gap:16px;">
                     <h2 style="color:var(--accent);font-size:1.2em;font-weight:800;margin:0;letter-spacing:-0.3px;">Gospel Mode</h2>
                     <div style="font-size:0.92em;color:var(--text-main);line-height:1.7;max-width:520px;text-align:center;font-family:'Droid Sans Mono','Courier New',monospace;">${GOSPEL_INTRO_TEXT}</div>
-                    <div style="font-size:0.8em;color:var(--text-muted);margin-top:4px;">Press <kbd style="background:var(--progress-bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:inherit;">Space</kbd> or tap to begin</div>
+                    <button class="gospel-btn" id="gospel-begin-btn" onclick="goToNextVerse()" style="margin-top:4px;">Begin ›</button>
                 </div>`;
 
-            // Listen for Space key or tap to begin
             function beginGospel(e) {
                 if (e.type === 'keydown' && e.key !== ' ') return;
                 if (e.type === 'keydown') e.preventDefault();
-                // Remove listeners
                 document.removeEventListener('keydown', beginGospel);
-                displayEl.removeEventListener('click', beginGospel);
+                window._gospelBeginHandler = null;
                 gospelVerseIndex = 0;
                 loadGospelVerse();
             }
-            setTimeout(() => {
-                document.addEventListener('keydown', beginGospel);
-                displayEl.addEventListener('click', beginGospel, { once: true });
-            }, 400);
+            window._gospelBeginHandler = beginGospel;
+            setTimeout(() => { document.addEventListener('keydown', beginGospel); }, 400);
         }
 
         function loadGospelVerse() {
@@ -3088,7 +3089,7 @@
             }
         }
 
-        // Long press on display to open BLB (500ms threshold)
+        // Long press on display = toggle speed reading
         let longPressTimer = null;
         let longPressTriggered = false;
 
@@ -3096,12 +3097,9 @@
             longPressTriggered = false;
             longPressTimer = setTimeout(() => {
                 longPressTriggered = true;
-                // Visual feedback first
                 displayEl.style.opacity = '0.7';
                 setTimeout(() => displayEl.style.opacity = '1', 200);
-                // iOS requires window.open to be called directly from a user gesture
-                // so we open immediately in the timeout which counts as user-initiated
-                openBLB();
+                toggleSpeedReading();
             }, 500);
         }, { passive: false });
 
@@ -3112,11 +3110,10 @@
                 return;
             }
             // Normal tap — focus hidden input to bring up keyboard
-            // iOS requires focus() called synchronously in user event handler
             if (!inputEl.disabled) {
                 inputEl.style.opacity = '1';
                 inputEl.style.pointerEvents = 'auto';
-                                setTimeout(() => {
+                setTimeout(() => {
                     inputEl.style.opacity = '0';
                     inputEl.style.pointerEvents = 'none';
                 }, 100);
@@ -3126,12 +3123,6 @@
         displayEl.addEventListener('touchmove', () => {
             clearTimeout(longPressTimer);
             longPressTriggered = false;
-        });
-
-        // Desktop: right-click or long mousedown
-        displayEl.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            openBLB();
         });
 
         // Focus on tap anywhere outside nav/buttons
@@ -3346,12 +3337,26 @@
             {
                 emoji: '✝',
                 title: 'Welcome to TypeScripture',
-                body: 'Type through the Bible verse by verse. Build speed, accuracy, and Scripture memory — all at once. This quick tour shows you the basics.',
-                mock: `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                body: 'Type through the Bible verse by verse. Build speed, accuracy, and Scripture memory — all at once. New to the Bible? Hit <strong style="color:var(--accent);">✝️ Gospel</strong> to start with 12 key verses that tell the whole story of grace.',
+                mock: `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">⌨️ Type verses</div>
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">📖 Read mode</div>
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">🔥 Daily streaks</div>
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">🏆 Leaderboard</div>
+                </div>
+                <div style="border-top:1px solid var(--border-inner);padding-top:10px;display:flex;align-items:center;gap:10px;justify-content:center;">
+                    <span style="font-size:11px;color:var(--text-muted);">New to the Bible? Start here →</span>
+                    <div style="background:rgba(88,166,255,0.12);border:1.5px solid var(--accent);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;color:var(--accent);">✝️ Gospel</div>
+                </div>`
+            },
+            {
+                emoji: '✝️',
+                title: 'Gospel Mode',
+                body: 'New to Scripture? Gospel Mode walks you through 12 hand-picked verses — from John 3:16 to John 10:28 — that lay out the full story of grace. Tap <strong style="color:var(--accent);">✝️ Gospel</strong> in the nav bar, then hit Begin › or swipe left to start.',
+                mock: `<div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+                    <div style="background:rgba(88,166,255,0.12);border:1.5px solid var(--accent);border-radius:8px;padding:10px 20px;font-size:14px;font-weight:700;color:var(--accent);">✝️ Gospel</div>
+                    <div style="font-size:12px;color:var(--text-muted);text-align:center;max-width:280px;line-height:1.6;">John 3:16 · Romans 6:23 · Romans 3:23<br>Romans 5:8 · Ephesians 1:7 · and more</div>
+                    <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:6px 18px;font-size:12px;color:var(--text-muted);">Gospel 1/12 → Gospel 12/12</div>
                 </div>`
             },
             {
@@ -3398,7 +3403,7 @@
             {
                 emoji: '⚡',
                 title: 'Speed reader',
-                body: 'In read mode, use the WPM slider at the bottom to auto-advance through verses at your chosen speed. Hit ▶ Start and the words highlight as you read. Toggle the 🔊 button to hear it spoken aloud in sync.',
+                body: 'In read mode, use the WPM slider to auto-advance through verses. Hit ▶ Start and words highlight as you read. 🔊 syncs voice. Tip: tap ⚡ next to the WPM to switch to RSVP mode — one word at a time, large, in the center of the screen. Tap 🎯 to return.',
                 mock: `<div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
                         <span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">⚡ <span style="color:var(--accent);font-weight:700;">300</span> WPM</span>
