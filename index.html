@@ -1690,6 +1690,18 @@
             updateBooks();
             markStreakActivity();
 
+            // Check for book/bible completion in read mode only
+            // (typing has its own completion screen via showChapterComplete)
+            if (readModeActive && !skipTimeCheck) {
+                const totalChaps = chapCounts[books.indexOf(bookName)] || 1;
+                const bookEntry = KJV_EMBEDDED && KJV_EMBEDDED.books.find(b => b.name === bookName);
+                const chapEntry = bookEntry && bookEntry.chapters.find(c => c.chapter === chapNum);
+                const totalVerses = chapEntry ? chapEntry.verses.length : 0;
+                if (chapNum >= totalChaps && verseNum >= totalVerses && isBookComplete(bookName)) {
+                    showBookCompleteRead(bookName);
+                }
+            }
+
             if (!currentUserId || !supabaseClient) return;
 
             try {
@@ -1974,9 +1986,20 @@
             const bookName = bookSel.value.replace(" ✅", "");
             const chapNum = parseInt(chapSel.value);
             const totalChaps = chapCounts[books.indexOf(bookName)] || 1;
-            const hasNext = chapNum < totalChaps;
+            const isLastChap = chapNum >= totalChaps;
             const versesTyped = verseWpms.length;
             markStreakActivity();
+
+            // Check if the whole book is now typed
+            if (isLastChap && isBookTyped(bookName)) {
+                // Check if this is the whole Bible
+                if (bookName === 'Revelation' && completedSet.size >= TOTAL_VERSES_BIBLE) {
+                    showBibleComplete('type', avg, best);
+                } else {
+                    showBookComplete(bookName, 'type', avg, best, versesTyped);
+                }
+                return;
+            }
 
             displayEl.innerHTML = `
                 <div class="complete-screen">
@@ -1996,11 +2019,334 @@
                             <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Verses</div>
                         </div>
                     </div>
-                    ${hasNext
-                        ? `<button class="next-btn" onclick="goToNextChapter()">Next Chapter →</button>`
-                        : `<div style="color:var(--text-muted);font-size:0.9em;margin-top:8px;">🏁 You've finished ${bookName}!</div>`
+                    ${isLastChap
+                        ? `<div style="color:var(--text-muted);font-size:0.9em;margin-top:8px;">🏁 You've finished ${bookName}!</div>`
+                        : `<button class="next-btn" onclick="goToNextChapter()">Next Chapter →</button>`
                     }
                 </div>`;
+        }
+
+        // ===== BOOK & BIBLE COMPLETION =====
+
+        function showBookComplete(bookName, mode, avg, best, verses) {
+            launchConfetti();
+            const isType = mode === 'type';
+            const modeLabel = isType ? 'Typed' : 'Read';
+            const modeEmoji = isType ? '⌨️' : '📖';
+            const bookIdx = books.indexOf(bookName) + 1;
+            const totalBooks = 66;
+
+            displayEl.innerHTML = `
+                <div class="complete-screen" id="book-complete-screen" style="gap:14px;">
+                    <div style="font-size:2.2em;">🏆</div>
+                    <h2 style="font-size:1.4em;margin:0;">${modeEmoji} ${bookName} Complete!</h2>
+                    <div style="font-size:0.82em;color:var(--text-muted);">Book ${bookIdx} of ${totalBooks} · KJV</div>
+                    ${isType ? `
+                    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:4px 0;">
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:10px 18px;text-align:center;">
+                            <div style="font-size:22px;font-weight:800;color:var(--accent);">${avg}</div>
+                            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Avg WPM</div>
+                        </div>
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:10px 18px;text-align:center;">
+                            <div style="font-size:22px;font-weight:800;color:var(--accent);">${best}</div>
+                            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Best WPM</div>
+                        </div>
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:10px 18px;text-align:center;">
+                            <div style="font-size:22px;font-weight:800;color:var(--accent);">${verses}</div>
+                            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Verses</div>
+                        </div>
+                    </div>` : ''}
+                    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:4px;">
+                        <button class="next-btn" id="book-share-btn" onclick="shareBookCompletion('${bookName}','${mode}',${avg},${best},${verses})" style="background:rgba(88,166,255,0.12);border:1.5px solid var(--accent);color:var(--accent);padding:8px 22px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">📤 Share</button>
+                        <button class="next-btn" onclick="goToNextBook('${bookName}')" style="padding:8px 22px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Next Book →</button>
+                    </div>
+                </div>`;
+        }
+
+        function showBookCompleteRead(bookName) {
+            // Called from markVerseRead when entire book is read
+            // Check full Bible first
+            if (bookName === 'Revelation' && readCompletedSet.size >= TOTAL_VERSES_BIBLE) {
+                showBibleComplete('read', 0, 0);
+                return;
+            }
+            showBookComplete(bookName, 'read', 0, 0, 0);
+        }
+
+        function showBibleComplete(mode, avg, best) {
+            launchConfetti();
+            setTimeout(launchConfetti, 1200); // double wave
+            const isType = mode === 'type';
+            const headline = isType
+                ? 'The Entire Bible — Typed.'
+                : 'The Entire Bible — Read.';
+            const message = isType
+                ? 'I have typed every word of the King James Bible. All 31,102 verses. To God be the glory.'
+                : 'I have read through the entire King James Bible on TypeScripture. From Genesis to Revelation.';
+
+            displayEl.innerHTML = `
+                <div class="complete-screen" id="bible-complete-screen" style="gap:16px;">
+                    <div style="font-size:2.5em;">✝️</div>
+                    <h2 style="font-size:1.5em;margin:0;color:var(--accent);">${headline}</h2>
+                    <div style="font-size:0.9em;color:var(--text-main);line-height:1.75;max-width:520px;text-align:center;font-family:'Droid Sans Mono','Courier New',monospace;font-style:italic;">"${message}"</div>
+                    ${isType ? `
+                    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:10px 18px;text-align:center;">
+                            <div style="font-size:22px;font-weight:800;color:var(--accent);">${avg}</div>
+                            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Avg WPM</div>
+                        </div>
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:10px 18px;text-align:center;">
+                            <div style="font-size:22px;font-weight:800;color:var(--accent);">${best}</div>
+                            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Best WPM</div>
+                        </div>
+                        <div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:8px;padding:10px 18px;text-align:center;">
+                            <div style="font-size:22px;font-weight:800;color:var(--accent);">31,102</div>
+                            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Verses</div>
+                        </div>
+                    </div>` : ''}
+                    <button class="next-btn" onclick="shareBookCompletion('The Holy Bible','${mode}',${avg},${best},31102)" style="background:rgba(88,166,255,0.12);border:1.5px solid var(--accent);color:var(--accent);padding:10px 28px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;">📤 Share This Achievement</button>
+                </div>`;
+        }
+
+        function goToNextBook(bookName) {
+            const idx = books.indexOf(bookName);
+            if (idx >= 0 && idx + 1 < books.length) {
+                bookSel.value = books[idx + 1];
+                updateChapters();
+                chapSel.value = 1;
+                updateVerses();
+                verseSel.value = 0;
+                fetchVerses();
+            }
+        }
+
+        // ===== SHARE CARD =====
+
+        async function shareBookCompletion(bookName, mode, avg, best, verses) {
+            const btn = document.getElementById('book-share-btn');
+            if (btn) { btn.textContent = '⏳ Generating...'; btn.disabled = true; }
+
+            try {
+                const canvas = generateShareCard(bookName, mode, avg, best, verses);
+                await shareCompletion(canvas, bookName, mode);
+            } catch(e) {
+                console.error('Share error:', e);
+                // Fallback: copy text
+                const text = buildShareText(bookName, mode, avg, best);
+                try { await navigator.clipboard.writeText(text); } catch(ce) {}
+                alert('Copied to clipboard:\n\n' + text);
+            }
+
+            if (btn) { btn.textContent = '📤 Share'; btn.disabled = false; }
+        }
+
+        function buildShareText(bookName, mode, avg, best) {
+            const modeWord = mode === 'type' ? 'typed' : 'read';
+            if (bookName === 'The Holy Bible') {
+                return mode === 'type'
+                    ? `I have typed every word of the King James Bible — all 31,102 verses. To God be the glory. typescripture.com`
+                    : `I have read through the entire King James Bible on TypeScripture. From Genesis to Revelation. typescripture.com`;
+            }
+            const wpmPart = (mode === 'type' && avg > 0) ? ` — ${avg} avg WPM` : '';
+            return `I just ${modeWord} the entire book of ${bookName} on TypeScripture${wpmPart}! typescripture.com`;
+        }
+
+        function generateShareCard(bookName, mode, avg, best, verses) {
+            const W = 800, H = 420;
+            const canvas = document.createElement('canvas');
+            canvas.width = W; canvas.height = H;
+            const ctx = canvas.getContext('2d');
+            const isLight = document.body.classList.contains('light-mode');
+            const isBible = bookName === 'The Holy Bible';
+            const isType = mode === 'type';
+
+            // Colors
+            const bg      = isLight ? '#f2e8d5' : '#0d1117';
+            const panel   = isLight ? '#faf3e0' : '#161b22';
+            const accent  = isLight ? '#b8860b' : '#58a6ff';
+            const border  = isLight ? '#c8a96e' : '#30363d';
+            const textMain= isLight ? '#1a1208' : '#c9d1d9';
+            const textMuted= isLight ? '#8a7560' : '#484f58';
+            const green   = '#2ea043';
+
+            // Background
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, W, H);
+
+            // Subtle grain overlay (light mode)
+            if (isLight) {
+                ctx.fillStyle = 'rgba(139,107,40,0.03)';
+                for (let i = 0; i < 4000; i++) {
+                    ctx.fillRect(Math.random()*W, Math.random()*H, 1, 1);
+                }
+            }
+
+            // Top accent bar
+            const grad = ctx.createLinearGradient(0, 0, W, 0);
+            grad.addColorStop(0, green);
+            grad.addColorStop(1, accent);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, 5);
+
+            // Panel box
+            ctx.fillStyle = panel;
+            roundRect(ctx, 40, 30, W - 80, H - 60, 16);
+            ctx.fill();
+            ctx.strokeStyle = border;
+            ctx.lineWidth = 1.5;
+            roundRect(ctx, 40, 30, W - 80, H - 60, 16);
+            ctx.stroke();
+
+            // Cross / trophy icon
+            const icon = isBible ? '✝' : '🏆';
+            ctx.font = isBible ? '52px serif' : '44px serif';
+            ctx.textAlign = 'center';
+            if (isBible) {
+                ctx.fillStyle = accent;
+                ctx.fillText(icon, W/2, 108);
+            } else {
+                ctx.fillText(icon, W/2, 106);
+            }
+
+            // Book name
+            ctx.fillStyle = accent;
+            ctx.font = `800 ${isBible ? 34 : bookName.length > 16 ? 30 : 36}px 'Segoe UI', system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(bookName, W/2, isBible ? 150 : 148);
+
+            // Subtitle
+            const modeLabel = isType ? '⌨️ Typed · KJV' : '📖 Read · KJV';
+            ctx.fillStyle = textMuted;
+            ctx.font = '500 15px "Segoe UI", system-ui, sans-serif';
+            ctx.fillText(modeLabel, W/2, 174);
+
+            if (isType && avg > 0) {
+                // Stat boxes
+                const stats = [
+                    { label: 'AVG WPM', value: String(avg) },
+                    { label: 'BEST WPM', value: String(best) },
+                    { label: 'VERSES', value: isBible ? '31,102' : String(verses) }
+                ];
+                const boxW = 140, boxH = 68, gap = 20;
+                const totalW = stats.length * boxW + (stats.length - 1) * gap;
+                const startX = (W - totalW) / 2;
+                const boxY = 196;
+
+                stats.forEach((s, i) => {
+                    const x = startX + i * (boxW + gap);
+                    ctx.fillStyle = bg;
+                    roundRect(ctx, x, boxY, boxW, boxH, 8);
+                    ctx.fill();
+                    ctx.strokeStyle = border;
+                    ctx.lineWidth = 1;
+                    roundRect(ctx, x, boxY, boxW, boxH, 8);
+                    ctx.stroke();
+
+                    ctx.fillStyle = accent;
+                    ctx.font = '800 26px "Segoe UI", system-ui, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(s.value, x + boxW/2, boxY + 38);
+
+                    ctx.fillStyle = textMuted;
+                    ctx.font = '600 10px "Segoe UI", system-ui, sans-serif';
+                    ctx.fillText(s.label, x + boxW/2, boxY + 56);
+                });
+            } else if (!isType) {
+                // Read mode: just a "Completed" badge
+                ctx.fillStyle = bg;
+                roundRect(ctx, W/2 - 80, 196, 160, 50, 8);
+                ctx.fill();
+                ctx.strokeStyle = border;
+                ctx.lineWidth = 1;
+                roundRect(ctx, W/2 - 80, 196, 160, 50, 8);
+                ctx.stroke();
+                ctx.fillStyle = green;
+                ctx.font = '700 18px "Segoe UI", system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('✓ Completed', W/2, 227);
+            }
+
+            // Bible completion quote
+            if (isBible) {
+                const quote = isType
+                    ? '"To God be the glory."'
+                    : '"From Genesis to Revelation."';
+                ctx.fillStyle = textMuted;
+                ctx.font = 'italic 14px "Segoe UI", system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(quote, W/2, 298);
+            }
+
+            // Divider
+            const divY = isBible ? 318 : 292;
+            ctx.strokeStyle = border;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(120, divY); ctx.lineTo(W - 120, divY);
+            ctx.stroke();
+
+            // Branding row
+            const brandY = divY + 30;
+            ctx.fillStyle = accent;
+            ctx.font = '800 18px "Segoe UI", system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('✝ TypeScripture', W/2, brandY);
+            ctx.fillStyle = textMuted;
+            ctx.font = '500 12px "Segoe UI", system-ui, sans-serif';
+            ctx.fillText('typescripture.com', W/2, brandY + 20);
+
+            return canvas;
+        }
+
+        function roundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
+        async function shareCompletion(canvas, bookName, mode) {
+            const shareText = buildShareText(bookName, mode, 0, 0);
+
+            // Try Web Share API with image (mobile)
+            if (navigator.share && navigator.canShare) {
+                canvas.toBlob(async (blob) => {
+                    const file = new File([blob], 'typescripture-completion.png', { type: 'image/png' });
+                    if (navigator.canShare({ files: [file] })) {
+                        try {
+                            await navigator.share({
+                                files: [file],
+                                text: shareText,
+                                url: 'https://typescripture.com'
+                            });
+                            return;
+                        } catch(e) {
+                            if (e.name !== 'AbortError') throw e;
+                            return; // user cancelled — that's fine
+                        }
+                    }
+                    // canShare returned false — fall through to download
+                    triggerDownload(canvas, bookName);
+                }, 'image/png');
+            } else {
+                // Desktop: download the image
+                triggerDownload(canvas, bookName);
+            }
+        }
+
+        function triggerDownload(canvas, bookName) {
+            const link = document.createElement('a');
+            const safeName = bookName.replace(/\s+/g, '-').toLowerCase();
+            link.download = `typescripture-${safeName}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
         }
 
         function goToNextChapter() {
