@@ -293,8 +293,8 @@
         :root { color-scheme: dark; }
 
         select option { background: var(--panel-bg); color: var(--text-main); }
-        /* Hide install button on desktop - only relevant on mobile */
-        @media (min-width: 601px) { #install-btn { display: none !important; } }
+        /* Hide install button on large desktop only - tablets and phones can install too */
+        @media (min-width: 1025px) { #install-btn { display: none !important; } }
 
         @media (max-width: 600px) {
             body { padding: 8px; overflow-y: auto; }
@@ -1517,11 +1517,13 @@
         }
 
         function setTypeMode() {
+            if (gospelModeActive) exitGospelMode();
             if (!readModeActive) return;
             toggleReadMode();
         }
 
         function setReadMode() {
+            if (gospelModeActive) exitGospelMode();
             if (readModeActive) return;
             toggleReadMode();
         }
@@ -2969,7 +2971,6 @@
                     </div>
                     <div id="gospel-complete-btns" style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:6px;">
                         <button class="gospel-believe-btn" onclick="gospelBelieve()">[ I Believe ]</button>
-                        <button class="gospel-btn" onclick="startGospelMode()">Restart Gospel Mode</button>
                     </div>
                 </div>`;
         }
