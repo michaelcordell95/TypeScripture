@@ -1952,6 +1952,13 @@
         function goToNextVerse(skipMark = false) {
             if (readModeActive && !skipMark) markVerseRead();
             // Gospel mode: advance gospel sequence instead of normal nav
+            // gospelVerseIndex === -1 means we're on the intro screen — begin the sequence
+            if (gospelModeActive && gospelVerseIndex === -1) {
+                document.removeEventListener('keydown', window._gospelBeginHandler);
+                gospelVerseIndex = 0;
+                loadGospelVerse();
+                return;
+            }
             if (gospelModeActive && gospelVerseIndex >= 0) {
                 gospelVerseIndex++;
                 loadGospelVerse();
@@ -2881,27 +2888,28 @@
             document.getElementById('verse-ref-text').textContent = 'Gospel Mode';
             document.getElementById('progress').innerText = 'Intro';
 
-            // Show intro in display box — wait for Space/Tap
+            // Show intro in display box — wait for Space/Tap/Button/Swipe
             displayEl.innerHTML = `
                 <div class="complete-screen" style="gap:20px;">
                     <h2 style="color:var(--accent);font-size:1.2em;font-weight:800;margin:0;letter-spacing:-0.3px;">Gospel Mode</h2>
                     <div style="font-size:0.92em;color:var(--text-main);line-height:1.7;max-width:520px;text-align:center;font-family:'Droid Sans Mono','Courier New',monospace;">${GOSPEL_INTRO_TEXT}</div>
-                    <div style="font-size:0.8em;color:var(--text-muted);margin-top:4px;">Press <kbd style="background:var(--progress-bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:inherit;">Space</kbd> or tap to begin</div>
+                    <button class="gospel-btn" id="gospel-begin-btn" onclick="goToNextVerse()" style="margin-top:4px;">Begin ›</button>
+                    <div style="font-size:0.8em;color:var(--text-muted);">or press <kbd style="background:var(--progress-bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:inherit;">Space</kbd> · swipe left</div>
                 </div>`;
 
-            // Listen for Space key or tap to begin
+            // Listen for Space key to begin (swipe is handled by global swipe → goToNextVerse)
             function beginGospel(e) {
                 if (e.type === 'keydown' && e.key !== ' ') return;
                 if (e.type === 'keydown') e.preventDefault();
                 // Remove listeners
                 document.removeEventListener('keydown', beginGospel);
-                displayEl.removeEventListener('click', beginGospel);
+                window._gospelBeginHandler = null;
                 gospelVerseIndex = 0;
                 loadGospelVerse();
             }
+            window._gospelBeginHandler = beginGospel;
             setTimeout(() => {
                 document.addEventListener('keydown', beginGospel);
-                displayEl.addEventListener('click', beginGospel, { once: true });
             }, 400);
         }
 
