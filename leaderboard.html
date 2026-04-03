@@ -239,6 +239,11 @@
                     <div class="stat-card"><div class="value" id="stat-read-pct">0%</div><div class="label">Bible Read</div></div>
                     <div class="stat-card"><div class="value" id="stat-read-books">0 / 66</div><div class="label">Books Fully Read</div></div>
                     <div class="stat-card">
+                        <div class="value" id="stat-lap-position" style="font-size:16px;line-height:1.4;">—</div>
+                        <div class="label">Current Lap Position</div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">furthest unbroken read chain</div>
+                    </div>
+                    <div class="stat-card">
                         <div class="value" id="stat-most-read" style="font-size:13px;line-height:1.4;">—</div>
                         <div class="label">Most Read Verse</div>
                     </div>
@@ -790,6 +795,9 @@
                 document.getElementById('stat-read-books').innerText = booksFullyRead + ' / 66';
                 document.getElementById('stat-most-read').innerText = bestReadCount > 0 ? bestReadRef : '—';
 
+                var myLapPos = getCurrentLapPosition(readKeys);
+                document.getElementById('stat-lap-position').innerText = myLapPos || '—';
+
                 allVerseData = graphPoints;
                 setGraphRange(currentGraphRange);
 
@@ -927,18 +935,48 @@
                 ctx.fillText(label, px(i), padT + gh + 18);
             }
         }
+        // Returns the last verse in the unbroken read chain from Genesis 1:1,
+        // as a string like "Exodus 10:4", or null if nothing read, or
+        // "Revelation 22:21" if the full Bible is complete.
+        function getCurrentLapPosition(readKeys) {
+            var lastBook = null, lastChap = null, lastVerse = null;
+            for (var bi = 1; bi <= 66; bi++) {
+                var bookName = BOOK_NAMES[bi];
+                var chapters = verseCounts[bookName];
+                if (!chapters) break;
+                for (var c = 0; c < chapters.length; c++) {
+                    for (var v = 0; v < chapters[c]; v++) {
+                        if (!readKeys[bi + '|' + (c+1) + '|' + v]) {
+                            // Hit a gap — return the last completed verse
+                            if (lastBook === null) return null; // nothing read yet
+                            return lastBook + ' ' + lastChap + ':' + lastVerse;
+                        }
+                        lastBook = bookName;
+                        lastChap = (c + 1);
+                        lastVerse = (v + 1);
+                    }
+                }
+            }
+            // Completed the full Bible
+            return 'Revelation 22:21';
+        }
+
         async function loadReadLeaderboard() {
             document.getElementById('read-lb-body').innerHTML = '<div class="loading">Loading...</div>';
             try {
                 var result = await supabaseClient
                     .from('chapter_progress')
-                    .select('user_id, read_counts');
+                    .select('user_id, book_index, chapter_num, read_counts');
 
+                // Build per-user: verseCount + readKeys for lap position
                 var userData = {};
                 (result.data || []).forEach(function(r) {
-                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0 };
-                    if (r.read_counts) r.read_counts.forEach(function(count) {
-                        if (count > 0) userData[r.user_id].verseCount++;
+                    if (!userData[r.user_id]) userData[r.user_id] = { verseCount: 0, readKeys: {} };
+                    if (r.read_counts) r.read_counts.forEach(function(count, i) {
+                        if (count > 0) {
+                            userData[r.user_id].verseCount++;
+                            userData[r.user_id].readKeys[r.book_index + '|' + r.chapter_num + '|' + i] = true;
+                        }
                     });
                 });
 
@@ -969,6 +1007,10 @@
                     var rankClass = rank <= 3 ? 'rank-' + rank : '';
                     var isFull = u.verseCount >= TOTAL_VERSES_BIBLE;
                     var medal = isFull ? '&#128081;' : (rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank);
+                    var lapPos = getCurrentLapPosition(u.readKeys);
+                    var lapCell = lapPos
+                        ? '<span style="font-size:12px;color:var(--text-muted);">📍 ' + lapPos + '</span>'
+                        : '<span style="font-size:12px;color:var(--text-muted);">—</span>';
                     return '<tr>' +
                         '<td class="rank ' + rankClass + '">' + medal + '</td>' +
                         '<td class="username' + (isYou ? ' is-you' : '') + '">' + username + '</td>' +
@@ -977,12 +1019,13 @@
                             '<span style="color:var(--text-muted);font-size:11px;"> (' + u.verseCount.toLocaleString() + ')</span>' +
                             '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + barWidth + '%;"></div></div>' +
                         '</td>' +
+                        '<td class="hide-mobile" style="text-align:right;white-space:nowrap;">' + lapCell + '</td>' +
                     '</tr>';
                 }).join('');
 
                 document.getElementById('read-lb-body').innerHTML =
                     '<table class="lb-table">' +
-                        '<thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Bible Read</th></tr></thead>' +
+                        '<thead><tr><th>#</th><th>Player</th><th style="text-align:right;">Bible Read</th><th class="hide-mobile" style="text-align:right;">Current Position</th></tr></thead>' +
                         '<tbody>' + rows + '</tbody>' +
                     '</table>';
 
