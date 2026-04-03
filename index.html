@@ -1952,9 +1952,12 @@
         function goToNextVerse(skipMark = false) {
             if (readModeActive && !skipMark) markVerseRead();
             // Gospel mode: advance gospel sequence instead of normal nav
-            // gospelVerseIndex === -1 means we're on the intro screen — begin the sequence
+            // gospelVerseIndex === -1 means intro screen — begin verse 1
             if (gospelModeActive && gospelVerseIndex === -1) {
-                document.removeEventListener('keydown', window._gospelBeginHandler);
+                if (window._gospelBeginHandler) {
+                    document.removeEventListener('keydown', window._gospelBeginHandler);
+                    window._gospelBeginHandler = null;
+                }
                 gospelVerseIndex = 0;
                 loadGospelVerse();
                 return;
@@ -2888,20 +2891,18 @@
             document.getElementById('verse-ref-text').textContent = 'Gospel Mode';
             document.getElementById('progress').innerText = 'Intro';
 
-            // Show intro in display box — wait for Space/Tap/Button/Swipe
+            // Show intro in display box — Begin button, Space key, or swipe left
             displayEl.innerHTML = `
-                <div class="complete-screen" style="gap:20px;">
+                <div class="complete-screen" style="gap:16px;">
                     <h2 style="color:var(--accent);font-size:1.2em;font-weight:800;margin:0;letter-spacing:-0.3px;">Gospel Mode</h2>
                     <div style="font-size:0.92em;color:var(--text-main);line-height:1.7;max-width:520px;text-align:center;font-family:'Droid Sans Mono','Courier New',monospace;">${GOSPEL_INTRO_TEXT}</div>
-                    <button class="gospel-btn" id="gospel-begin-btn" onclick="goToNextVerse()" style="margin-top:4px;">Begin ›</button>
-                    <div style="font-size:0.8em;color:var(--text-muted);">or press <kbd style="background:var(--progress-bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:inherit;">Space</kbd> · swipe left</div>
+                    <button class="gospel-btn" id="gospel-begin-btn" onclick="goToNextVerse()">Begin ›</button>
                 </div>`;
 
-            // Listen for Space key to begin (swipe is handled by global swipe → goToNextVerse)
+            // Listen for Space key to begin (swipe left calls goToNextVerse automatically)
             function beginGospel(e) {
                 if (e.type === 'keydown' && e.key !== ' ') return;
                 if (e.type === 'keydown') e.preventDefault();
-                // Remove listeners
                 document.removeEventListener('keydown', beginGospel);
                 window._gospelBeginHandler = null;
                 gospelVerseIndex = 0;
@@ -3322,12 +3323,16 @@
             {
                 emoji: '✝',
                 title: 'Welcome to TypeScripture',
-                body: 'Type through the Bible verse by verse. Build speed, accuracy, and Scripture memory — all at once. This quick tour shows you the basics.',
-                mock: `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                body: 'Type through the Bible verse by verse. Build speed, accuracy, and Scripture memory — all at once. New to the Bible? Hit <strong style="color:var(--accent);">✝️ Gospel</strong> to start with 12 key verses that tell the whole story of grace.',
+                mock: `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">⌨️ Type verses</div>
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">📖 Read mode</div>
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">🔥 Daily streaks</div>
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">🏆 Leaderboard</div>
+                </div>
+                <div style="border-top:1px solid var(--border-inner);padding-top:10px;display:flex;align-items:center;gap:10px;justify-content:center;">
+                    <span style="font-size:11px;color:var(--text-muted);">New to the Bible? Start here →</span>
+                    <div style="background:rgba(88,166,255,0.12);border:1.5px solid var(--accent);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;color:var(--accent);">✝️ Gospel</div>
                 </div>`
             },
             {
