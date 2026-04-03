@@ -2064,6 +2064,7 @@
         }
 
         function showBookCompleteRead(bookName) {
+            bookCompleteShown = true;
             // Called from markVerseRead when entire book is read
             // Check full Bible first
             if (bookName === 'Revelation' && readCompletedSet.size >= TOTAL_VERSES_BIBLE) {
@@ -2109,6 +2110,7 @@
         }
 
         function goToNextBook(bookName) {
+            bookCompleteShown = false;
             const idx = books.indexOf(bookName);
             if (idx >= 0 && idx + 1 < books.length) {
                 bookSel.value = books[idx + 1];
@@ -2361,7 +2363,24 @@
             }
         }
 
+        let bookCompleteShown = false; // true while book completion screen is displayed
+
         function goToNextVerse(skipMark = false) {
+            // If book complete screen is showing, next press advances to the next book
+            if (bookCompleteShown) {
+                bookCompleteShown = false;
+                const bookName = bookSel.value.replace(' ✅', '');
+                const bookIdx = books.indexOf(bookName);
+                if (bookIdx + 1 < books.length) {
+                    bookSel.value = books[bookIdx + 1];
+                    updateChapters();
+                    chapSel.value = 1;
+                    updateVerses();
+                    verseSel.value = 0;
+                    fetchVerses();
+                }
+                return;
+            }
             if (readModeActive && !skipMark) markVerseRead();
             // Gospel intro screen (index -1) — Begin button / swipe-left starts verse 1
             if (gospelModeActive && gospelVerseIndex === -1) {
