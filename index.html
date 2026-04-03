@@ -230,6 +230,14 @@
         .speed-word { position: relative; display: inline; }
         .speed-word.active-word::after { content: ''; position: absolute; bottom: -3px; left: 0; width: 100%; height: 3px; background: var(--accent); border-radius: 2px; box-shadow: 0 0 8px rgba(88,166,255,0.6); }
         .speed-word.past-word { color: var(--text-muted) !important; font-weight: normal !important; }
+        /* RSVP mode */
+        #rsvp-overlay { display:none; position:absolute; inset:0; background:var(--panel-bg); border-radius:16px; align-items:center; justify-content:center; flex-direction:column; gap:12px; z-index:10; }
+        #rsvp-overlay.active { display:flex; }
+        #rsvp-word { font-family:'Droid Sans Mono','Courier New',monospace; font-size:clamp(32px,6vh,56px); font-weight:700; color:var(--text-bright); letter-spacing:-0.5px; text-align:center; padding:0 20px; animation:rsvpPop 0.08s ease-out; }
+        @keyframes rsvpPop { from { transform:scale(0.88); opacity:0.5; } to { transform:scale(1); opacity:1; } }
+        #rsvp-progress { font-size:11px; color:var(--text-muted); letter-spacing:0.5px; }
+        #rsvp-mode-btn { font-size:13px; cursor:pointer; background:transparent; border:none; padding:0 2px; line-height:1; transition:opacity 0.15s; color:inherit; }
+        #rsvp-mode-btn:hover { opacity:0.7; }
         #speed-toggle-btn { background:transparent; border:1px solid #30363d; color:var(--text-muted); padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.2s; font-family:inherit; }
         #speed-toggle-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,0.1); }
         .next-btn { padding: 12px 32px; font-size: 1em; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
@@ -593,7 +601,7 @@
         <span id="verse-ref-sub" style="color:var(--text-muted);font-size:11px;">KJV</span>
         <button id="place-btn" onclick="toggleSavePlace()" title="Save your place" aria-label="Save your place" style="background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">📍</button>
     </div>
-    <div id="display"><div id="skeleton-screen">
+    <div id="display"><div id="rsvp-overlay"><div id="rsvp-word">—</div><div id="rsvp-progress">1 / 1</div></div><div id="skeleton-screen">
         <div class="skeleton-line" style="height:28px; width:95%;"></div>
         <div class="skeleton-line" style="height:28px; width:88%;"></div>
         <div class="skeleton-line" style="height:28px; width:92%;"></div>
@@ -604,7 +612,7 @@
     <div id="read-nav" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--panel-bg); border-top:1px solid #30363d; padding:10px 20px; justify-content:center; align-items:center; flex-direction:column; gap:8px; z-index:100;">
         <!-- WPM slider — always visible -->
         <div style="display:flex; align-items:center; gap:10px; width:100%; max-width:500px;">
-            <span style="font-size:11px; color:var(--text-muted); font-weight:600; white-space:nowrap;">⚡ <span id="wpm-display">300</span> WPM</span>
+            <button id="rsvp-mode-btn" onclick="toggleRsvpMode()" title="Toggle RSVP mode">⚡</button><span style="font-size:11px; color:var(--text-muted); font-weight:600; white-space:nowrap;"> <span id="wpm-display">300</span> WPM</span>
             <input type="range" id="speed-wpm-input" min="50" max="1000" value="300"
                 style="flex:1; accent-color:var(--accent); cursor:pointer; height:4px;"
                 oninput="document.getElementById('wpm-display').textContent=this.value; updateReadStats();"
@@ -1952,16 +1960,6 @@
         function goToNextVerse(skipMark = false) {
             if (readModeActive && !skipMark) markVerseRead();
             // Gospel mode: advance gospel sequence instead of normal nav
-            // gospelVerseIndex === -1 means intro screen — begin verse 1
-            if (gospelModeActive && gospelVerseIndex === -1) {
-                if (window._gospelBeginHandler) {
-                    document.removeEventListener('keydown', window._gospelBeginHandler);
-                    window._gospelBeginHandler = null;
-                }
-                gospelVerseIndex = 0;
-                loadGospelVerse();
-                return;
-            }
             if (gospelModeActive && gospelVerseIndex >= 0) {
                 gospelVerseIndex++;
                 loadGospelVerse();
@@ -2431,6 +2429,23 @@
         let speedWords = [];
         let speedControlsVisible = false;
         let speedTtsEnabled = false; // TTS sync toggle
+        let rsvpModeActive = false;
+
+        function toggleRsvpMode() {
+            rsvpModeActive = !rsvpModeActive;
+            const btn = document.getElementById('rsvp-mode-btn');
+            btn.textContent = rsvpModeActive ? '🎯' : '⚡';
+            btn.title = rsvpModeActive ? 'RSVP mode — click to switch back' : 'Toggle RSVP mode';
+            // If speed reading is running, re-render immediately in new mode
+            if (speedReadActive) {
+                renderSpeedDisplay(speedWordIndex);
+            } else if (activeVerseText) {
+                // Not running — reset verse view
+                if (!rsvpModeActive) renderDisplay(activeVerseText);
+                const overlay = document.getElementById('rsvp-overlay');
+                if (overlay) overlay.classList.toggle('active', false);
+            }
+        }
 
         function toggleSpeedTts() {
             speedTtsEnabled = !speedTtsEnabled;
@@ -2521,11 +2536,35 @@
             const btn = document.getElementById('speed-toggle-btn');
             btn.innerText = '▶ Start';
             btn.classList.remove('active');
-            // Re-render verse without pacer
+            // Hide RSVP overlay and restore verse
+            const overlay = document.getElementById('rsvp-overlay');
+            if (overlay) overlay.classList.remove('active');
             if (activeVerseText) renderDisplay(activeVerseText);
         }
 
         function renderSpeedDisplay(wordIdx) {
+            // ── RSVP mode: show one large word in the overlay ──
+            if (rsvpModeActive) {
+                const overlay = document.getElementById('rsvp-overlay');
+                const wordEl  = document.getElementById('rsvp-word');
+                const progEl  = document.getElementById('rsvp-progress');
+                if (overlay && wordEl) {
+                    overlay.classList.add('active');
+                    // Strip punctuation for display but keep the real token
+                    const raw = speedWords[wordIdx] || '';
+                    wordEl.textContent = raw;
+                    // Re-trigger pop animation
+                    wordEl.style.animation = 'none';
+                    wordEl.offsetHeight; // reflow
+                    wordEl.style.animation = '';
+                    if (progEl) progEl.textContent = (wordIdx + 1) + ' / ' + speedWords.length;
+                }
+                return;
+            }
+            // Hide RSVP overlay if switching away mid-verse
+            const overlay = document.getElementById('rsvp-overlay');
+            if (overlay) overlay.classList.remove('active');
+
             const useSyntax = document.getElementById('syntax-mode')?.checked;
 
             if (useSyntax) {
@@ -2891,26 +2930,27 @@
             document.getElementById('verse-ref-text').textContent = 'Gospel Mode';
             document.getElementById('progress').innerText = 'Intro';
 
-            // Show intro in display box — Begin button, Space key, or swipe left
+            // Show intro in display box — wait for Space/Tap
             displayEl.innerHTML = `
-                <div class="complete-screen" style="gap:16px;">
+                <div class="complete-screen" style="gap:20px;">
                     <h2 style="color:var(--accent);font-size:1.2em;font-weight:800;margin:0;letter-spacing:-0.3px;">Gospel Mode</h2>
                     <div style="font-size:0.92em;color:var(--text-main);line-height:1.7;max-width:520px;text-align:center;font-family:'Droid Sans Mono','Courier New',monospace;">${GOSPEL_INTRO_TEXT}</div>
-                    <button class="gospel-btn" id="gospel-begin-btn" onclick="goToNextVerse()">Begin ›</button>
+                    <div style="font-size:0.8em;color:var(--text-muted);margin-top:4px;">Press <kbd style="background:var(--progress-bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:inherit;">Space</kbd> or tap to begin</div>
                 </div>`;
 
-            // Listen for Space key to begin (swipe left calls goToNextVerse automatically)
+            // Listen for Space key or tap to begin
             function beginGospel(e) {
                 if (e.type === 'keydown' && e.key !== ' ') return;
                 if (e.type === 'keydown') e.preventDefault();
+                // Remove listeners
                 document.removeEventListener('keydown', beginGospel);
-                window._gospelBeginHandler = null;
+                displayEl.removeEventListener('click', beginGospel);
                 gospelVerseIndex = 0;
                 loadGospelVerse();
             }
-            window._gospelBeginHandler = beginGospel;
             setTimeout(() => {
                 document.addEventListener('keydown', beginGospel);
+                displayEl.addEventListener('click', beginGospel, { once: true });
             }, 400);
         }
 
@@ -3323,16 +3363,12 @@
             {
                 emoji: '✝',
                 title: 'Welcome to TypeScripture',
-                body: 'Type through the Bible verse by verse. Build speed, accuracy, and Scripture memory — all at once. New to the Bible? Hit <strong style="color:var(--accent);">✝️ Gospel</strong> to start with 12 key verses that tell the whole story of grace.',
-                mock: `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">
+                body: 'Type through the Bible verse by verse. Build speed, accuracy, and Scripture memory — all at once. This quick tour shows you the basics.',
+                mock: `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">⌨️ Type verses</div>
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">📖 Read mode</div>
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">🔥 Daily streaks</div>
                     <div style="background:var(--progress-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-muted);">🏆 Leaderboard</div>
-                </div>
-                <div style="border-top:1px solid var(--border-inner);padding-top:10px;display:flex;align-items:center;gap:10px;justify-content:center;">
-                    <span style="font-size:11px;color:var(--text-muted);">New to the Bible? Start here →</span>
-                    <div style="background:rgba(88,166,255,0.12);border:1.5px solid var(--accent);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;color:var(--accent);">✝️ Gospel</div>
                 </div>`
             },
             {
