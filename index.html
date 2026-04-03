@@ -214,6 +214,7 @@
         #listen-btn:hover, #blb-btn:hover { border-color: var(--accent); color: var(--accent); }
         #bookmark-btn.bookmarked, #bookmark-btn-read.bookmarked, #bookmark-btn-read-top.bookmarked { border-color: #f0b429 !important; color: #f0b429 !important; background: rgba(240,180,41,0.18) !important; box-shadow: 0 0 8px rgba(240,180,41,0.4) !important; }
         #place-btn.placed { border-color: #e05a2b !important; color: #e05a2b !important; background: rgba(224,90,43,0.18) !important; box-shadow: 0 0 6px rgba(224,90,43,0.3) !important; }
+        #lap-btn:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
         #voice-btn.listening { border-color: var(--error) !important; color: var(--error) !important; animation: pulse-mic 1s infinite; }
         @keyframes pulse-mic { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         #read-prev-btn, #read-next-btn { color: var(--accent) !important; border-color: var(--accent) !important; }
@@ -602,6 +603,7 @@
         <span id="verse-ref-text" style="color:var(--accent);"></span>
         <span id="verse-ref-sub" style="color:var(--text-muted);font-size:11px;">KJV</span>
         <button id="place-btn" onclick="toggleSavePlace()" title="Save your place" aria-label="Save your place" style="background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">📍</button>
+        <button id="lap-btn" onclick="goToLapPosition()" title="Go to your current reading lap position" aria-label="Go to lap position" style="display:none;background:transparent;border:1px solid #30363d;color:var(--text-muted);padding:2px 8px;border-radius:5px;cursor:pointer;font-size:13px;transition:all 0.2s;">🔖</button>
     </div>
     <div id="display"><div id="skeleton-screen">
         <div class="skeleton-line" style="height:28px; width:95%;"></div>
@@ -937,6 +939,8 @@
                 console.log('✓ User logged in:', session.user.email);
             } else {
                 console.log('ℹ No user session');
+                loadReadProgressLocal();
+                updateLapBtn();
             }
         }
 
@@ -1608,6 +1612,57 @@
 
         function getReadKey(book, chap, verse) { return book + '|' + chap + '|' + verse; }
 
+        // ===== LAP POSITION (current reading chain) =====
+        // Returns the next unread verse in the unbroken chain from Genesis 1:1.
+        // e.g. if you've read up through Exodus 23:33, returns {book:'Exodus', chap:24, verse:1}.
+        // Returns null if the full Bible is complete, or {book:'Genesis', chap:1, verse:1} if nothing read.
+        function getLapNextVerse() {
+            if (typeof KJV_EMBEDDED === 'undefined' || !KJV_EMBEDDED) return null;
+            for (let bi = 1; bi <= 66; bi++) {
+                const bookName = BOOK_NAMES[bi];
+                const bookEntry = KJV_EMBEDDED ? KJV_EMBEDDED.books.find(b => b.name === bookName) : null;
+                if (!bookEntry) continue;
+                for (const chapObj of bookEntry.chapters) {
+                    for (const verseObj of chapObj.verses) {
+                        if (!readCompletedSet.has(getReadKey(bookName, chapObj.chapter, verseObj.verse))) {
+                            return { book: bookName, chap: chapObj.chapter, verse: verseObj.verse };
+                        }
+                    }
+                }
+            }
+            return null; // full Bible read — no next verse
+        }
+
+        function updateLapBtn() {
+            const btn = document.getElementById('lap-btn');
+            if (!btn) return;
+            const next = getLapNextVerse();
+            if (!next) {
+                // Full Bible complete — hide the button
+                btn.style.display = 'none';
+                return;
+            }
+            const isStart = next.book === 'Genesis' && next.chap === 1 && next.verse === 1;
+            btn.style.display = '';
+            btn.title = isStart
+                ? 'Start reading from Genesis 1:1'
+                : 'Continue reading — ' + next.book + ' ' + next.chap + ':' + next.verse;
+        }
+
+        function goToLapPosition() {
+            const next = getLapNextVerse();
+            if (!next) return; // full Bible done
+            // Navigate to the target verse
+            bookSel.value = next.book;
+            updateChapters();
+            chapSel.value = next.chap;
+            updateVerses();
+            verseSel.value = next.verse - 1; // verseSel is 0-based
+            fetchVerses();
+            // Switch to read mode if not already in it
+            if (!readModeActive) setReadMode();
+        }
+
         let verseReadStartTime = null;
 
         function onVerseLoaded() {
@@ -1716,6 +1771,7 @@
             document.getElementById('read-progress-fill').style.width = minVisible + '%';
             const display = pct < 0.1 ? pct.toFixed(3) : pct < 1 ? pct.toFixed(2) : Math.round(pct);
             document.getElementById('read-progress-text').innerText = `Bible Read: ${read} / ${total} verses (${display}%)`;
+            updateLapBtn();
         }
 
         function updateReadRefBox(overrideVerseIdx) {
@@ -3253,6 +3309,7 @@
 
         fetchVerses();
         initStreak();
+        updateLapBtn();
 
         // Auth init — runs after all variables and functions are declared
         checkAuth();
