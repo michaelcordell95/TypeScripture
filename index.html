@@ -1690,6 +1690,38 @@
             updateBooks();
             markStreakActivity();
 
+            // Save to Supabase FIRST (before any early return), so the last verse of a book
+            // is always persisted to the DB even when the book-complete screen fires.
+            if (currentUserId && supabaseClient) {
+                try {
+                    const bookIndex = BOOK_INDEX[bookName];
+                    if (bookIndex) {
+                        const verseIdx = verseNum - 1;
+
+                        // Fetch current row for this chapter
+                        const { data: existing } = await supabaseClient
+                            .from('chapter_progress')
+                            .select('read_counts')
+                            .eq('user_id', currentUserId)
+                            .eq('book_index', bookIndex)
+                            .eq('chapter_num', chapNum)
+                            .maybeSingle();
+
+                        const readCounts = existing?.read_counts ? [...existing.read_counts] : [];
+                        while (readCounts.length <= verseIdx) readCounts.push(0);
+                        readCounts[verseIdx] = (readCounts[verseIdx] || 0) + 1;
+
+                        await supabaseClient.from('chapter_progress').upsert({
+                            user_id: currentUserId,
+                            book_index: bookIndex,
+                            chapter_num: chapNum,
+                            read_counts: readCounts,
+                            last_activity: new Date().toISOString()
+                        }, { onConflict: 'user_id,book_index,chapter_num' });
+                    }
+                } catch(e) { console.warn('Could not save verse read:', e); }
+            }
+
             // Check for book/bible completion in read mode only
             // (typing has its own completion screen via showChapterComplete)
             if (readModeActive && !skipTimeCheck) {
@@ -1702,35 +1734,6 @@
                     return true; // signal to goToNextVerse to stop navigation
                 }
             }
-
-            if (!currentUserId || !supabaseClient) return;
-
-            try {
-                const bookIndex = BOOK_INDEX[bookName];
-                if (!bookIndex) return;
-                const verseIdx = verseNum - 1;
-
-                // Fetch current row for this chapter
-                const { data: existing } = await supabaseClient
-                    .from('chapter_progress')
-                    .select('read_counts')
-                    .eq('user_id', currentUserId)
-                    .eq('book_index', bookIndex)
-                    .eq('chapter_num', chapNum)
-                    .maybeSingle();
-
-                const readCounts = existing?.read_counts ? [...existing.read_counts] : [];
-                while (readCounts.length <= verseIdx) readCounts.push(0);
-                readCounts[verseIdx] = (readCounts[verseIdx] || 0) + 1;
-
-                await supabaseClient.from('chapter_progress').upsert({
-                    user_id: currentUserId,
-                    book_index: bookIndex,
-                    chapter_num: chapNum,
-                    read_counts: readCounts,
-                    last_activity: new Date().toISOString()
-                }, { onConflict: 'user_id,book_index,chapter_num' });
-            } catch(e) { console.warn('Could not save verse read:', e); }
         }
 
         function saveReadProgress() {
