@@ -3272,7 +3272,7 @@
                     const newBestWpm = Math.max(wpm, currentBestWpm);
                     if (newBestWpm > currentBestWpm) {
                         isNewBest = true;
-                        saveVerseToDatabase(bookName, chapNum, verseNum, newBestWpm);
+                        // Update localStorage and UI immediately; DB save happens below in the accuracy>=50 block
                         localStorage.setItem(vKey, newBestWpm);
                         document.getElementById("verse-best-val").innerText = newBestWpm;
                     }
@@ -3301,6 +3301,7 @@
                         markVerseRead(true);
                     }
                     updateBibleProgress();
+                    updateVerses(); // refresh verse selector so ✅ appears immediately
                     updateBooks();
                 } else {
                     warningEl.innerText = 'Accuracy too low — verse not counted. Try again!';
